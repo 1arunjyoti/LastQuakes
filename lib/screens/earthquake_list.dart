@@ -145,8 +145,9 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
           "LastQuakes",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
       ),
-      drawer: CustomDrawer(),
+      drawer: const CustomDrawer(),
       body:
           widget.earthquakes == null
               ? const Center(child: CircularProgressIndicator())

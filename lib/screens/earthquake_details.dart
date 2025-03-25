@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:lastquake/widgets/custom_drawer.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 
@@ -107,8 +108,10 @@ class _EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
           "Earthquake Details",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
       ),
+
       body: Column(
         children: [
           Padding(
@@ -199,7 +202,7 @@ class _EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
           height: 20,
           width: 20,
           child: IconButton(
-            icon: const Icon(Icons.copy, size: 18, color: Colors.black),
+            icon: const Icon(Icons.copy, size: 18),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onPressed: _copyCoordinates,
