@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:lastquake/screens/earthquake_details.dart';
+import 'package:lastquake/services/location_service.dart';
+import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
 import '../services/api_service.dart';
 
@@ -38,15 +41,140 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   ];
 
   late ScrollController _scrollController;
+  Position? _userPosition;
+  bool _isLoadingLocation = false;
+  final LocationService _locationService = LocationService();
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
+    // automatic location fetching
+    _fetchUserLocation();
 
     if (widget.earthquakes != null) {
       _initializeEarthquakeData(widget.earthquakes!);
     }
+  }
+
+  Future<void> _fetchUserLocation() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingLocation = true;
+      });
+    }
+
+    // Check if location services are enabled first
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+        _showLocationServicesDisabledDialog();
+        return;
+      }
+    }
+
+    try {
+      // Force refresh location
+      final position = await _locationService.getCurrentLocation(
+        forceRefresh: true,
+      );
+      if (mounted) {
+        setState(() {
+          _userPosition = position;
+          _isLoadingLocation = false;
+        });
+
+        if (position != null) {
+          // If earthquakes are already loaded, update distances
+          if (widget.earthquakes != null) {
+            _filterEarthquakes(widget.earthquakes!);
+            _showLocationSuccessSnackBar();
+          }
+        } else {
+          // No position retrieved
+          _showLocationErrorDialog();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+        _showLocationErrorDialog();
+      }
+    }
+  }
+
+  void _showLocationSuccessSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Location updated successfully',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showLocationErrorDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Location Access Failed'),
+            content: const Text(
+              'We couldn\'t retrieve your location. This could be due to:\n\n'
+              '• Location services are turned off\n'
+              '• App doesn\'t have permission to access location\n'
+              '• Network or GPS issues',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Geolocator.openLocationSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showLocationServicesDisabledDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Location Services Disabled'),
+            content: const Text(
+              'Please enable location services on your device to use this feature. '
+              'Go to your device settings and turn on location services.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Geolocator.openLocationSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+    );
   }
 
   void _initializeEarthquakeData(List earthquakes) {
@@ -124,6 +252,25 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
             final place = properties["place"] ?? "";
             final country = _extractCountry(place);
 
+            // Add distance calculation
+            if (_userPosition != null) {
+              final geometry = quake["geometry"];
+              if (geometry != null && geometry["coordinates"] is List) {
+                final double longitude = geometry["coordinates"][0].toDouble();
+                final double latitude = geometry["coordinates"][1].toDouble();
+
+                final distance = _locationService.calculateDistance(
+                  _userPosition!.latitude,
+                  _userPosition!.longitude,
+                  latitude,
+                  longitude,
+                );
+
+                // Attach distance to properties for display
+                properties["distance"] = distance.round();
+              }
+            }
+
             return magnitude >= selectedMagnitude &&
                 (selectedCountry == "All" || country == selectedCountry);
           }).toList();
@@ -139,13 +286,22 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        title: const Text(
-          "LastQuakes",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
+      appBar: LastQuakesAppBar(
+        title: "LastQuakes",
+        actions: [
+          IconButton(
+            icon:
+                _isLoadingLocation
+                    ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.location_searching),
+            onPressed: _fetchUserLocation,
+            tooltip: 'Refresh Location',
+          ),
+        ],
       ),
       drawer: const CustomDrawer(),
       body:
@@ -166,12 +322,21 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                       ),
                     ),
                   ),
+                  // Display current location if available
+                  /* if (_userPosition != null)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        'Current Location: ${_userPosition!.latitude.toStringAsFixed(4)}, ${_userPosition!.longitude.toStringAsFixed(4)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ), */
 
                   // Earthquake Count Display
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: Text(
-                      "Total Earthquakes: ${filteredEarthquakes.length}",
+                      "Quakes in the last 45 days: ${filteredEarthquakes.length}",
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -195,50 +360,145 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                             quake["time"],
                           );
 
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: _getMagnitudeColor(magnitude),
-                                child: Text(
-                                  magnitude.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => EarthquakeDetailsScreen(
+                                            quakeData:
+                                                filteredEarthquakes[index],
+                                          ),
+                                    ),
+                                  );
+                                },
+                                child: Card(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
                                   ),
-                                ),
-                              ),
-                              title: Text(
-                                quake["place"] ?? "Unknown location",
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                DateFormat.yMMMd().add_jm().format(time),
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                              trailing: const Icon(Icons.arrow_forward_ios),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => EarthquakeDetailsScreen(
-                                          quakeData: filteredEarthquakes[index],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  elevation: 4,
+                                  child: Stack(
+                                    children: [
+                                      // Main Content
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            minWidth: constraints.maxWidth,
+                                            maxWidth: constraints.maxWidth,
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              // Left Section - Location & Time
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      "${quake["distance"] ?? 'N/A'} km from your position",
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors
+                                                                .blue
+                                                                .shade700,
+                                                        fontSize: 12,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      quake["place"] ??
+                                                          "Unknown location",
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      maxLines: 2,
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 16,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      DateFormat.yMMMd()
+                                                          .add_jm()
+                                                          .format(time),
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(
+                                                width: 8,
+                                              ), // Add some spacing
+                                              // Right Section - Magnitude Box
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 8,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: _getMagnitudeColor(
+                                                    magnitude,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  magnitude.toStringAsFixed(1),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 26,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
+                                      ),
+                                      // Side Indicator Bar (Magnitude Severity)
+                                      Positioned(
+                                        left: 0,
+                                        top: 8,
+                                        bottom: 8,
+                                        child: Container(
+                                          width: 4,
+                                          decoration: BoxDecoration(
+                                            color: _getMagnitudeColor(
+                                              magnitude,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

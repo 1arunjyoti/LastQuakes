@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
@@ -103,14 +104,7 @@ class _EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     final formattedTime = DateFormat.yMMMd().add_jm().format(dateTime);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "Earthquake Details",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-      ),
+      appBar: LastQuakesAppBar(title: "Earthquake Details"),
 
       body: Column(
         children: [

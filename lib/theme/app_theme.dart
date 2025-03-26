@@ -8,10 +8,10 @@ class AppTheme {
       seedColor: Colors.blue,
       brightness: Brightness.light,
     ),
-    scaffoldBackgroundColor: const Color.fromRGBO(251, 248, 239, 1),
+    scaffoldBackgroundColor: const Color.fromRGBO(246, 239, 255, 1),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color.fromRGBO(251, 248, 239, 1),
-      elevation: 0,
+      backgroundColor: Color.fromRGBO(246, 239, 255, 1),
+      elevation: 1,
       titleTextStyle: TextStyle(
         color: Colors.black,
         fontSize: 20,
@@ -30,7 +30,7 @@ class AppTheme {
     scaffoldBackgroundColor: const Color(0xFF121212),
     appBarTheme: const AppBarTheme(
       backgroundColor: Color(0xFF1E1E1E),
-      elevation: 0,
+      elevation: 1,
       titleTextStyle: TextStyle(
         color: Colors.white,
         fontSize: 20,

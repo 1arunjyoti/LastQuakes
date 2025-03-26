@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lastquake/screens/earthquake_list.dart';
 import 'package:lastquake/screens/earthquake_map_screen.dart';
-import 'package:lastquake/screens/news/news_screen.dart';
+//import 'package:lastquake/screens/news/news_screen.dart';
 
 class NavigationHandler extends StatefulWidget {
   final List<Map<String, dynamic>> earthquakes;
@@ -25,7 +26,7 @@ class _NavigationHandlerState extends State<NavigationHandler> {
     _screens = [
       EarthquakeListScreen(earthquakes: widget.earthquakes),
       EarthquakeMapScreen(earthquakes: widget.earthquakes),
-      const NewsScreen(),
+      //const NewsScreen(),
     ];
   }
 
@@ -44,25 +45,25 @@ class _NavigationHandlerState extends State<NavigationHandler> {
         currentIndex: _currentIndex,
         onTap: _onBottomNavTap,
         // Add color and styling for better UX
-        selectedItemColor: Colors.blue,
+        selectedItemColor: Color.fromRGBO(124, 122, 221, 1),
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
+            icon: FaIcon(FontAwesomeIcons.house),
+            activeIcon: FaIcon(FontAwesomeIcons.house),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map_outlined),
-            activeIcon: Icon(Icons.map),
+            icon: FaIcon(FontAwesomeIcons.map),
+            activeIcon: FaIcon(FontAwesomeIcons.map),
             label: 'Map',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.newspaper_outlined),
-            activeIcon: Icon(Icons.newspaper),
+          /* BottomNavigationBarItem(
+            icon: FaIcon(FontAwesomeIcons.newspaper),
+            activeIcon: FaIcon(FontAwesomeIcons.newspaper),
             label: 'News',
-          ),
+          ), */
         ],
       ),
     );
