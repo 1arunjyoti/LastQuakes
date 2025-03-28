@@ -24,6 +24,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   List filteredEarthquakes = [];
   bool showFilters = true;
   bool isRefreshing = false;
+  bool _showPullToRefreshSnackbar = true;
 
   String selectedCountry = "All";
   double selectedMagnitude = 3.0;
@@ -50,11 +51,16 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
     // automatic location fetching
-    _fetchUserLocation();
+    //_fetchUserLocation();
 
     if (widget.earthquakes != null) {
       _initializeEarthquakeData(widget.earthquakes!);
     }
+
+    // Show the initial snackbar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showPullToRefreshSnackBar();
+    });
   }
 
   Future<void> _fetchUserLocation() async {
@@ -198,6 +204,11 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
         !showFilters) {
       setState(() => showFilters = true);
     }
+    // Hide the snackbar when scrolling starts
+    if (_showPullToRefreshSnackbar &&
+        currentScrollDirection != ScrollDirection.idle) {
+      _hidePullToRefreshSnackBar();
+    }
   }
 
   Future<void> _fetchEarthquakes({bool isPullToRefresh = false}) async {
@@ -206,9 +217,11 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     }
 
     try {
+      // Force refresh when pull to refresh is triggered
       final newData = await ApiService.fetchEarthquakes(
         minMagnitude: selectedMagnitude,
         days: 45,
+        forceRefresh: isPullToRefresh,
       );
 
       if (mounted) {
@@ -220,6 +233,13 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       }
     } catch (e) {
       if (mounted) {
+        // Show error snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to fetch earthquakes: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
         setState(() => isRefreshing = false);
       }
     }
@@ -281,6 +301,32 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     if (magnitude >= 7.0) return Colors.red.shade900;
     if (magnitude >= 5.0) return Colors.orange;
     return Colors.green;
+  }
+
+  // Function to show the "pull to refresh" snackbar
+  void _showPullToRefreshSnackBar() {
+    if (_showPullToRefreshSnackbar) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Pull down to refresh earthquake data'),
+          duration: const Duration(seconds: 3),
+          /* action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {
+              _hidePullToRefreshSnackBar();
+            },
+          ), */
+        ),
+      );
+    }
+  }
+
+  // Function to hide the "pull to refresh" snackbar
+  void _hidePullToRefreshSnackBar() {
+    if (_showPullToRefreshSnackbar) {
+      _showPullToRefreshSnackbar = false;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    }
   }
 
   @override
@@ -515,60 +561,90 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       child: Row(
         children: [
           // Country Filter Dropdown
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              value: selectedCountry,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: "Country",
-                border: OutlineInputBorder(),
-              ),
-              items:
-                  countryList.map((String country) {
-                    return DropdownMenuItem<String>(
-                      value: country,
-                      child: Text(country, overflow: TextOverflow.ellipsis),
-                    );
-                  }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    selectedCountry = value;
-                    _filterEarthquakes(widget.earthquakes!);
-                  });
-                }
-              },
-            ),
-          ),
+          Expanded(child: _buildCountryDropdown()),
           const SizedBox(width: 12),
 
           // Magnitude Filter Dropdown
-          Expanded(
-            child: DropdownButtonFormField<double>(
-              value: selectedMagnitude,
-              decoration: const InputDecoration(
-                labelText: "Magnitude",
-                border: OutlineInputBorder(),
-              ),
-              items:
-                  magnitudeOptions.map((double mag) {
-                    return DropdownMenuItem<double>(
-                      value: mag,
-                      child: Text("≥ $mag"),
-                    );
-                  }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    selectedMagnitude = value;
-                    _filterEarthquakes(widget.earthquakes!);
-                  });
-                }
-              },
-            ),
-          ),
+          Expanded(child: _buildMagnitudeDropdown()),
         ],
       ),
     );
   }
+
+  // Extracted Country Dropdown Method
+  Widget _buildCountryDropdown() {
+    // Memoize dropdown items to prevent unnecessary recreations
+    final countryDropdownItems =
+        _memoizedCountryItems ??=
+            countryList.map((country) {
+              return DropdownMenuItem<String>(
+                value: country,
+                child: Text(
+                  country,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              );
+            }).toList();
+
+    return DropdownButtonFormField<String>(
+      value: selectedCountry,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: "Country",
+        border: OutlineInputBorder(),
+        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      items: countryDropdownItems,
+      onChanged: _onCountryChanged,
+    );
+  }
+
+  // Extracted Magnitude Dropdown Method
+  Widget _buildMagnitudeDropdown() {
+    // Memoize dropdown items to prevent unnecessary recreations
+    final magnitudeDropdownItems =
+        _memoizedMagnitudeItems ??=
+            magnitudeOptions.map((mag) {
+              return DropdownMenuItem<double>(
+                value: mag,
+                child: Text("≥ $mag", style: const TextStyle(fontSize: 14)),
+              );
+            }).toList();
+
+    return DropdownButtonFormField<double>(
+      value: selectedMagnitude,
+      decoration: const InputDecoration(
+        labelText: "Magnitude",
+        border: OutlineInputBorder(),
+        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      items: magnitudeDropdownItems,
+      onChanged: _onMagnitudeChanged,
+    );
+  }
+
+  // Separate method for country change to improve readability and performance
+  void _onCountryChanged(String? value) {
+    if (value == null) return;
+
+    setState(() {
+      selectedCountry = value;
+      _filterEarthquakes(widget.earthquakes!);
+    });
+  }
+
+  // Separate method for magnitude change
+  void _onMagnitudeChanged(double? value) {
+    if (value == null) return;
+
+    setState(() {
+      selectedMagnitude = value;
+      _filterEarthquakes(widget.earthquakes!);
+    });
+  }
+
+  // Add these as class-level variables to cache memoized items
+  List<DropdownMenuItem<String>>? _memoizedCountryItems;
+  List<DropdownMenuItem<double>>? _memoizedMagnitudeItems;
 }

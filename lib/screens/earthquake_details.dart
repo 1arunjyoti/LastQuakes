@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:lastquake/widgets/appbar.dart';
-import 'package:lastquake/widgets/custom_drawer.dart';
+//import 'package:lastquake/widgets/custom_drawer.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 

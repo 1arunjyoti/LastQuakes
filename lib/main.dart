@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+//import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/homeScreen.dart';
 import 'package:lastquake/services/api_service.dart';

@@ -36,7 +36,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   final LocationService _locationService = LocationService();
 
   // Memoize markers to avoid unnecessary recalculation
-  late final List<Marker> _cachedMarkers;
+  //late final List<Marker> _cachedMarkers;
 
   @override
   bool get wantKeepAlive => true;
@@ -45,7 +45,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   void initState() {
     super.initState();
     _mapController = MapController();
-    _cachedMarkers = _buildMarkers(); // Pre-compute markers once
+    //_cachedMarkers = _buildMarkers(); // Pre-compute markers once
     // automatic location fetching
     //_fetchUserLocation();
   }

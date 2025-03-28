@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lastquake/screens/earthquake_list.dart';
 import 'package:lastquake/screens/earthquake_map_screen.dart';
-//import 'package:lastquake/screens/news/news_screen.dart';
 
 class NavigationHandler extends StatefulWidget {
   final List<Map<String, dynamic>> earthquakes;
@@ -16,18 +15,51 @@ class NavigationHandler extends StatefulWidget {
 
 class _NavigationHandlerState extends State<NavigationHandler> {
   // Use a final list to store screen widgets for performance
-  late final List<Widget> _screens;
+  late final List<Widget?> _screens;
   int _currentIndex = 0;
+  //final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
     // Initialize screens once in initState for better performance
     _screens = [
-      EarthquakeListScreen(earthquakes: widget.earthquakes),
-      EarthquakeMapScreen(earthquakes: widget.earthquakes),
+      null,
+      null,
+      //null,
+
       //const NewsScreen(),
     ];
+    // Check for high-magnitude earthquakes and send notifications
+    _checkEarthquakeNotifications();
+  }
+
+  void _checkEarthquakeNotifications() {
+    // Send notifications for high-magnitude earthquakes
+    /*  for (var earthquake in widget.earthquakes) {
+      _notificationService.sendEarthquakeNotification(earthquake);
+    } */
+  }
+
+  Widget _loadScreen(int index) {
+    if (_screens[index] == null) {
+      switch (index) {
+        case 0:
+          _screens[index] = EarthquakeListScreen(
+            earthquakes: widget.earthquakes,
+          );
+          break;
+        case 1:
+          _screens[index] = EarthquakeMapScreen(
+            earthquakes: widget.earthquakes,
+          );
+          break;
+        /* case 2:
+          _screens[index] = NotificationSettingsScreen();
+          break; */
+      }
+    }
+    return _screens[index]!;
   }
 
   void _onBottomNavTap(int index) {
@@ -40,7 +72,10 @@ class _NavigationHandlerState extends State<NavigationHandler> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: List.generate(_screens.length, (index) => _loadScreen(index)),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onBottomNavTap,
@@ -59,11 +94,11 @@ class _NavigationHandlerState extends State<NavigationHandler> {
             activeIcon: FaIcon(FontAwesomeIcons.map),
             label: 'Map',
           ),
-          /* BottomNavigationBarItem(
-            icon: FaIcon(FontAwesomeIcons.newspaper),
-            activeIcon: FaIcon(FontAwesomeIcons.newspaper),
-            label: 'News',
-          ), */
+          BottomNavigationBarItem(
+            icon: FaIcon(FontAwesomeIcons.bell),
+            activeIcon: FaIcon(FontAwesomeIcons.bell),
+            label: 'Notifications',
+          ),
         ],
       ),
     );

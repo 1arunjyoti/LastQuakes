@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/widgets/custom_drawer.dart';
+//import 'package:lastquake/widgets/custom_drawer.dart';
 
 class LastQuakesAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
