@@ -56,7 +56,7 @@ class ApiService {
       "endtime": now.toIso8601String(),
     });
 
-    debugPrint("Fetching data from: $url");
+    //debugPrint("Fetching data from: $url");
 
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 10));

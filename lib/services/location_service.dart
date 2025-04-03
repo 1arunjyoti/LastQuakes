@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+//import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
@@ -15,7 +15,7 @@ class LocationService {
     // Check if location services are enabled - critical first check
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      debugPrint('Location services are disabled.');
+      //debugPrint('Location services are disabled.');
       return null;
     }
 
@@ -43,7 +43,7 @@ class LocationService {
       _lastLocationFetchTime = DateTime.now();
       return _cachedPosition;
     } catch (e) {
-      debugPrint('Error getting location: $e');
+      //debugPrint('Error getting location: $e');
       return null;
     }
   }

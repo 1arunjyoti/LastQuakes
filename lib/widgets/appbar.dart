@@ -17,7 +17,7 @@ class LastQuakesAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      centerTitle: true,
+      //centerTitle: true,
       backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
       automaticallyImplyLeading: automaticallyImplyLeading,
       actions: actions,

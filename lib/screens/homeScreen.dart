@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lastquake/screens/earthquake_list.dart';
 import 'package:lastquake/screens/earthquake_map_screen.dart';
+import 'package:lastquake/screens/notification_screen.dart';
+//import 'package:lastquake/services/notification_service.dart';
 
 class NavigationHandler extends StatefulWidget {
   final List<Map<String, dynamic>> earthquakes;
@@ -23,23 +25,18 @@ class _NavigationHandlerState extends State<NavigationHandler> {
   void initState() {
     super.initState();
     // Initialize screens once in initState for better performance
-    _screens = [
-      null,
-      null,
-      //null,
+    _screens = List.filled(3, null, growable: false);
 
-      //const NewsScreen(),
-    ];
-    // Check for high-magnitude earthquakes and send notifications
-    _checkEarthquakeNotifications();
+    // Use the consolidated notification method from NotificationService
+    //_processInitialEarthquakes();
   }
 
-  void _checkEarthquakeNotifications() {
-    // Send notifications for high-magnitude earthquakes
-    /*  for (var earthquake in widget.earthquakes) {
-      _notificationService.sendEarthquakeNotification(earthquake);
-    } */
-  }
+  // Process earthquakes when app starts, using the consolidated method
+  /* void _processInitialEarthquakes() async {
+    await _notificationService.processEarthquakeNotifications(
+      widget.earthquakes,
+    );
+  } */
 
   Widget _loadScreen(int index) {
     if (_screens[index] == null) {
@@ -54,19 +51,23 @@ class _NavigationHandlerState extends State<NavigationHandler> {
             earthquakes: widget.earthquakes,
           );
           break;
-        /* case 2:
-          _screens[index] = NotificationSettingsScreen();
-          break; */
+        case 2:
+          _screens[index] = const NotificationScreen();
+          break;
+        default: // Handle potential invalid index gracefully
+          _screens[index] = Center(child: Text("Invalid Screen Index: $index"));
       }
     }
     return _screens[index]!;
   }
 
   void _onBottomNavTap(int index) {
-    // Extract navigation logic to a separate method
-    setState(() {
-      _currentIndex = index;
-    });
+    if (_currentIndex != index) {
+      // Avoid unnecessary rebuilds if same tab tapped
+      setState(() {
+        _currentIndex = index;
+      });
+    }
   }
 
   @override
@@ -79,8 +80,7 @@ class _NavigationHandlerState extends State<NavigationHandler> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onBottomNavTap,
-        // Add color and styling for better UX
-        selectedItemColor: Color.fromRGBO(124, 122, 221, 1),
+        selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         items: const [

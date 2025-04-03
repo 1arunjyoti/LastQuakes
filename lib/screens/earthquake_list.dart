@@ -21,10 +21,17 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   // Memoization cache for country extraction
   final _memoizedCountryExtraction = <String, String>{};
 
-  List filteredEarthquakes = [];
+  List allEarthquakes = []; // Store all filtered earthquakes
+  List displayedEarthquakes = []; // Store currently displayed earthquakes
   bool showFilters = true;
   bool isRefreshing = false;
   bool _showPullToRefreshSnackbar = true;
+  bool _isLoadingMore = false;
+  bool _hasMoreData = true;
+
+  // Pagination constants
+  static const int _itemsPerPage = 20;
+  int _currentPage = 1;
 
   String selectedCountry = "All";
   double selectedMagnitude = 3.0;
@@ -51,7 +58,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
     // automatic location fetching
-    //_fetchUserLocation();
+    _fetchUserLocation();
 
     if (widget.earthquakes != null) {
       _initializeEarthquakeData(widget.earthquakes!);
@@ -204,10 +211,56 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
         !showFilters) {
       setState(() => showFilters = true);
     }
+
     // Hide the snackbar when scrolling starts
     if (_showPullToRefreshSnackbar &&
         currentScrollDirection != ScrollDirection.idle) {
       _hidePullToRefreshSnackBar();
+    }
+
+    // Implement lazy loading when scrolling to the bottom
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent * 0.8 &&
+        !_isLoadingMore &&
+        _hasMoreData) {
+      _loadMoreEarthquakes();
+    }
+  }
+
+  // Load more earthquakes for lazy loading
+  Future<void> _loadMoreEarthquakes() async {
+    if (_isLoadingMore || !_hasMoreData) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    await Future.delayed(Duration(milliseconds: 500)); // Simulate network delay
+
+    final nextPage = _currentPage + 1;
+    final startIndex = _currentPage * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+
+    if (startIndex >= allEarthquakes.length) {
+      setState(() {
+        _hasMoreData = false;
+        _isLoadingMore = false;
+      });
+      return;
+    }
+
+    final nextItems = allEarthquakes.sublist(
+      startIndex,
+      endIndex > allEarthquakes.length ? allEarthquakes.length : endIndex,
+    );
+
+    if (mounted) {
+      setState(() {
+        displayedEarthquakes.addAll(nextItems);
+        _currentPage = nextPage;
+        _isLoadingMore = false;
+        _hasMoreData = endIndex < allEarthquakes.length;
+      });
     }
   }
 
@@ -229,6 +282,9 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
           countryList = ["All"] + _getUniqueCountries(newData);
           _filterEarthquakes(newData);
           isRefreshing = false;
+          // Reset pagination on refresh
+          _currentPage = 1;
+          _hasMoreData = true;
         });
       }
     } catch (e) {
@@ -264,36 +320,51 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   }
 
   void _filterEarthquakes(List earthquakesToFilter) {
-    setState(() {
-      filteredEarthquakes =
-          earthquakesToFilter.where((quake) {
-            final properties = quake["properties"];
-            final magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
-            final place = properties["place"] ?? "";
-            final country = _extractCountry(place);
+    final List filteredList =
+        earthquakesToFilter.where((quake) {
+          final properties = quake["properties"];
+          final magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
+          final place = properties["place"] ?? "";
+          final country = _extractCountry(place);
 
-            // Add distance calculation
-            if (_userPosition != null) {
-              final geometry = quake["geometry"];
-              if (geometry != null && geometry["coordinates"] is List) {
-                final double longitude = geometry["coordinates"][0].toDouble();
-                final double latitude = geometry["coordinates"][1].toDouble();
+          // Add distance calculation
+          if (_userPosition != null) {
+            final geometry = quake["geometry"];
+            if (geometry != null && geometry["coordinates"] is List) {
+              final double longitude = geometry["coordinates"][0].toDouble();
+              final double latitude = geometry["coordinates"][1].toDouble();
 
-                final distance = _locationService.calculateDistance(
-                  _userPosition!.latitude,
-                  _userPosition!.longitude,
-                  latitude,
-                  longitude,
-                );
+              final distance = _locationService.calculateDistance(
+                _userPosition!.latitude,
+                _userPosition!.longitude,
+                latitude,
+                longitude,
+              );
 
-                // Attach distance to properties for display
-                properties["distance"] = distance.round();
-              }
+              // Attach distance to properties for display
+              properties["distance"] = distance.round();
             }
+          }
 
-            return magnitude >= selectedMagnitude &&
-                (selectedCountry == "All" || country == selectedCountry);
-          }).toList();
+          return magnitude >= selectedMagnitude &&
+              (selectedCountry == "All" || country == selectedCountry);
+        }).toList();
+
+    // Sort by time (most recent first) if needed
+    filteredList.sort((a, b) {
+      return (b["properties"]["time"] as int) -
+          (a["properties"]["time"] as int);
+    });
+
+    setState(() {
+      allEarthquakes = filteredList;
+
+      // Reset pagination
+      _currentPage = 1;
+      _hasMoreData = filteredList.length > _itemsPerPage;
+
+      // Load only first page
+      displayedEarthquakes = filteredList.take(_itemsPerPage).toList();
     });
   }
 
@@ -310,12 +381,6 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
         SnackBar(
           content: const Text('Pull down to refresh earthquake data'),
           duration: const Duration(seconds: 3),
-          /* action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {
-              _hidePullToRefreshSnackBar();
-            },
-          ), */
         ),
       );
     }
@@ -368,21 +433,12 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                       ),
                     ),
                   ),
-                  // Display current location if available
-                  /* if (_userPosition != null)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Current Location: ${_userPosition!.latitude.toStringAsFixed(4)}, ${_userPosition!.longitude.toStringAsFixed(4)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ), */
 
                   // Earthquake Count Display
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: Text(
-                      "Quakes in the last 45 days: ${filteredEarthquakes.length}",
+                      "Quakes in the last 45 days: ${allEarthquakes.length}",
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -396,10 +452,22 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                       onRefresh: () => _fetchEarthquakes(isPullToRefresh: true),
                       child: ListView.builder(
                         controller: _scrollController,
-                        itemCount: filteredEarthquakes.length,
+                        itemCount:
+                            displayedEarthquakes.length +
+                            (_hasMoreData ? 1 : 0),
                         itemBuilder: (context, index) {
+                          // Show loading indicator at the bottom
+                          if (index == displayedEarthquakes.length) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+
                           final quake =
-                              filteredEarthquakes[index]["properties"];
+                              displayedEarthquakes[index]["properties"];
                           final magnitude =
                               (quake["mag"] as num?)?.toDouble() ?? 0.0;
                           final time = DateTime.fromMillisecondsSinceEpoch(
@@ -416,7 +484,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                                       builder:
                                           (context) => EarthquakeDetailsScreen(
                                             quakeData:
-                                                filteredEarthquakes[index],
+                                                displayedEarthquakes[index],
                                           ),
                                     ),
                                   );
@@ -597,6 +665,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       ),
       items: countryDropdownItems,
       onChanged: _onCountryChanged,
+      menuMaxHeight: 500,
     );
   }
 
