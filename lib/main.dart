@@ -41,7 +41,7 @@ void main() async {
     sound: true,
   );
 
-  print("🔔 Notification permission: ${settings.authorizationStatus}");
+  debugPrint("🔔 Notification permission: ${settings.authorizationStatus}");
 
   // Add topic subscription
   await notificationService.subscribeToEarthquakeTopics();
@@ -51,48 +51,35 @@ void main() async {
 
   // Listen for foreground FCM messages
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print("📱 Received foreground message: ${message.messageId}");
-    print("   Data: ${message.data}");
+    //print("📱 Received foreground message: ${message.messageId}");
+    //print("   Data: ${message.data}");
     NotificationService().showFCMNotification(message);
   });
 
   // Get FCM token and handle refresh
   FirebaseMessaging.instance.getToken().then((String? fcmToken) async {
     if (fcmToken != null) {
-      print("📲 Initial FCM Token: ${fcmToken.substring(0, 15)}...");
+      debugPrint("📲 Initial FCM Token: ${fcmToken.substring(0, 15)}...");
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('fcm_token', fcmToken);
       // Initial registration done above, this is just for logging/storing
     } else {
-      print("Failed to get initial FCM token.");
+      debugPrint("Failed to get initial FCM token.");
     }
   });
 
   // Listen for token refresh
   FirebaseMessaging.instance.onTokenRefresh.listen((String token) async {
-    print("🔄 FCM Token refreshed: ${token.substring(0, 15)}...");
+    debugPrint("🔄 FCM Token refreshed: ${token.substring(0, 15)}...");
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('fcm_token', token);
     // Re-register with the new token and current preferences
     await notificationService.registerDeviceWithServer();
-    // Also update topic subscriptions if needed (registerDeviceWithServer might already handle this via updateFCMTopics implicitly if prefs change)
+    // Also update topic subscriptions if needed
     // await notificationService.updateFCMTopics(); // Consider if needed separately
   });
 
-  // Handle foreground messages
-  /* FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print("📱 Got a message whilst in the foreground!");
-    print("📱 Message data: ${message.data}");
-
-    if (message.notification != null) {
-      print(
-        "📱 Message also contained a notification: ${message.notification}",
-      );
-      notificationService.showFCMNotification(message);
-    }
-  }); */
-
-  // 🔹 Set preferred orientations
+  // Set preferred orientations
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -163,7 +150,7 @@ class _EarthquakeInitializerState extends State<EarthquakeInitializer> {
             );
           case ConnectionState.done:
             if (snapshot.hasError) {
-              print("Error loading earthquakes: ${snapshot.error}");
+              debugPrint("Error loading earthquakes: ${snapshot.error}");
               return Scaffold(
                 body: Center(
                   child: Padding(

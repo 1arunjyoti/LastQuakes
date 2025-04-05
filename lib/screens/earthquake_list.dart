@@ -6,6 +6,7 @@ import 'package:lastquake/screens/earthquake_details.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
+import 'package:lastquake/widgets/earthquake_list_item.dart';
 import '../services/api_service.dart';
 
 class EarthquakeListScreen extends StatefulWidget {
@@ -58,7 +59,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
     // automatic location fetching
-    _fetchUserLocation();
+    //_fetchUserLocation();
 
     if (widget.earthquakes != null) {
       _initializeEarthquakeData(widget.earthquakes!);
@@ -461,155 +462,45 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                             return Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(16.0),
-                                child: CircularProgressIndicator(),
+                                child: CircularProgressIndicator.adaptive(),
                               ),
                             );
                           }
 
-                          final quake =
-                              displayedEarthquakes[index]["properties"];
+                          // Prepare data for the list item widget
+                          final quakeData =
+                              displayedEarthquakes[index]; // Full quake map
+                          final properties = quakeData["properties"];
                           final magnitude =
-                              (quake["mag"] as num?)?.toDouble() ?? 0.0;
+                              (properties["mag"] as num?)?.toDouble() ?? 0.0;
                           final time = DateTime.fromMillisecondsSinceEpoch(
-                            quake["time"],
+                            properties["time"],
                           );
+                          final String place =
+                              properties["place"] ?? "Unknown location";
+                          final Color magnitudeColor = _getMagnitudeColor(
+                            magnitude,
+                          );
+                          final String formattedTime = DateFormat.yMMMd()
+                              .add_jm()
+                              .format(time);
+                          final String distanceText =
+                              "${properties["distance"] ?? 'N/A'} km from you";
 
-                          return LayoutBuilder(
-                            builder: (context, constraints) {
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => EarthquakeDetailsScreen(
-                                            quakeData:
-                                                displayedEarthquakes[index],
-                                          ),
-                                    ),
-                                  );
-                                },
-                                child: Card(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  elevation: 4,
-                                  child: Stack(
-                                    children: [
-                                      // Main Content
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            minWidth: constraints.maxWidth,
-                                            maxWidth: constraints.maxWidth,
-                                          ),
-                                          child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              // Left Section - Location & Time
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      "${quake["distance"] ?? 'N/A'} km from your position",
-                                                      style: TextStyle(
-                                                        color:
-                                                            Colors
-                                                                .blue
-                                                                .shade700,
-                                                        fontSize: 12,
-                                                      ),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      quake["place"] ??
-                                                          "Unknown location",
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      maxLines: 2,
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      DateFormat.yMMMd()
-                                                          .add_jm()
-                                                          .format(time),
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                      ),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(
-                                                width: 8,
-                                              ), // Add some spacing
-                                              // Right Section - Magnitude Box
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 8,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: _getMagnitudeColor(
-                                                    magnitude,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                                child: Text(
-                                                  magnitude.toStringAsFixed(1),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 26,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
+                          return EarthquakeListItem(
+                            location: place,
+                            distanceText: distanceText,
+                            formattedTime: formattedTime,
+                            magnitude: magnitude,
+                            magnitudeColor: magnitudeColor,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => EarthquakeDetailsScreen(
+                                        quakeData: quakeData,
                                       ),
-                                      // Side Indicator Bar (Magnitude Severity)
-                                      Positioned(
-                                        left: 0,
-                                        top: 8,
-                                        bottom: 8,
-                                        child: Container(
-                                          width: 4,
-                                          decoration: BoxDecoration(
-                                            color: _getMagnitudeColor(
-                                              magnitude,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                 ),
                               );
                             },

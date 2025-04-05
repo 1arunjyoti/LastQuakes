@@ -88,7 +88,7 @@ class NotificationService {
       final String? fcmToken = await FirebaseMessaging.instance.getToken();
 
       if (fcmToken == null) {
-        print("FCM token is null, not registering device.");
+        //print("FCM token is null, not registering device.");
         return;
       }
 
@@ -122,9 +122,9 @@ class NotificationService {
         "$_SERVER_URL/api/devices/register",
       ); // Append /register
 
-      print("Registering device with server... $url");
-      print("Token: ${fcmToken.substring(0, 15)}...");
-      print("Prefs: ${json.encode(preferences)}");
+      //print("Registering device with server... $url");
+      //print("Token: ${fcmToken.substring(0, 15)}...");
+      //print("Prefs: ${json.encode(preferences)}");
 
       final response = await http.post(
         url,
@@ -133,14 +133,14 @@ class NotificationService {
       );
 
       if (response.statusCode == 200) {
-        print("Device registered/updated successfully with server");
+        //print("Device registered/updated successfully with server");
       } else {
-        print(
+        /* print(
           "Failed to register device: ${response.statusCode} - ${response.body}",
-        );
+        ); */
       }
     } catch (e) {
-      print("Error registering device: $e");
+      //print("Error registering device: $e");
     }
   }
 
@@ -183,13 +183,13 @@ class NotificationService {
     bool notificationsEnabled = prefs.getBool('notifications_enabled') ?? false;
 
     if (!notificationsEnabled) {
-      print("🔕 Notifications disabled locally, skipping topic subscription.");
+      //print("🔕 Notifications disabled locally, skipping topic subscription.");
       // Consider unsubscribing from all topics here if desired when disabled
       await _unsubscribeFromAllKnownTopics(prefs);
       return;
     }
 
-    print("🔄 Subscribing to FCM topics based on settings...");
+    //print("🔄 Subscribing to FCM topics based on settings...");
 
     // Magnitude Topics (Matching Backend: earthquakes_magXplus)
     // Subscribe to all topics >= the user's minimum threshold
@@ -207,7 +207,7 @@ class NotificationService {
     }
     // Add more if your backend supports them (e.g., mag7plus)
 
-    print("   Subscribed to magnitude topics for >= M${minMagnitude}");
+    //print("   Subscribed to magnitude topics for >= M${minMagnitude}");
 
     // Country Topic (Matching Backend: region_xxx)
     if (country != "ALL") {
@@ -215,16 +215,16 @@ class NotificationService {
       String countryTopic =
           'region_${country.toLowerCase().replaceAll(' ', '_')}';
       await FirebaseMessaging.instance.subscribeToTopic(countryTopic);
-      print("   Subscribed to country topic: $countryTopic");
+      //print("   Subscribed to country topic: $countryTopic");
     } else {
-      print("   Subscribed to ALL countries (no specific country topic).");
+      //print("   Subscribed to ALL countries (no specific country topic).");
     }
   }
 
   // Method to update FCM subscriptions when settings change
   Future<void> updateFCMTopics() async {
     final prefs = await SharedPreferences.getInstance();
-    print("🔄 Updating FCM Topics...");
+    //print("🔄 Updating FCM Topics...");
 
     // First unsubscribe from all known topics to ensure clean state
     await _unsubscribeFromAllKnownTopics(prefs);
@@ -243,7 +243,7 @@ class NotificationService {
 
   // Helper to unsubscribe from topics we manage
   Future<void> _unsubscribeFromAllKnownTopics(SharedPreferences prefs) async {
-    print("   Unsubscribing from previous topics...");
+    //print("   Unsubscribing from previous topics...");
     // Unsubscribe from all potential magnitude topics
     await FirebaseMessaging.instance.unsubscribeFromTopic(
       'earthquakes_mag3plus',
@@ -267,7 +267,7 @@ class NotificationService {
       String oldCountryTopic =
           'region_${oldCountry.toLowerCase().replaceAll(' ', '_')}';
       await FirebaseMessaging.instance.unsubscribeFromTopic(oldCountryTopic);
-      print("   Unsubscribed from old country topic: $oldCountryTopic");
+      //print("   Unsubscribed from old country topic: $oldCountryTopic");
     }
   }
 
@@ -424,7 +424,7 @@ class NotificationService {
           .where((item) => item.isNotEmpty)
           .toList(); // Filter out empty maps
     } catch (e) {
-      print("Error parsing notifications: $e");
+      //print("Error parsing notifications: $e");
       await clearNotificationHistory(); // Clear corrupted data
       return [];
     }
@@ -443,13 +443,13 @@ class NotificationService {
     try {
       await prefs.setString('notification_history', json.encode(notifications));
     } catch (e) {
-      print("Error saving notifications: $e");
+      //print("Error saving notifications: $e");
     }
   }
 
   Future<void> clearNotificationHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('notification_history');
-    print("Notification history cleared.");
+    //print("Notification history cleared.");
   }
 }
