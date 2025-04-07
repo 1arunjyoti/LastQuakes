@@ -3,12 +3,13 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lastquake/screens/earthquake_list.dart';
 import 'package:lastquake/screens/earthquake_map_screen.dart';
 import 'package:lastquake/screens/notification_screen.dart';
-//import 'package:lastquake/services/notification_service.dart';
+// REMOVED: import 'package:lastquake/services/notification_service.dart'; // Not needed here anymore
 
 class NavigationHandler extends StatefulWidget {
-  final List<Map<String, dynamic>> earthquakes;
+  // REMOVED: No longer requires initial earthquakes
+  // final List<Map<String, dynamic>> earthquakes;
 
-  const NavigationHandler({Key? key, required this.earthquakes})
+  const NavigationHandler({Key? key /*, required this.earthquakes*/})
     : super(key: key);
 
   @override
@@ -19,36 +20,36 @@ class _NavigationHandlerState extends State<NavigationHandler> {
   // Use a final list to store screen widgets for performance
   late final List<Widget?> _screens;
   int _currentIndex = 0;
-  //final NotificationService _notificationService = NotificationService();
+  // REMOVED: Notification service instance
+  // final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
     // Initialize screens once in initState for better performance
+    // Screens will now fetch their own data
     _screens = List.filled(3, null, growable: false);
 
-    // Use the consolidated notification method from NotificationService
-    //_processInitialEarthquakes();
+    // REMOVED: Initial earthquake processing logic
+    // _processInitialEarthquakes();
   }
 
-  // Process earthquakes when app starts, using the consolidated method
-  /* void _processInitialEarthquakes() async {
-    await _notificationService.processEarthquakeNotifications(
-      widget.earthquakes,
-    );
-  } */
+  // REMOVED: _processInitialEarthquakes method
 
   Widget _loadScreen(int index) {
+    // Lazy load screens
     if (_screens[index] == null) {
       switch (index) {
         case 0:
-          _screens[index] = EarthquakeListScreen(
-            earthquakes: widget.earthquakes,
+          // Pass NO initial data, screen will fetch it
+          _screens[index] = const EarthquakeListScreen(
+            /* earthquakes: widget.earthquakes, */
           );
           break;
         case 1:
-          _screens[index] = EarthquakeMapScreen(
-            earthquakes: widget.earthquakes,
+          // Pass NO initial data, screen will fetch it
+          _screens[index] = const EarthquakeMapScreen(
+            /* earthquakes: widget.earthquakes, */
           );
           break;
         case 2:
@@ -75,6 +76,7 @@ class _NavigationHandlerState extends State<NavigationHandler> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
+        // Screens are loaded via _loadScreen which handles lazy initialization
         children: List.generate(_screens.length, (index) => _loadScreen(index)),
       ),
       bottomNavigationBar: BottomNavigationBar(

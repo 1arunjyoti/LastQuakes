@@ -7,6 +7,7 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lastquake/services/api_service.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
@@ -14,16 +15,6 @@ import 'package:latlong2/latlong.dart';
 import 'dart:ui';
 
 import 'package:url_launcher/url_launcher.dart';
-
-class EarthquakeMapScreen extends StatefulWidget {
-  final List<Map<String, dynamic>> earthquakes;
-
-  const EarthquakeMapScreen({Key? key, required this.earthquakes})
-    : super(key: key);
-
-  @override
-  State<EarthquakeMapScreen> createState() => _EarthquakeMapScreenState();
-}
 
 // --- Top-level function for parsing in an isolate ---
 // IMPORTANT: This function must be top-level or static
@@ -115,14 +106,26 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
   }
 }
 
+class EarthquakeMapScreen extends StatefulWidget {
+  const EarthquakeMapScreen({Key? key}) : super(key: key);
+
+  @override
+  State<EarthquakeMapScreen> createState() => _EarthquakeMapScreenState();
+}
+
 class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     with AutomaticKeepAliveClientMixin {
+  // State Variables
+  bool _isLoading = true;
+  String? _error;
+  List<Map<String, dynamic>> _earthquakeData = []; // Store fetched data
+
   late final MapController _mapController;
   double _zoomLevel = 2.0;
   static const double _minZoom = 2.0;
   static const double _maxZoom = 18.0;
   static const double _clusteringThreshold = 3.0;
-  static Map<double, Color> _markerColorCache = {};
+  static final Map<double, Color> _markerColorCache = {};
   MapLayerType _selectedMapType = MapLayerType.osm;
 
   // --- State for Fault Lines ---
@@ -136,9 +139,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   bool _isLoadingLocation = false;
   final LocationService _locationService = LocationService();
 
-  // Cache for Markers
-  List<Marker> _cachedMarkers = [];
-
   @override
   bool get wantKeepAlive => true;
 
@@ -146,22 +146,44 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   void initState() {
     super.initState();
     _mapController = MapController();
-    // Generate initial markers
-    _cachedMarkers = _buildMarkersInternal();
+
+    // ADDED: Fetch initial data
+    _fetchInitialData();
+
     // automatic location fetching
     //_fetchUserLocation();
   }
 
-  // --- Called when widget configuration changes
-  @override
-  void didUpdateWidget(covariant EarthquakeMapScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  // ADDED: Fetch initial earthquake data
+  Future<void> _fetchInitialData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-    if (widget.earthquakes != oldWidget.earthquakes) {
-      print("Earthquake data changed, rebuilding markers.");
-      // --- Regenerate markers and trigger rebuild ---
+    try {
+      // Fetch data (consider if filters are needed here, maybe default magnitude?)
+      // For simplicity, fetch recent significant ones initially
+      final data = await ApiService.fetchEarthquakes(
+        minMagnitude: 3.0, // Default initial fetch, maybe adjustable later
+        days: 45,
+        forceRefresh: false,
+      );
+      if (!mounted) return;
       setState(() {
-        _cachedMarkers = _buildMarkersInternal();
+        _earthquakeData = data;
+        _isLoading = false;
+        // Optionally, trigger marker rebuild if needed immediately,
+        // but _buildMarkersInternal will use _earthquakeData anyway.
+      });
+      // Optionally fetch location now
+      // await _fetchUserLocation();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Failed to load map data: ${e.toString()}";
+        _isLoading = false;
       });
     }
   }
@@ -192,14 +214,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         setState(() {
           _userPosition = position;
           _isLoadingLocation = false;
-          // Regenerate markers because user location is now available/updated
-          _cachedMarkers = _buildMarkersInternal();
         });
 
         _mapController.move(
           LatLng(position.latitude, position.longitude),
           _zoomLevel,
         );
+        _showLocationSuccessSnackBar(); // Added notification
       } else {
         setState(() => _isLoadingLocation = false);
         _showLocationErrorDialog();
@@ -258,6 +279,18 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
+  // ADDED: Snackbar for success
+  void _showLocationSuccessSnackBar() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Location updated'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   // Add a marker for user's current location
   // Cached user location marker
   Marker? _buildUserLocationMarker() {
@@ -267,7 +300,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
       width: 40,
       height: 40,
-      child: const Icon(Icons.person_pin_circle, color: Colors.blue, size: 40),
+      child: const Icon(Icons.location_on, color: Colors.blue, size: 30),
     );
   }
 
@@ -282,11 +315,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     });
   }
 
-  // Optimized marker building with memoization and clustering support
+  // MODIFIED: Marker building now uses internal _earthquakeData state
   List<Marker> _buildMarkersInternal() {
     final List<Marker> markers = [];
+    if (_earthquakeData.isEmpty) return markers; // Return early if no data
 
-    for (final quake in widget.earthquakes) {
+    // Use the internal state _earthquakeData
+    for (final quake in _earthquakeData) {
       final properties = quake["properties"];
       final geometry = quake["geometry"];
 
@@ -300,11 +335,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       final double? lat =
           (coordinates[1] is num) ? coordinates[1].toDouble() : null;
 
-      if (lat == null || lon == null)
-        continue; // Skip if coordinates are invalid
+      if (lat == null || lon == null) continue;
 
       final double magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
-      final double markerSize = 10 + (magnitude * 2.0).clamp(0, 30);
+      final double markerSize = 2 + (magnitude * 4.0).clamp(0, 30);
+
+      // Create a mutable copy of properties to add distance
+      final Map<String, dynamic> mutableProperties = Map.from(properties);
 
       // Calculate distance if user location is available
       if (_userPosition != null) {
@@ -314,9 +351,9 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           lat,
           lon,
         );
-        properties["distance"] = distance.round();
+        mutableProperties["distance"] = distance.round(); // Add to the copy
       } else {
-        properties.remove("distance"); // Ensure distance isn't stale
+        mutableProperties.remove("distance");
       }
 
       markers.add(
@@ -325,11 +362,16 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           width: markerSize,
           height: markerSize,
           child: GestureDetector(
-            onTap: () => _showEarthquakeDetails(properties),
-            child: Icon(
-              Icons.location_on,
-              color: _getMarkerColor(magnitude).withValues(alpha: 0.7),
-              size: markerSize,
+            onTap: () => _showEarthquakeDetails(mutableProperties),
+            child: Tooltip(
+              message:
+                  'M ${magnitude.toStringAsFixed(1)}\n${mutableProperties["place"] ?? 'Unknown'}',
+              preferBelow: false,
+              child: Icon(
+                Icons.circle,
+                color: _getMarkerColor(magnitude).withValues(alpha: 0.8),
+                size: markerSize,
+              ),
             ),
           ),
         ),
@@ -477,10 +519,33 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
+  // --- Helper to toggle fault lines and load data if needed ---
+  void _toggleFaultLines() {
+    if (_isLoadingFaultLines) return; // Prevent action while loading
+
+    if (_showFaultLines) {
+      // Just hide if already shown
+      setState(() {
+        _showFaultLines = false;
+      });
+    } else {
+      // Show: Load data if it hasn't been loaded yet
+      if (_faultLinePolylines.isEmpty) {
+        _loadFaultLineData(); // Will set _showFaultLines = true on success
+      } else {
+        // Data already loaded, just make visible
+        setState(() {
+          _showFaultLines = true;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
-    //final markers = _buildMarkersInternal(); // Pre-compute markers
+    super.build(context);
+    // Build markers dynamically based on current state
+    final List<Marker> currentMarkers = _buildMarkersInternal();
 
     return Scaffold(
       appBar: LastQuakesAppBar(
@@ -496,7 +561,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                     )
                     : const Icon(Icons.my_location),
             onPressed: _isLoadingLocation ? null : _fetchUserLocation,
-            tooltip: 'Refresh Location',
+            tooltip: 'Find my location',
           ),
           // --- Map Layer Selection Button ---
           PopupMenuButton<dynamic>(
@@ -558,69 +623,66 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       drawer: const CustomDrawer(),
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter:
-                  _userPosition != null
-                      ? LatLng(
-                        _userPosition!.latitude,
-                        _userPosition!.longitude,
-                      )
-                      : const LatLng(20.0, 78.9), // Center of India
-              initialZoom: _zoomLevel,
-              minZoom: _minZoom,
-              maxZoom: _maxZoom,
-              // Update _zoomLevel state on interaction
-              onPositionChanged: (position, hasGesture) {
-                if (hasGesture &&
-                    position.zoom != null &&
-                    position.zoom != _zoomLevel) {
-                  // Use setState ONLY if zoom actually changed to avoid loop
-                  // Check mounted prevents error during disposal
-                  if (mounted) {
-                    setState(() {
-                      _zoomLevel = position.zoom!;
-                    });
-                  }
-                }
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                subdomains: const ['a', 'b', 'c'],
+          // Show map content only when not loading and no error
+          if (!_isLoading && _error == null)
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter:
+                    _userPosition != null
+                        ? LatLng(
+                          _userPosition!.latitude,
+                          _userPosition!.longitude,
+                        )
+                        : const LatLng(
+                          20.0,
+                          0.0,
+                        ), // Default center (adjust as needed)
+                initialZoom: _zoomLevel,
+                minZoom: _minZoom,
                 maxZoom: _maxZoom,
+                onPositionChanged: (position, hasGesture) {
+                  if (hasGesture &&
+                      position.zoom != null &&
+                      position.zoom != _zoomLevel) {
+                    if (mounted) {
+                      setState(() {
+                        _zoomLevel = position.zoom!;
+                      });
+                    }
+                  }
+                },
               ),
-              _buildTileLayer(),
+              children: [
+                _buildTileLayer(),
 
-              // --- Conditional Fault Line Layer ---
-              if (_showFaultLines && _faultLinePolylines.isNotEmpty)
-                PolylineLayer(
-                  polylines: _faultLinePolylines,
-                  polylineCulling:
-                      true, // Optimisation: only draw visible lines
-                ),
+                // --- Conditional Fault Line Layer ---
+                if (_showFaultLines && _faultLinePolylines.isNotEmpty)
+                  PolylineLayer(
+                    polylines: _faultLinePolylines,
+                    polylineCulling: true,
+                  ),
 
-              if (_zoomLevel < _clusteringThreshold)
-                MarkerClusterLayerWidget(
-                  options: MarkerClusterLayerOptions(
-                    maxClusterRadius: 40,
-                    size: const Size(40, 40),
-                    markers: _cachedMarkers,
-                    polygonOptions: const PolygonOptions(
-                      borderColor: Colors.blueAccent,
-                      color: Colors.blue,
-                      borderStrokeWidth: 3,
-                    ),
-                    builder: (context, markers) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          color: Colors.blue.withValues(alpha: .8),
-                        ),
-                        child: Center(
+                // --- Marker Layer (Clustered or Normal) ---
+                // Use currentMarkers built dynamically
+                if (_zoomLevel < _clusteringThreshold)
+                  MarkerClusterLayerWidget(
+                    options: MarkerClusterLayerOptions(
+                      maxClusterRadius: 45, // Slightly larger radius
+                      size: const Size(40, 40),
+                      markers: currentMarkers, // Use dynamically built markers
+                      polygonOptions: const PolygonOptions(
+                        borderColor: Colors.blueAccent,
+                        color: Colors.black12, // Less intrusive polygon color
+                        borderStrokeWidth: 2,
+                      ),
+                      builder: (context, markers) {
+                        return FloatingActionButton(
+                          // Use FAB for better look
+                          heroTag: null, // Avoid hero tag conflicts
+                          mini: true,
+                          backgroundColor: Colors.blue.withOpacity(0.9),
+                          onPressed: null, // Not clickable itself
                           child: Text(
                             markers.length.toString(),
                             style: const TextStyle(
@@ -628,96 +690,110 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              else
-                MarkerLayer(markers: _cachedMarkers),
-              RichAttributionWidget(
-                showFlutterMapAttribution: false,
-                attributions: [
-                  // Conditionally add attribution based on selected layer
-                  if (_selectedMapType == MapLayerType.osm)
-                    TextSourceAttribution(
-                      'OpenStreetMap contributors',
-                      onTap:
-                          () => launchUrl(
-                            Uri.parse('https://openstreetmap.org/copyright'),
-                          ),
+                        );
+                      },
                     ),
-                  if (_selectedMapType == MapLayerType.satellite)
-                    TextSourceAttribution(
-                      'Tiles Esri',
-                      onTap:
-                          () => launchUrl(Uri.parse('https://www.esri.com/')),
-                    ),
-                  if (_selectedMapType == MapLayerType.terrain)
-                    TextSourceAttribution(
-                      'OpenTopoMap (CC-BY-SA)',
-                      onTap:
-                          () =>
-                              launchUrl(Uri.parse('https://opentopomap.org/')),
-                    ),
-                  if (_selectedMapType == MapLayerType.dark) ...[
-                    TextSourceAttribution(
-                      'OpenStreetMap contributors',
-                      onTap:
-                          () => launchUrl(
-                            Uri.parse('https://openstreetmap.org/copyright'),
-                          ),
-                    ),
-                    TextSourceAttribution(
-                      'CARTO',
-                      onTap:
-                          () => launchUrl(
-                            Uri.parse('https://carto.com/attributions'),
-                          ),
+                  )
+                else
+                  MarkerLayer(
+                    markers: currentMarkers,
+                  ), // Use dynamically built markers
+                RichAttributionWidget(
+                  showFlutterMapAttribution: false,
+                  attributions: [
+                    // Conditionally add attribution based on selected layer
+                    if (_selectedMapType == MapLayerType.osm)
+                      TextSourceAttribution(
+                        'OpenStreetMap contributors',
+                        onTap:
+                            () => launchUrl(
+                              Uri.parse('https://openstreetmap.org/copyright'),
+                            ),
+                      ),
+                    if (_selectedMapType == MapLayerType.satellite)
+                      TextSourceAttribution(
+                        'Tiles Esri',
+                        onTap:
+                            () => launchUrl(Uri.parse('https://www.esri.com/')),
+                      ),
+                    if (_selectedMapType == MapLayerType.terrain)
+                      TextSourceAttribution(
+                        'OpenTopoMap (CC-BY-SA)',
+                        onTap:
+                            () => launchUrl(
+                              Uri.parse('https://opentopomap.org/'),
+                            ),
+                      ),
+                    if (_selectedMapType == MapLayerType.dark) ...[
+                      TextSourceAttribution(
+                        'OpenStreetMap contributors',
+                        onTap:
+                            () => launchUrl(
+                              Uri.parse('https://openstreetmap.org/copyright'),
+                            ),
+                      ),
+                      TextSourceAttribution(
+                        'CARTO',
+                        onTap:
+                            () => launchUrl(
+                              Uri.parse('https://carto.com/attributions'),
+                            ),
+                      ),
+                    ],
+                  ],
+                  alignment: AttributionAlignment.bottomLeft,
+                ),
+              ],
+            ),
+
+          // Show Loading Indicator Centered
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator.adaptive()),
+
+          // Show Error Message Centered
+          if (_error != null)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                color: Colors.red.withOpacity(0.8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, style: const TextStyle(color: Colors.white)),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: _fetchInitialData, // Retry button
+                      child: const Text("Retry"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.red,
+                      ),
                     ),
                   ],
-                ],
-                alignment: AttributionAlignment.bottomLeft,
+                ),
               ),
-            ],
-          ),
-          _ZoomControls(
-            zoomLevel: _zoomLevel,
-            mapController: _mapController,
-            onZoomChanged: (newZoom) {
-              // Update state when zoom buttons are used
-              if (mounted && newZoom != _zoomLevel) {
-                setState(() {
-                  _zoomLevel = newZoom;
-                });
-              }
-            },
-          ),
+            ),
+
+          // Zoom Controls (Positioned on top)
+          if (!_isLoading &&
+              _error == null) // Only show controls when map is visible
+            _ZoomControls(
+              zoomLevel: _zoomLevel,
+              mapController: _mapController,
+              onZoomChanged: (newZoom) {
+                if (mounted && newZoom != _zoomLevel) {
+                  setState(() {
+                    _zoomLevel = newZoom;
+                  });
+                }
+              },
+            ),
         ],
       ),
     );
-  }
-
-  // --- Helper to toggle fault lines and load data if needed ---
-  void _toggleFaultLines() {
-    if (_isLoadingFaultLines) return; // Prevent action while loading
-
-    if (_showFaultLines) {
-      // Just hide if already shown
-      setState(() {
-        _showFaultLines = false;
-      });
-    } else {
-      // Show: Load data if it hasn't been loaded yet
-      if (_faultLinePolylines.isEmpty) {
-        _loadFaultLineData(); // Will set _showFaultLines = true on success
-      } else {
-        // Data already loaded, just make visible
-        setState(() {
-          _showFaultLines = true;
-        });
-      }
-    }
   }
 }
 

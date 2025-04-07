@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/homeScreen.dart';
-import 'package:lastquake/services/api_service.dart';
 import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -18,66 +17,30 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 void main() async {
-  //Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  //Initialize Firebase Messaging
+  //Initialize Firebase Messaging Background Handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  //Initialize notification service
-  final notificationService = NotificationService();
-  await notificationService.initNotifications();
-
-  //Request FCM permission
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
-
-  debugPrint("🔔 Notification permission: ${settings.authorizationStatus}");
-
-  // Add topic subscription
-  await notificationService.subscribeToEarthquakeTopics();
-
-  // Register device with server initially
-  await notificationService.registerDeviceWithServer();
-
-  // Listen for foreground FCM messages
+  // Listen for foreground FCM messages (essential early setup)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    //print("📱 Received foreground message: ${message.messageId}");
-    //print("   Data: ${message.data}");
+    debugPrint("Received foreground message: ${message.messageId}");
     NotificationService().showFCMNotification(message);
-  });
-
-  // Get FCM token and handle refresh
-  FirebaseMessaging.instance.getToken().then((String? fcmToken) async {
-    if (fcmToken != null) {
-      debugPrint("📲 Initial FCM Token: ${fcmToken.substring(0, 15)}...");
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('fcm_token', fcmToken);
-      // Initial registration done above, this is just for logging/storing
-    } else {
-      debugPrint("Failed to get initial FCM token.");
-    }
   });
 
   // Listen for token refresh
   FirebaseMessaging.instance.onTokenRefresh.listen((String token) async {
-    debugPrint("🔄 FCM Token refreshed: ${token.substring(0, 15)}...");
+    debugPrint("FCM Token refreshed: ${token.substring(0, 15)}...");
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('fcm_token', token);
     // Re-register with the new token and current preferences
-    await notificationService.registerDeviceWithServer();
-    // Also update topic subscriptions if needed
-    // await notificationService.updateFCMTopics(); // Consider if needed separately
+    // Ensure NotificationService can be instantiated or use a static method
+    await NotificationService().registerDeviceWithServer();
   });
+
+  // Get initial FCM token and store it (can run in parallel with UI)
+  _storeInitialFcmToken();
 
   // Set preferred orientations
   SystemChrome.setPreferredOrientations([
@@ -93,8 +56,80 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+// Helper function to store initial token without blocking main
+Future<void> _storeInitialFcmToken() async {
+  try {
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken != null) {
+      debugPrint(
+        "📲 Initial FCM Token (async): ${fcmToken.substring(0, 15)}...",
+      );
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('fcm_token', fcmToken);
+      // Initial registration will be handled later in _initializeNotificationsAndRegistration
+    } else {
+      debugPrint("Failed to get initial FCM token (async).");
+    }
+  } catch (e) {
+    debugPrint("Error getting initial FCM token (async): $e");
+  }
+}
+
+// Helper function to perform deferred initializations
+Future<void> _initializeNotificationsAndRegistration(
+  BuildContext context,
+) async {
+  debugPrint("Starting deferred initialization...");
+  try {
+    // Initialize notification service
+    final notificationService = NotificationService();
+    await notificationService.initNotifications(); // Local notifications init
+
+    // Request FCM permission
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    debugPrint("Notification permission: ${settings.authorizationStatus}");
+
+    // Only proceed if permission is granted (or potentially provisional)
+    if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional) {
+      // Register device with server initially
+      // This ensures the token stored earlier (or fetched now if needed) is registered
+      await notificationService.registerDeviceWithServer();
+    } else {
+      debugPrint(
+        "Notification permission denied. Skipping topic subscription and registration.",
+      );
+    }
+    debugPrint("Deferred initialization complete.");
+  } catch (e) {
+    debugPrint("Error during deferred initialization: $e");
+  }
+}
+
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeNotificationsAndRegistration(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,82 +141,8 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          home: EarthquakeInitializer(),
+          home: const NavigationHandler(),
         );
-      },
-    );
-  }
-}
-
-class EarthquakeInitializer extends StatefulWidget {
-  @override
-  _EarthquakeInitializerState createState() => _EarthquakeInitializerState();
-}
-
-class _EarthquakeInitializerState extends State<EarthquakeInitializer> {
-  late Future<List<Map<String, dynamic>>> _earthquakeFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _earthquakeFuture = _fetchEarthquakeData();
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchEarthquakeData() async {
-    final prefs = await SharedPreferences.getInstance();
-    double initialMinMagnitude = 3.0;
-    int days = 45;
-
-    return ApiService.fetchEarthquakes(
-      minMagnitude: initialMinMagnitude,
-      days: days,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _earthquakeFuture,
-      builder: (context, snapshot) {
-        switch (snapshot.connectionState) {
-          case ConnectionState.waiting:
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator.adaptive()),
-            );
-          case ConnectionState.done:
-            if (snapshot.hasError) {
-              debugPrint("Error loading earthquakes: ${snapshot.error}");
-              return Scaffold(
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      'Error loading initial earthquake data. Please check your connection and try restarting the app. \n(${snapshot.error})',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(color: Colors.red),
-                    ),
-                  ),
-                ),
-              );
-            }
-            // Pass data even if it's empty, let screens handle empty state
-            return NavigationHandler(earthquakes: snapshot.data ?? []);
-            /* if (snapshot.hasData) {
-              return NavigationHandler(earthquakes: snapshot.data!);
-            }
-            return const Scaffold(
-              body: Center(child: Text('No earthquake data available')),
-            ) */
-            ;
-          default:
-            return const Scaffold(
-              body: Center(
-                child: Text('Initializing...'),
-              ), // Placeholder for other states
-            );
-        }
       },
     );
   }
