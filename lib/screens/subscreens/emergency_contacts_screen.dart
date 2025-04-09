@@ -127,21 +127,42 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 ],
               ),
             ),
-            ElevatedButton(
+            /* ElevatedButton(
               onPressed: () => _showAddContactDialog(),
-              child: Text("Add Custom Contact"),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Icon(Icons.add),
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 20), */
           ],
         ),
       ),
 
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.small(
+            onPressed: () => _showAddContactDialog(),
+            heroTag: "add_contact_button",
+            child: Icon(Icons.add),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: () => _callEmergencyNumber(),
+            heroTag: "sos_button",
+            backgroundColor: Colors.red,
+            child: Icon(Icons.sos, color: Colors.white),
+          ),
+        ],
+      ),
+
       ///Dynamic SOS Button
-      floatingActionButton: FloatingActionButton(
+      /* floatingActionButton: FloatingActionButton(
         onPressed: () => _callEmergencyNumber(),
         backgroundColor: Colors.red,
         child: Icon(Icons.sos, color: Colors.white),
-      ),
+      ), */
     );
   }
 

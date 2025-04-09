@@ -8,9 +8,9 @@ class AppTheme {
       seedColor: Colors.blue,
       brightness: Brightness.light,
     ),
-    scaffoldBackgroundColor: const Color.fromRGBO(246, 239, 255, 1),
+    scaffoldBackgroundColor: const Color.fromRGBO(242, 242, 242, 1),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color.fromRGBO(246, 239, 255, 1),
+      backgroundColor: Color.fromRGBO(242, 242, 242, 1),
       elevation: 1,
       titleTextStyle: TextStyle(
         color: Colors.black,

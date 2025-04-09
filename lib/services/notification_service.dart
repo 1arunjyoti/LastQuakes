@@ -14,7 +14,7 @@ class NotificationService {
       LocationService(); // For getting user location
 
   // Update with your Firebase Function URL
-  static const String _SERVER_URL = 'https://lastquakenotify.onrender.com';
+  static const String _SERVER_URL = '';
 
   Future<void> initNotifications() async {
     const AndroidInitializationSettings androidSettings =
@@ -43,36 +43,19 @@ class NotificationService {
 
     // Extract data from FCM message
     final Map<String, dynamic> data = message.data;
-    String title = message.notification?.title ?? "Earthquake Alert";
-    String body = message.notification?.body ?? "An earthquake occurred!";
-    String? id = data['id'];
-
-    // Store to notification history
-    if (id != null) {
-      List<Map<String, String>> storedNotifications =
-          await getStoredNotifications();
-
-      // Avoid adding duplicates if the message somehow gets processed twice quickly
-      bool alreadyExists = storedNotifications.any(
-        (n) => n['id'] == id && n['title'] == title,
-      );
-
-      if (!alreadyExists) {
-        storedNotifications.add({
-          'id': id, // Use the actual earthquake ID
-          'title': title,
-          'body': body,
-          'timestamp': DateTime.now().toIso8601String(),
-        });
-        await _saveNotifications(storedNotifications);
-      }
-    }
+    String title =
+        data['title'] ?? message.notification?.title ?? "Earthquake Alert";
+    String body =
+        data['body'] ?? message.notification?.body ?? "An earthquake occurred!";
+    String? id = data['earthquakeId'] ?? message.messageId;
 
     await flutterLocalNotificationsPlugin.show(
-      id?.hashCode ?? message.messageId.hashCode,
+      id?.hashCode ?? DateTime.now().millisecondsSinceEpoch,
       title,
       body,
       details,
+      // Optional: payload for notification tap handling
+      // payload: json.encode(data),
     );
   }
 
@@ -154,77 +137,5 @@ class NotificationService {
     // Re-register with the server to update preferences (location, radius, mag etc.)
     // This ensures the backend has the latest settings for direct/radius notifications
     await registerDeviceWithServer();
-  }
-
-  // Method to show local notifications
-  Future<void> showNotification({
-    required int id,
-    required String title,
-    required String body,
-  }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'earthquake_channel',
-          'Earthquake Alerts',
-          importance: Importance.high,
-          priority: Priority.high,
-        );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-    );
-
-    await flutterLocalNotificationsPlugin.show(id, title, body, details);
-  }
-
-  // Methods for handling notification history storage
-  // Method to get stored notification history
-  Future<List<Map<String, String>>> getStoredNotifications() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? notificationsJson = prefs.getString('notification_history');
-    if (notificationsJson == null) return [];
-    try {
-      final List<dynamic> decoded = json.decode(notificationsJson);
-      return decoded
-          .map((item) {
-            if (item is Map) {
-              return Map<String, String>.from(
-                item.map(
-                  (key, value) => MapEntry(key.toString(), value.toString()),
-                ),
-              );
-            }
-            return <String, String>{};
-          })
-          .where((item) => item.isNotEmpty)
-          .toList();
-    } catch (e) {
-      debugPrint("Error parsing notifications history: $e");
-      await clearNotificationHistory();
-      return [];
-    }
-  }
-
-  Future<void> _saveNotifications(
-    List<Map<String, String>> notifications,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Limit to last 50 notifications
-    if (notifications.length > 50) {
-      notifications = notifications.sublist(notifications.length - 50);
-    }
-
-    try {
-      await prefs.setString('notification_history', json.encode(notifications));
-    } catch (e) {
-      //print("Error saving notifications: $e");
-    }
-  }
-
-  Future<void> clearNotificationHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('notification_history');
-    debugPrint("Notification history cleared.");
   }
 }

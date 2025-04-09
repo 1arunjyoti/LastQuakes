@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lastquake/provider/theme_provider.dart';
+import 'package:lastquake/screens/settings_screen.dart';
+import 'package:lastquake/screens/subscreens/about_screen.dart';
 import 'package:lastquake/screens/subscreens/emergency_contacts_screen.dart';
 import 'package:lastquake/screens/subscreens/preparedness_screen.dart';
 import 'package:lastquake/screens/subscreens/quiz_screen.dart';
@@ -20,7 +22,42 @@ class CustomDrawer extends StatelessWidget {
         children: [
           _buildDrawerHeader(context, themeProvider),
           Expanded(child: _buildMenuItems(context)),
-          _buildCloseButton(context),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              // Use Column for footer items
+              children: [
+                _buildFooterItem(
+                  // Example helper
+                  context: context,
+                  icon: Icons.settings_outlined,
+                  text: "Settings",
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildFooterItem(
+                  context: context,
+                  icon: Icons.info_outline,
+                  text: "About",
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AboutScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -31,12 +68,10 @@ class CustomDrawer extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       width: double.infinity,
       color: Theme.of(context).primaryColor,
+
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildAppInfo(),
-          _buildDarkModeToggle(context, themeProvider),
-        ],
+        children: [_buildAppInfo()],
       ),
     );
   }
@@ -45,6 +80,7 @@ class CustomDrawer extends StatelessWidget {
     return const Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.public,
@@ -67,25 +103,6 @@ class CustomDrawer extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDarkModeToggle(
-    BuildContext context,
-    ThemeProvider themeProvider,
-  ) {
-    return IconButton(
-      icon: Icon(
-        themeProvider.themeMode == ThemeMode.dark
-            ? Icons.light_mode
-            : Icons.dark_mode,
-        color: Colors.white,
-      ),
-      tooltip: 'Toggle Theme',
-      onPressed: () {
-        // Directly call toggle method
-        themeProvider.toggleTheme();
-      },
     );
   }
 
@@ -123,7 +140,7 @@ class CustomDrawer extends StatelessWidget {
     VoidCallback? onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.blueGrey.shade800, semanticLabel: text),
+      leading: Icon(icon, semanticLabel: text),
       title: Text(text, style: const TextStyle(fontSize: 16)),
       onTap:
           onTap ??
@@ -142,18 +159,28 @@ class CustomDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildCloseButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.black87,
-          foregroundColor: Colors.white,
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+  // Helper for footer items (similar to _buildDrawerItem but maybe simpler)
+  Widget _buildFooterItem({
+    required BuildContext context,
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 16),
+            Text(text, style: Theme.of(context).textTheme.bodyLarge),
+          ],
         ),
-        icon: const Icon(Icons.keyboard_double_arrow_left),
-        label: const Text("Close"),
-        onPressed: () => Navigator.pop(context),
       ),
     );
   }

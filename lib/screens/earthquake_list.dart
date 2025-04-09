@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:geolocator/geolocator.dart';
-import 'package:intl/intl.dart';
 import 'package:lastquake/screens/earthquake_details.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/widgets/appbar.dart'; // Assumed correct name
@@ -162,7 +161,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     _scrollController = ScrollController()..addListener(_onScroll);
     // automatic location fetching
 
-    _fetchUserLocation();
+    //_fetchUserLocation();
     // Fetch initial data when screen loads
     _fetchAndSetInitialData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -570,44 +569,30 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                             {};
                         final magnitude =
                             (properties["mag"] as num?)?.toDouble() ?? 0.0;
-                        final time = DateTime.fromMillisecondsSinceEpoch(
-                          properties["time"] as int? ?? 0,
-                        );
+                        final DateTime time =
+                            DateTime.fromMillisecondsSinceEpoch(
+                              properties["time"] as int? ?? 0,
+                            );
                         final String place =
                             properties["place"] as String? ??
                             "Unknown location";
                         final Color magnitudeColor = _getMagnitudeColor(
                           magnitude,
                         );
-                        final String formattedTime = DateFormat.yMMMd()
-                            .add_jm()
-                            .format(time);
-                        // --- OPTION A: Calculate distance here for visible items ---
-                        /* String distanceText = "Distance N/A";
-                            if (_userPosition != null) {
-                              final geometry = quakeData["geometry"];
-                              if (geometry is Map && geometry["coordinates"] is List) {
-                                  final coordinates = geometry["coordinates"] as List;
-                                  if (coordinates.length >= 2 && coordinates[0] is num && coordinates[1] is num) {
-                                    final double longitude = coordinates[0].toDouble();
-                                    final double latitude = coordinates[1].toDouble();
-                                    final distance = _locationService.calculateDistance( // Use service here
-                                        _userPosition!.latitude, _userPosition!.longitude, latitude, longitude);
-                                    distanceText = "${distance.round()} km from you";
-                                  }
-                              }
-                        } */
 
-                        // --- OPTION B: Use distance calculated in isolate
-                        final String distanceText =
-                            properties.containsKey("distance")
-                                ? "${properties["distance"]} km from you"
-                                : "Tap on the location button";
+                        // --- Use distance calculated in isolate
+                        double? distanceKm;
+                        if (_userPosition != null) {
+                          if (properties.containsKey("distance")) {
+                            distanceKm =
+                                (properties["distance"] as num?)?.toDouble();
+                          }
+                        }
 
                         return EarthquakeListItem(
                           location: place,
-                          distanceText: distanceText,
-                          formattedTime: formattedTime,
+                          distanceKm: distanceKm,
+                          timestamp: time,
                           magnitude: magnitude,
                           magnitudeColor: magnitudeColor,
                           onTap: () {

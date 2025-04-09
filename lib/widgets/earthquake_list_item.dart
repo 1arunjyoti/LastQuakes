@@ -1,29 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:lastquake/utils/formatting.dart';
 //import 'package:intl/intl.dart'; // Keep if formatting time here, otherwise remove
 
 class EarthquakeListItem extends StatelessWidget {
   final String location;
-  final String distanceText;
-  final String formattedTime;
   final double magnitude;
   final Color magnitudeColor;
-  final VoidCallback onTap; // Callback for navigation
+  final VoidCallback onTap;
+  final DateTime timestamp; // Pass DateTime instead of formatted string
+  final double? distanceKm; // Pass distance in KM (can be null)
 
   const EarthquakeListItem({
     Key? key,
     required this.location,
-    required this.distanceText,
-    required this.formattedTime,
     required this.magnitude,
     required this.magnitudeColor,
     required this.onTap,
+    required this.timestamp,
+    required this.distanceKm,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Use const where possible
+    // Format distance and time using utils inside build method
+    String displayDistance;
+    if (distanceKm != null) {
+      displayDistance = FormattingUtils.formatDistance(context, distanceKm!);
+      displayDistance = "$displayDistance from your location";
+    } else {
+      // Or show placeholder if location services are off/unavailable
+      displayDistance = "Enable location for distance";
+    }
+    final String displayTime = FormattingUtils.formatDateTime(
+      context,
+      timestamp,
+    );
+    final String displayLocation = FormattingUtils.formatPlaceString(
+      context,
+      location,
+    );
+
     const cardMargin = EdgeInsets.symmetric(horizontal: 12, vertical: 6);
-    const contentPadding = EdgeInsets.all(16.0); // Combined inner/outer padding
+    const contentPadding = EdgeInsets.all(16.0);
     const magnitudeBoxPadding = EdgeInsets.symmetric(
       horizontal: 12,
       vertical: 8,
@@ -38,15 +56,12 @@ class EarthquakeListItem extends StatelessWidget {
       fontSize: 16,
     );
     const timeTextStyle = TextStyle(fontSize: 12);
-    const distanceTextStyle = TextStyle(
-      color: Colors.blueAccent, // Adjusted color slightly for contrast
-      fontSize: 12,
-    );
+    const distanceTextStyle = TextStyle(color: Colors.blueAccent, fontSize: 12);
     const indicatorBarWidth = 4.0;
     const indicatorBarPadding = EdgeInsets.symmetric(vertical: 8.0);
 
     return GestureDetector(
-      onTap: onTap, // Use the passed callback
+      onTap: onTap,
       child: Card(
         margin: cardMargin,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -77,26 +92,24 @@ class EarthquakeListItem extends StatelessWidget {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment:
-                              MainAxisAlignment
-                                  .center, // Center content vertically
-                          mainAxisSize: MainAxisSize.min, // Take minimum space
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              distanceText,
+                              displayDistance,
                               style: distanceTextStyle,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              location,
+                              displayLocation,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 2,
                               style: locationTextStyle,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              formattedTime,
+                              displayTime,
                               style: timeTextStyle,
                               overflow: TextOverflow.ellipsis,
                             ),

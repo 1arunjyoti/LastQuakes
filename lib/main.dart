@@ -3,7 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/screens/homeScreen.dart';
+import 'package:lastquake/screens/home_screen.dart';
 import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -50,7 +50,7 @@ void main() async {
 
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ThemeProvider()..loadThemeFromPreferences(),
+      create: (context) => ThemeProvider()..loadPreferences(),
       child: const MyApp(),
     ),
   );
