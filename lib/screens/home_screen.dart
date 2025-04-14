@@ -56,34 +56,31 @@ class _NavigationHandlerState extends State<NavigationHandler> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate responsive height, e.g., 8% of screen height, clamped between 60 and 80
+    final screenHeight = MediaQuery.of(context).size.height;
+    final responsiveNavBarHeight = (screenHeight * 0.08).clamp(60.0, 80.0);
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         // Screens are loaded via _loadScreen which handles lazy initialization
         children: List.generate(_screens.length, (index) => _loadScreen(index)),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _onBottomNavTap,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        items: const [
-          BottomNavigationBarItem(
-            icon: FaIcon(FontAwesomeIcons.house),
-            activeIcon: FaIcon(FontAwesomeIcons.house),
-            label: 'Home',
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: _onBottomNavTap,
+        height: responsiveNavBarHeight, // Use calculated responsive height
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Explore',
           ),
-          BottomNavigationBarItem(
+          NavigationDestination(
             icon: FaIcon(FontAwesomeIcons.earthAsia),
-            activeIcon: FaIcon(FontAwesomeIcons.earthAsia),
+            selectedIcon: FaIcon(FontAwesomeIcons.earthAsia),
             label: 'Map',
           ),
-          /* BottomNavigationBarItem(
-            icon: FaIcon(FontAwesomeIcons.gear),
-            activeIcon: FaIcon(FontAwesomeIcons.gear),
-            label: 'Settings',
-          ), */
         ],
       ),
     );

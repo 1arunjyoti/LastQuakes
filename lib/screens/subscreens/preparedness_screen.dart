@@ -5,37 +5,50 @@ class PreparednessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text("Earthquake Preparedness")),
-      body: _PreparednessList(),
+      appBar: AppBar(
+        title: const Text("Earthquake Preparedness"),
+        surfaceTintColor: colorScheme.surfaceTint,
+      ),
+      body: const _PreparednessList(),
     );
   }
 }
 
 class _PreparednessList extends StatelessWidget {
-  final List<PreparednessSectionData> _preparednessData = [
+  const _PreparednessList();
+
+  static const List<PreparednessSectionData> _preparednessData = [
     PreparednessSectionData(
       title: "Before an Earthquake",
       tips: [
         "Secure heavy furniture and appliances.",
-        "Have an emergency kit ready.",
-        "Identify safe spots at home/work.",
+        "Have an emergency kit ready (water, food, first aid, flashlight, batteries, whistle).",
+        "Identify safe spots (under sturdy tables, against interior walls) and danger zones (windows, heavy objects) at home/work.",
+        "Develop a family communication plan.",
+        "Know how to turn off utilities (gas, water, electricity).",
       ],
     ),
     PreparednessSectionData(
       title: "During an Earthquake",
       tips: [
-        "Drop, Cover, and Hold On!",
-        "Stay away from windows and furniture.",
-        "If outside, move to an open area.",
+        "Indoors: Drop, Cover, and Hold On! Get under a sturdy desk or table. Protect your head and neck.",
+        "Stay away from windows, glass, hanging objects, and heavy furniture.",
+        "Do not use elevators.",
+        "Outdoors: Move to an open area away from buildings, trees, streetlights, and utility wires.",
+        "In a vehicle: Pull over safely, stop, and stay inside until shaking stops. Avoid bridges and overpasses.",
       ],
     ),
     PreparednessSectionData(
       title: "After an Earthquake",
       tips: [
-        "Check yourself and others for injuries.",
-        "Be prepared for aftershocks.",
-        "Use text messages instead of calls.",
+        "Check yourself and others for injuries. Provide first aid if needed.",
+        "Be prepared for aftershocks. Drop, Cover, and Hold On if they occur.",
+        "Check for damage (gas leaks, electrical damage, structural issues). If you smell gas, open windows and leave immediately.",
+        "Use phone for emergencies only. Text messages are often more reliable than calls.",
+        "Listen to official information via battery-powered radio or authorities.",
+        "Do not enter damaged buildings.",
       ],
     ),
   ];
@@ -60,9 +73,17 @@ class _PreparednessSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -72,10 +93,10 @@ class _PreparednessSectionCard extends StatelessWidget {
               sectionData.title,
               style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
+                color: colorScheme.primary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             ...sectionData.tips.map((tip) => _TipListTile(tip: tip)),
           ],
         ),
@@ -91,14 +112,29 @@ class _TipListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      leading: Icon(
-        Icons.check_circle_outline,
-        color: Theme.of(context).colorScheme.primary,
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            color: colorScheme.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              tip,
+              style: textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
       ),
-      title: Text(tip, style: Theme.of(context).textTheme.bodyMedium),
     );
   }
 }

@@ -3,6 +3,9 @@ import 'package:lastquake/utils/enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider with ChangeNotifier {
+  // Make SharedPreferences instance available
+  final SharedPreferences? _prefs;
+
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
   static const String _themePrefKey = 'theme_mode_v2';
@@ -17,18 +20,13 @@ class ThemeProvider with ChangeNotifier {
   bool get use24HourClock => _use24HourClock;
   static const String _clockPrefKey = 'use_24_hour_clock';
 
-  // --- Theme Methods
-  void setThemeMode(ThemeMode mode) {
-    if (_themeMode != mode) {
-      _themeMode = mode;
-      _saveThemePreference();
-      notifyListeners();
-    }
-  }
+  // Constructor accepts SharedPreferences instance
+  ThemeProvider({SharedPreferences? prefs}) : _prefs = prefs;
+
+  // --- Methods for saving preferences (use the instance variable) ---
 
   Future<void> _saveThemePreference() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Store as String for robustness against enum order changes
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
     String themeString;
     switch (_themeMode) {
       case ThemeMode.light:
@@ -45,7 +43,26 @@ class ThemeProvider with ChangeNotifier {
     await prefs.setString(_themePrefKey, themeString);
   }
 
-  // --- Unit Methods ---
+  Future<void> _saveDistanceUnitPreference() async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    await prefs.setString(_unitPrefKey, _distanceUnit.name);
+  }
+
+  Future<void> _saveClockPreference() async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    await prefs.setBool(_clockPrefKey, _use24HourClock);
+  }
+
+  // --- Methods for setting values (trigger save and notify) ---
+
+  void setThemeMode(ThemeMode mode) {
+    if (_themeMode != mode) {
+      _themeMode = mode;
+      _saveThemePreference();
+      notifyListeners();
+    }
+  }
+
   void setDistanceUnit(DistanceUnit unit) {
     if (_distanceUnit != unit) {
       _distanceUnit = unit;
@@ -54,12 +71,6 @@ class ThemeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _saveDistanceUnitPreference() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_unitPrefKey, _distanceUnit.name);
-  }
-
-  // --- Clock Format Methods ---
   void setUse24HourClock(bool use24Hour) {
     if (_use24HourClock != use24Hour) {
       _use24HourClock = use24Hour;
@@ -68,14 +79,18 @@ class ThemeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _saveClockPreference() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_clockPrefKey, _use24HourClock);
-  }
+  // --- Load Preferences (use the instance variable) ---
 
-  // --- Load All Preferences ---
-  Future<void> loadPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
+  // Renamed to void as it doesn't need to return Future
+  // This should be called after the provider is created with prefs
+  void loadPreferences() {
+    if (_prefs == null) {
+      debugPrint(
+        "Warning: ThemeProvider created without SharedPreferences instance. Cannot load preferences.",
+      );
+      return; // Cannot load if prefs is null
+    }
+    final prefs = _prefs!;
 
     // Load Theme
     final savedThemeString = prefs.getString(_themePrefKey);
@@ -101,10 +116,11 @@ class ThemeProvider with ChangeNotifier {
     }
 
     // Load Clock Format
-    _use24HourClock =
-        prefs.getBool(_clockPrefKey) ?? false; // Default false (12-hour)
+    _use24HourClock = prefs.getBool(_clockPrefKey) ?? false;
 
-    // Important: Notify listeners after loading all preferences
-    notifyListeners();
+    // No need to notify listeners here if loadPreferences is called
+    // immediately after construction, as the initial build will use these values.
+    // If called later, uncomment the line below.
+    // notifyListeners();
   }
 }

@@ -45,8 +45,17 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         _customContacts =
             savedContacts.map((contact) {
               List<String> parts = contact.split('|');
-              return {"name": parts[0], "number": parts[1]};
+              // Add validation in case the split doesn't yield two parts
+              if (parts.length == 2) {
+                return {"name": parts[0], "number": parts[1]};
+              }
+              // Return a default or handle the error appropriately
+              return {"name": "Invalid Contact", "number": ""};
             }).toList();
+        // Optionally filter out invalid contacts
+        _customContacts.removeWhere(
+          (contact) => contact["name"] == "Invalid Contact",
+        );
       });
     }
   }
@@ -76,8 +85,16 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: Text("Emergency Contacts")),
+      appBar: AppBar(
+        title: const Text("Emergency Contacts"),
+        // Consider adding elevation or surfaceTintColor for M3 style
+        // surfaceTintColor: colorScheme.surfaceTint,
+        // elevation: 2,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -85,11 +102,13 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           children: [
             Text(
               "Select Your Country:",
-              style: Theme.of(context).textTheme.titleLarge,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w500, // M3 Title Large Weight
+              ),
             ),
             const SizedBox(height: 10),
 
-            ///Country Dropdown
+            ///Country Dropdown - Consider using DropdownMenu for a more modern M3 feel if applicable
             DropdownButton<String>(
               value: _selectedCountry,
               isExpanded: true,
@@ -109,6 +128,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   _saveCountry(newCountry);
                 }
               },
+              // Style the dropdown if needed, e.g., underline color
+              // underline: Container(height: 1, color: colorScheme.outline),
             ),
 
             const SizedBox(height: 20),
@@ -118,23 +139,22 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
               child: ListView(
                 children: [
                   ..._contacts.map(
-                    (contact) =>
-                        _buildContactTile(contact['name']!, contact['number']!),
+                    (contact) => _buildContactTile(
+                      context,
+                      contact['name']!,
+                      contact['number']!,
+                    ),
                   ),
                   ..._customContacts.asMap().entries.map(
-                    (entry) => _buildCustomContactTile(entry.key, entry.value),
+                    (entry) => _buildCustomContactTile(
+                      context,
+                      entry.key,
+                      entry.value,
+                    ),
                   ),
                 ],
               ),
             ),
-            /* ElevatedButton(
-              onPressed: () => _showAddContactDialog(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Icon(Icons.add),
-              ),
-            ),
-            const SizedBox(height: 20), */
           ],
         ),
       ),
@@ -143,97 +163,174 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton.small(
-            onPressed: () => _showAddContactDialog(),
+            onPressed: () => _showAddContactDialog(context),
             heroTag: "add_contact_button",
-            child: Icon(Icons.add),
+            // Use theme colors
+            backgroundColor: colorScheme.secondaryContainer,
+            foregroundColor: colorScheme.onSecondaryContainer,
+            child: const Icon(Icons.add),
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
             onPressed: () => _callEmergencyNumber(),
             heroTag: "sos_button",
-            backgroundColor: Colors.red,
-            child: Icon(Icons.sos, color: Colors.white),
+            // Use error colors for SOS button
+            backgroundColor: colorScheme.errorContainer,
+            foregroundColor: colorScheme.onErrorContainer,
+            child: const Icon(Icons.sos),
           ),
         ],
       ),
-
-      ///Dynamic SOS Button
-      /* floatingActionButton: FloatingActionButton(
-        onPressed: () => _callEmergencyNumber(),
-        backgroundColor: Colors.red,
-        child: Icon(Icons.sos, color: Colors.white),
-      ), */
     );
   }
 
   ///Function to get the main emergency number for the selected country
   void _callEmergencyNumber() {
-    String emergencyNumber = emergencyNumbers[_selectedCountry]![0]["number"]!;
-    launchUrl(Uri.parse("tel://$emergencyNumber"));
+    // Add safety check in case the list is empty or structure is unexpected
+    if (emergencyNumbers.containsKey(_selectedCountry) &&
+        emergencyNumbers[_selectedCountry]!.isNotEmpty &&
+        emergencyNumbers[_selectedCountry]![0].containsKey("number")) {
+      String emergencyNumber =
+          emergencyNumbers[_selectedCountry]![0]["number"]!;
+      // Consider adding error handling for launchUrl
+      try {
+        launchUrl(Uri.parse("tel://$emergencyNumber"));
+      } catch (e) {
+        // Handle potential exceptions, e.g., show a snackbar
+        print("Could not launch dialer: $e");
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(content: Text("Could not open dialer.")),
+        // );
+      }
+    } else {
+      // Handle cases where the number is not found
+      print("Emergency number not found for $_selectedCountry");
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(content: Text("Emergency number not found for $_selectedCountry.")),
+      // );
+    }
   }
 
-  ///Build a contact tile
-  Widget _buildContactTile(String name, String phone) {
+  ///Build a contact tile using Material 3 styling
+  Widget _buildContactTile(BuildContext context, String name, String phone) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Card(
+      // Use M3 card styling
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12), // M3 recommended radius
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: Icon(Icons.phone, color: Colors.red),
-        title: Text(name),
-        subtitle: Text("Call: $phone"),
+        leading: Icon(
+          Icons.phone,
+          color: colorScheme.primary,
+        ), // Use primary color
+        title: Text(name, style: textTheme.titleMedium),
+        subtitle: Text(
+          "Call: $phone",
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
         onTap: () => launchUrl(Uri.parse("tel://$phone")),
+        // Add visual density for tighter spacing if desired
+        // visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  Widget _buildCustomContactTile(int index, Map<String, String> contact) {
+  ///Build a custom contact tile using Material 3 styling
+  Widget _buildCustomContactTile(
+    BuildContext context,
+    int index,
+    Map<String, String> contact,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: Icon(Icons.contact_emergency, color: Colors.blue),
-        title: Text(contact['name']!),
-        subtitle: Text("Call: ${contact['number']}"),
+        leading: Icon(
+          Icons.contact_emergency,
+          color: colorScheme.secondary,
+        ), // Use secondary color
+        title: Text(contact['name']!, style: textTheme.titleMedium),
+        subtitle: Text(
+          "Call: ${contact['number']}",
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
         trailing: IconButton(
-          icon: Icon(Icons.delete, color: Colors.red),
+          icon: Icon(Icons.delete, color: colorScheme.error), // Use error color
+          tooltip: "Delete Contact",
           onPressed: () => _deleteCustomContact(index),
         ),
         onTap: () => launchUrl(Uri.parse("tel://${contact['number']}")),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  void _showAddContactDialog() {
+  /// Show Add Contact Dialog with M3 styling
+  void _showAddContactDialog(BuildContext context) {
+    // Pass context
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     TextEditingController nameController = TextEditingController();
     TextEditingController numberController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
+        // Use a different context name for the dialog
         return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(28), // M3 Dialog radius
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24), // M3 Dialog padding
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "Add Custom Contact",
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: textTheme.headlineSmall?.copyWith(
+                    // M3 Headline Small
+                    // fontWeight: FontWeight.bold, // Default weight is usually fine
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16), // M3 spacing
                 TextField(
                   controller: nameController,
                   decoration: InputDecoration(
                     labelText: "Contact Name",
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      // M3 default border
+                      borderRadius: BorderRadius.circular(
+                        12,
+                      ), // Consistent radius
                     ),
-                    prefixIcon: Icon(Icons.person),
+                    prefixIcon: Icon(
+                      Icons.person,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
+                  textInputAction: TextInputAction.next, // Improve usability
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16), // M3 spacing
                 TextField(
                   controller: numberController,
                   decoration: InputDecoration(
@@ -241,35 +338,63 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    prefixIcon: Icon(Icons.phone),
+                    prefixIcon: Icon(
+                      Icons.phone,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done, // Improve usability
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24), // M3 spacing before actions
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        "Cancel",
-                        //style: TextStyle(color: Colors.grey),
-                      ),
+                    // Use TextButton for less emphasis action
+                    TextButton(
+                      onPressed:
+                          () =>
+                              Navigator.of(
+                                dialogContext,
+                              ).pop(), // Use dialogContext
+                      child: const Text("Cancel"),
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton(
+                    // Use FilledButton or ElevatedButton for primary action
+                    FilledButton(
+                      // M3 primary button
                       onPressed: () {
-                        if (nameController.text.isNotEmpty &&
-                            numberController.text.isNotEmpty) {
-                          _addCustomContact(
-                            nameController.text,
-                            numberController.text,
+                        final name = nameController.text.trim();
+                        final number = numberController.text.trim();
+                        if (name.isNotEmpty && number.isNotEmpty) {
+                          // Basic phone number validation (optional but recommended)
+                          if (RegExp(
+                            r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$',
+                          ).hasMatch(number)) {
+                            _addCustomContact(name, number);
+                            Navigator.of(
+                              dialogContext,
+                            ).pop(); // Use dialogContext
+                          } else {
+                            // Show error if number is invalid
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Please enter a valid phone number.",
+                                ),
+                              ),
+                            );
+                          }
+                        } else {
+                          // Show error if fields are empty
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Please fill in both fields."),
+                            ),
                           );
-                          Navigator.of(context).pop();
                         }
                       },
-
-                      child: Text("Add"),
+                      child: const Text("Add"),
                     ),
                   ],
                 ),
@@ -283,6 +408,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 }
 
 ///Expanded Emergency Numbers Database
+// Keep this map as is, it's data not UI
 Map<String, List<Map<String, String>>> emergencyNumbers = {
   "India": [
     {"name": "Emergency", "number": "112"},

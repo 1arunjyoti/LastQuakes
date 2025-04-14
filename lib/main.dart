@@ -9,38 +9,27 @@ import 'package:lastquake/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-//Handle Firebase background messages
+// Handle Firebase background messages
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized for background handling
   await Firebase.initializeApp();
-  await NotificationService().showFCMNotification(message);
+  // Use a try-catch block for robustness in background isolate
+  try {
+    await NotificationService.instance.showFCMNotification(message);
+  } catch (e) {
+    debugPrint('Error showing background notification: $e');
+  }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase first, as other services might depend on it
   await Firebase.initializeApp();
 
-  //Initialize Firebase Messaging Background Handler
+  // Set up background message handler *after* Firebase init
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Listen for foreground FCM messages (essential early setup)
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    debugPrint("Received foreground message: ${message.messageId}");
-    NotificationService().showFCMNotification(message);
-  });
-
-  // Listen for token refresh
-  FirebaseMessaging.instance.onTokenRefresh.listen((String token) async {
-    debugPrint("FCM Token refreshed: ${token.substring(0, 15)}...");
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('fcm_token', token);
-    // Re-register with the new token and current preferences
-    // Ensure NotificationService can be instantiated or use a static method
-    await NotificationService().registerDeviceWithServer();
-  });
-
-  // Get initial FCM token and store it (can run in parallel with UI)
-  _storeInitialFcmToken();
 
   // Set preferred orientations
   SystemChrome.setPreferredOrientations([
@@ -48,91 +37,123 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Preload SharedPreferences - can happen concurrently
+  final prefsFuture = SharedPreferences.getInstance();
+
+  // Initialize notification service (local notifications part)
+  // Moved initialization here, can happen concurrently with prefs
+  final notificationInitFuture =
+      NotificationService.instance.initNotifications();
+
+  // Handle foreground messages
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint("Foreground message received: ${message.messageId}");
+    NotificationService.instance.showFCMNotification(message);
+  });
+
+  // Handle token refresh - Update backend when token changes
+  FirebaseMessaging.instance.onTokenRefresh.listen((String token) async {
+    debugPrint("🔄 FCM Token refreshed: ${token.substring(0, 15)}...");
+    // Update token in prefs and trigger backend update
+    try {
+      final prefs = await prefsFuture;
+      await prefs.setString('fcm_token', token); // Store the new token
+      await NotificationService.instance.updateBackendRegistration();
+    } catch (e) {
+      debugPrint("❌ Error handling token refresh: $e");
+    }
+  });
+
+  // Wait for essential initializations to complete before running the app
+  final prefs = await prefsFuture;
+  await notificationInitFuture; // Ensure notification service init is done
+
+  // Perform initial token storage and backend registration *after* main initializations
+  _postFrameInitializations();
+
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ThemeProvider()..loadPreferences(),
+      // Pass the already awaited SharedPreferences instance
+      create: (context) => ThemeProvider(prefs: prefs)..loadPreferences(),
       child: const MyApp(),
     ),
   );
 }
 
-// Helper function to store initial token without blocking main
+// Non-blocking initializations that can run after the first frame
+Future<void> _postFrameInitializations() async {
+  debugPrint("🚀 Starting post-frame initializations...");
+  // Store initial FCM token
+  await _storeInitialFcmToken();
+
+  // Perform initial backend registration
+  await _requestPermissionAndRegister();
+  debugPrint("✅ Post-frame initializations complete.");
+}
+
+// Helper function to store the initial FCM token
 Future<void> _storeInitialFcmToken() async {
   try {
     String? fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {
-      debugPrint(
-        "📲 Initial FCM Token (async): ${fcmToken.substring(0, 15)}...",
-      );
-      SharedPreferences prefs = await SharedPreferences.getInstance();
+      debugPrint("📲 Initial FCM Token: ${fcmToken.substring(0, 15)}...");
+      SharedPreferences prefs =
+          await SharedPreferences.getInstance(); // Get instance again or pass from main
       await prefs.setString('fcm_token', fcmToken);
-      // Initial registration will be handled later in _initializeNotificationsAndRegistration
     } else {
-      debugPrint("Failed to get initial FCM token (async).");
+      debugPrint("⚠️ Failed to get initial FCM token.");
     }
   } catch (e) {
-    debugPrint("Error getting initial FCM token (async): $e");
+    debugPrint("❌ Error getting initial FCM token: $e");
   }
 }
 
-// Helper function to perform deferred initializations
-Future<void> _initializeNotificationsAndRegistration(
-  BuildContext context,
-) async {
-  debugPrint("Starting deferred initialization...");
+// Helper function to request permissions and trigger initial registration
+Future<void> _requestPermissionAndRegister() async {
   try {
-    // Initialize notification service
-    final notificationService = NotificationService();
-    await notificationService.initNotifications(); // Local notifications init
-
-    // Request FCM permission
+    // Request FCM permission (required for receiving messages)
     FirebaseMessaging messaging = FirebaseMessaging.instance;
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,
-      announcement: false,
       badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
       sound: true,
+      provisional:
+          false, // Set to true if you want silent pushes before explicit grant
     );
-    debugPrint("Notification permission: ${settings.authorizationStatus}");
+    debugPrint(
+      "ℹ️ FCM Notification permission status: ${settings.authorizationStatus}",
+    );
 
-    // Only proceed if permission is granted (or potentially provisional)
+    // We attempt registration regardless of permission status initially.
+    // The backend should ideally handle tokens from users who haven't granted
+    // notification permission (e.g., by not sending them pushes).
+    // The NotificationService.updateBackendRegistration already checks
+    // location permissions internally if needed for the selected filter.
+    // We don't need to explicitly check NotificationFilterType.none here,
+    // as updateBackendRegistration sends the type to the backend.
+
     if (settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional) {
-      // Register device with server initially
-      // This ensures the token stored earlier (or fetched now if needed) is registered
-      await notificationService.registerDeviceWithServer();
+      debugPrint("🚀 Triggering initial backend registration...");
+      await NotificationService.instance.initialRegisterOrUpdate();
     } else {
       debugPrint(
-        "Notification permission denied. Skipping topic subscription and registration.",
+        "⚠️ FCM permission denied. Backend registration will still be attempted, but notifications may not be received.",
       );
+      // Still attempt registration, backend decides if it should store/use the token
+      await NotificationService.instance.initialRegisterOrUpdate();
     }
-    debugPrint("Deferred initialization complete.");
   } catch (e) {
-    debugPrint("Error during deferred initialization: $e");
+    debugPrint("❌ Error during permission request or initial registration: $e");
   }
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeNotificationsAndRegistration(context);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // No need for initState or postFrameCallback here anymore
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(

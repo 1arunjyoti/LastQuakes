@@ -105,6 +105,38 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
   }
 }
 
+// Top level isolate function and data class for filtering
+class FilterParameters {
+  final List<Map<String, dynamic>> earthquakes;
+  final double minMagnitude;
+  final DateTime? cutoffTime;
+
+  FilterParameters({
+    required this.earthquakes,
+    required this.minMagnitude,
+    this.cutoffTime,
+  });
+}
+
+List<Map<String, dynamic>> _filterEarthquakesIsolate(FilterParameters params) {
+  return params.earthquakes.where((quake) {
+    final properties = quake['properties'];
+    if (properties == null || properties is! Map) return false;
+
+    final magnitude = (properties['mag'] as num?)?.toDouble() ?? 0.0;
+    final timeMillis = (properties['time'] as int?) ?? 0;
+
+    bool passesMagnitude = magnitude >= params.minMagnitude;
+    bool passesTime = true;
+    if (params.cutoffTime != null && timeMillis > 0) {
+      final quakeDateTime = DateTime.fromMillisecondsSinceEpoch(timeMillis);
+      passesTime = quakeDateTime.isAfter(params.cutoffTime!);
+    }
+
+    return passesMagnitude && passesTime;
+  }).toList();
+}
+
 class EarthquakeMapScreen extends StatefulWidget {
   const EarthquakeMapScreen({Key? key}) : super(key: key);
 
@@ -118,6 +150,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _allFetchedEarthquakes = []; // Store fetched data
+  List<Map<String, dynamic>> _filteredEarthquakes = [];
+  List<Marker> _currentMarkers = []; // Memoized markers list
 
   late final MapController _mapController;
   double _zoomLevel = 2.0;
@@ -144,8 +178,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   final LocationService _locationService = LocationService();
 
   // --- NEW State Variables for Filtering ---
-  // Holds the earthquakes currently displayed after filtering
-  List<Map<String, dynamic>> _filteredEarthquakes = [];
   double _selectedMinMagnitude = 3.0;
   bool _isFilteringLocally = false;
   static final List<double> _magnitudeFilterOptions = [
@@ -261,15 +293,15 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
-  void _applyFilters() {
+  Future<void> _applyFilters() async {
     if (!mounted) return;
     setState(() {
-      _isFilteringLocally = true; // Show indicator if needed
+      _isFilteringLocally = true;
     });
 
-    // --- Calculate Time Cutoff ---
+    // Calculate Time Cutoff
     final now = DateTime.now();
-    DateTime? cutoffTime; // Nullable - if null, don't filter by time
+    DateTime? cutoffTime;
 
     switch (_selectedTimeWindow) {
       case TimeWindow.lastHour:
@@ -281,38 +313,118 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       case TimeWindow.last7Days:
         cutoffTime = now.subtract(const Duration(days: 7));
         break;
-      case TimeWindow.last45Days: // Explicitly handle the "all" case
-        cutoffTime = null; // No time filtering needed
+      case TimeWindow.last45Days:
+        cutoffTime = null;
         break;
     }
 
-    // Filter the master list based on current filter settings
-    _filteredEarthquakes =
-        _allFetchedEarthquakes.where((quake) {
-          final properties = quake['properties'];
-          if (properties == null || properties is! Map) return false;
+    // Create filter parameters for isolate
+    final params = FilterParameters(
+      earthquakes: _allFetchedEarthquakes,
+      minMagnitude: _selectedMinMagnitude,
+      cutoffTime: cutoffTime,
+    );
 
-          final magnitude = (properties['mag'] as num?)?.toDouble() ?? 0.0;
-          final timeMillis = (properties['time'] as int?) ?? 0;
+    try {
+      // Run filtering in isolate
+      final filteredResults = await compute(_filterEarthquakesIsolate, params);
 
-          // Apply minimum magnitude filter
-          bool passesMagnitude = magnitude >= _selectedMinMagnitude;
-          // --- Check Time ---
-          bool passesTime = true; // Default to true
-          if (cutoffTime != null && timeMillis > 0) {
-            // Only filter if a cutoff is set and time is valid
-            final quakeDateTime = DateTime.fromMillisecondsSinceEpoch(
-              timeMillis,
-            );
-            passesTime = quakeDateTime.isAfter(cutoffTime);
-          }
+      if (!mounted) return;
+      setState(() {
+        _filteredEarthquakes = filteredResults;
+        _isFilteringLocally = false;
+      });
 
-          return passesMagnitude && passesTime;
-        }).toList();
+      // Update markers after filtering
+      _updateMarkers();
+    } catch (e) {
+      debugPrint('Error during filtering: $e');
+      if (!mounted) return;
+      setState(() {
+        _isFilteringLocally = false;
+      });
+    }
+  }
 
-    setState(() {
-      _isFilteringLocally = false;
-    });
+  void _updateMarkers() {
+    if (!mounted) return;
+
+    final List<Marker> newMarkers = [];
+    if (_filteredEarthquakes.isEmpty) {
+      setState(() => _currentMarkers = newMarkers);
+      return;
+    }
+
+    // Create markers from filtered earthquakes
+    for (final quake in _filteredEarthquakes) {
+      final properties = quake["properties"];
+      final geometry = quake["geometry"];
+      if (properties == null || geometry == null) continue;
+      final coordinates = geometry["coordinates"];
+      if (coordinates is! List || coordinates.length < 2) continue;
+
+      final double? lon =
+          (coordinates[0] is num) ? coordinates[0].toDouble() : null;
+      final double? lat =
+          (coordinates[1] is num) ? coordinates[1].toDouble() : null;
+      if (lat == null || lon == null) continue;
+
+      final double magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
+      final double markerSize = 2 + (magnitude * 4.0).clamp(0, 30);
+      final Color markerColor = _getMarkerColor(
+        magnitude,
+      ).withValues(alpha: 0.85);
+
+      // Create a mutable copy of properties to add distance
+      final Map<String, dynamic> mutableProperties = Map.from(properties);
+
+      // Calculate distance if user location is available
+      if (_userPosition != null) {
+        final distanceKm = _locationService.calculateDistance(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+          lat,
+          lon,
+        );
+        mutableProperties["distance"] = distanceKm.round();
+      } else {
+        mutableProperties.remove("distance");
+      }
+
+      newMarkers.add(
+        Marker(
+          point: LatLng(lat, lon),
+          width: markerSize,
+          height: markerSize,
+          child: GestureDetector(
+            onTap: () => _showEarthquakeDetails(mutableProperties),
+            child: Tooltip(
+              message:
+                  'M ${magnitude.toStringAsFixed(1)}\n${mutableProperties["place"] ?? 'Unknown'}',
+              preferBelow: false,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: markerColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    width: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Add user location marker if available
+    final userMarker = _buildUserLocationMarker();
+    if (userMarker != null) {
+      newMarkers.add(userMarker);
+    }
+
+    setState(() => _currentMarkers = newMarkers);
   }
 
   void _showFilterBottomSheet() {
@@ -434,7 +546,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   Future<void> _fetchUserLocation() async {
     if (!mounted) return;
 
-    // Check if location services are enabled first
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
@@ -462,7 +573,10 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           LatLng(position.latitude, position.longitude),
           _zoomLevel,
         );
-        _showLocationSuccessSnackBar(); // Added notification
+        _showLocationSuccessSnackBar();
+
+        // Update markers to reflect new distances
+        _updateMarkers();
       } else {
         setState(() => _isLoadingLocation = false);
         _showLocationErrorDialog();
@@ -555,88 +669,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       if (magnitude >= 5.0) return Colors.amber.shade700;
       return Colors.green.shade600;
     });
-  }
-
-  // MODIFIED: Marker building now uses internal _earthquakeData state
-  List<Marker> _buildMarkersInternal() {
-    final List<Marker> markers = [];
-    if (_allFetchedEarthquakes.isEmpty) {
-      return markers; // Return early if no data
-    }
-
-    // Use the internal state _earthquakeData
-    for (final quake in _filteredEarthquakes) {
-      final properties = quake["properties"];
-      final geometry = quake["geometry"];
-      if (properties == null || geometry == null) continue;
-      final coordinates = geometry["coordinates"];
-      if (coordinates is! List || coordinates.length < 2) continue;
-
-      final double? lon =
-          (coordinates[0] is num) ? coordinates[0].toDouble() : null;
-      final double? lat =
-          (coordinates[1] is num) ? coordinates[1].toDouble() : null;
-      if (lat == null || lon == null) continue;
-
-      final double magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
-      final double markerSize = 2 + (magnitude * 4.0).clamp(0, 30);
-      final Color markerColor = _getMarkerColor(
-        magnitude,
-      ).withValues(alpha: 0.85);
-
-      // Create a mutable copy of properties to add distance
-      final Map<String, dynamic> mutableProperties = Map.from(properties);
-
-      // Calculate distance if user location is available
-      if (_userPosition != null) {
-        final distanceKm = _locationService.calculateDistance(
-          _userPosition!.latitude,
-          _userPosition!.longitude,
-          lat,
-          lon,
-        );
-        mutableProperties["distance"] = distanceKm.round(); // Add to the copy
-      } else {
-        mutableProperties.remove("distance");
-      }
-
-      markers.add(
-        Marker(
-          point: LatLng(lat, lon),
-          width: markerSize,
-          height: markerSize,
-          child: GestureDetector(
-            onTap: () => _showEarthquakeDetails(mutableProperties),
-            child: Tooltip(
-              message:
-                  'M ${magnitude.toStringAsFixed(1)}\n${mutableProperties["place"] ?? 'Unknown'}',
-              preferBelow: false,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: markerColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    // Add border
-                    color: Colors.black.withValues(
-                      alpha: 0.5,
-                    ), // Semi-transparent black border
-                    width: 1.0,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Add user location marker if available
-    final userMarker = _buildUserLocationMarker();
-    if (userMarker != null) {
-      markers.add(userMarker);
-    }
-
-    return markers;
   }
 
   /// Optimized dialog construction with const and reduced computation
@@ -801,8 +833,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // Build markers dynamically based on current state
-    final List<Marker> currentMarkers = _buildMarkersInternal();
 
     return Scaffold(
       appBar: LastQuakesAppBar(
@@ -911,8 +941,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                           _userPosition!.longitude,
                         )
                         : const LatLng(
-                          20.0,
-                          0.0,
+                          20.6,
+                          78.9,
                         ), // Default center (adjust as needed)
                 initialZoom: _zoomLevel,
                 minZoom: _minZoom,
@@ -957,13 +987,12 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                   ),
 
                 // --- Marker Layer (Clustered or Normal) ---
-                // Use currentMarkers built dynamically
                 if (_zoomLevel < _clusteringThreshold)
                   MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
                       maxClusterRadius: 45, // Slightly larger radius
                       size: const Size(40, 40),
-                      markers: currentMarkers, // Use dynamically built markers
+                      markers: _currentMarkers, // Use memoized markers
                       polygonOptions: const PolygonOptions(
                         borderColor: Colors.blueAccent,
                         color: Colors.black12, // Less intrusive polygon color
@@ -988,9 +1017,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                     ),
                   )
                 else
-                  MarkerLayer(
-                    markers: currentMarkers,
-                  ), // Use dynamically built markers
+                  MarkerLayer(markers: _currentMarkers), // Use memoized markers
                 RichAttributionWidget(
                   showFlutterMapAttribution: false,
                   attributions: [

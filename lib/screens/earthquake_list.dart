@@ -11,7 +11,7 @@ import '../services/api_service.dart';
 
 // --- Top-level function for Isolate Processing ---
 // NOTE: LocationService cannot be directly used here. Pass necessary primitives.
-List<Map<String, dynamic>> _filterAndSortEarthquakesIsolate(
+Map<String, dynamic> _filterAndSortEarthquakesIsolate(
   Map<String, dynamic> args,
 ) {
   final List<Map<String, dynamic>> inputList = args['list'];
@@ -20,15 +20,11 @@ List<Map<String, dynamic>> _filterAndSortEarthquakesIsolate(
   final double? userLat = args['userLat'];
   final double? userLon = args['userLon'];
 
-  // Simple distance calculation (can be replaced with Geolocator version if needed,
-  // but would require passing Geolocator's static method or pre-calculating)
-  // For simplicity, keep the core filtering logic here. Distance calc adds overhead.
-  // Let's calculate distance on the main thread only for displayed items later if needed,
-  // or accept the overhead here if filtering by distance becomes a feature.
-  // For now, focus on filtering by mag/country in isolate.
-
   List<Map<String, dynamic>> correctlyTypedInput =
       inputList.whereType<Map<String, dynamic>>().toList();
+
+  // Extract unique countries while filtering
+  Set<String> uniqueCountries = {};
 
   final List<Map<String, dynamic>> filteredList =
       correctlyTypedInput
@@ -38,9 +34,12 @@ List<Map<String, dynamic>> _filterAndSortEarthquakesIsolate(
 
             final magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
             final place = properties["place"] as String? ?? "";
-            // Simple country extraction (must be self-contained)
+            // Extract country and add to set
             final String country =
                 place.contains(", ") ? place.split(", ").last.trim() : "";
+            if (country.isNotEmpty) {
+              uniqueCountries.add(country);
+            }
 
             bool passesMagnitude = magnitude >= minMagnitude;
             bool passesCountry =
@@ -67,7 +66,6 @@ List<Map<String, dynamic>> _filterAndSortEarthquakesIsolate(
                     coordinates[1] is num) {
                   final double longitude = coordinates[0].toDouble();
                   final double latitude = coordinates[1].toDouble();
-                  // Using Geolocator's static method IS possible in isolates
                   final distance =
                       Geolocator.distanceBetween(
                         userLat,
@@ -77,14 +75,12 @@ List<Map<String, dynamic>> _filterAndSortEarthquakesIsolate(
                       ) /
                       1000.0; // km
                   properties["distance"] = distance.round();
-                  currentQuake["properties"] =
-                      properties; // Update the copied properties
+                  currentQuake["properties"] = properties;
                 }
               }
             }
-            // --- End Optional Distance Calc ---
 
-            return currentQuake; // Return the (potentially modified) quake map
+            return currentQuake;
           })
           .toList();
 
@@ -95,7 +91,11 @@ List<Map<String, dynamic>> _filterAndSortEarthquakesIsolate(
     return timeB.compareTo(timeA);
   });
 
-  return filteredList;
+  // Convert the result to a map containing both the filtered list and unique countries
+  return {
+    'filteredList': filteredList,
+    'uniqueCountries': uniqueCountries.toList()..sort(),
+  };
 }
 
 class EarthquakeListScreen extends StatefulWidget {
@@ -237,34 +237,35 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     if (!mounted) return;
     setState(() {
       _isFiltering = true;
-    }); // Show filtering indicator
+    });
 
     final args = {
       'list': _unfilteredEarthquakes,
       'minMagnitude': selectedMagnitude,
       'countryFilter': selectedCountry,
-      'userLat': _userPosition?.latitude, // Pass user location primitives
+      'userLat': _userPosition?.latitude,
       'userLon': _userPosition?.longitude,
     };
 
     try {
-      // Run filtering in an isolate
-      final List<Map<String, dynamic>> filteredData = await compute(
+      final Map<String, dynamic> result = await compute(
         _filterAndSortEarthquakesIsolate,
         args,
       );
 
       if (!mounted) return;
 
-      // Update state with results from isolate
       setState(() {
-        allEarthquakes = filteredData;
+        allEarthquakes = result['filteredList'] as List<Map<String, dynamic>>;
+        // Update country list with the results from isolate
+        countryList = ["All"] + (result['uniqueCountries'] as List<String>);
+        _memoizedCountryItems = null; // Clear memoized dropdown
         _currentPage = 1;
-        displayedEarthquakes = filteredData.take(_itemsPerPage).toList();
-        _hasMoreData = filteredData.length > _itemsPerPage;
-        _isLoading = false; // Ensure initial loading is off
-        isRefreshing = false; // Ensure refreshing is off
-        _isFiltering = false; // Hide filtering indicator
+        displayedEarthquakes = allEarthquakes.take(_itemsPerPage).toList();
+        _hasMoreData = allEarthquakes.length > _itemsPerPage;
+        _isLoading = false;
+        isRefreshing = false;
+        _isFiltering = false;
       });
     } catch (e) {
       debugPrint("Error during filtering isolate: $e");
@@ -393,7 +394,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       _isLoadingMore = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    //await Future.delayed(const Duration(milliseconds: 500));
 
     final startIndex = _currentPage * _itemsPerPage;
     // Use the 'allEarthquakes' (filtered) list for pagination
@@ -403,11 +404,12 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
             : startIndex + _itemsPerPage;
 
     if (startIndex >= allEarthquakes.length) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _hasMoreData = false;
           _isLoadingMore = false;
         });
+      }
       return;
     }
 
@@ -454,7 +456,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                       height: 24,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                    : const Icon(Icons.location_searching),
+                    : const Icon(Icons.my_location),
             onPressed: _isLoadingLocation ? null : _fetchUserLocation,
             tooltip: 'Refresh Location',
           ),

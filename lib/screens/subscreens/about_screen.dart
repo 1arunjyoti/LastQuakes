@@ -74,7 +74,7 @@ class _AboutScreenState extends State<AboutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            const SizedBox(height: 20),
+            /* const SizedBox(height: 20),
 
             // App Icon (Using a generic one here, replace with your actual logo)
             Icon(
@@ -82,7 +82,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   .track_changes_outlined, // Or Icons.public, or your custom logo asset
               size: 80,
               color: colorScheme.primary,
-            ),
+            ), */
             const SizedBox(height: 16),
 
             // App Name
@@ -111,9 +111,9 @@ class _AboutScreenState extends State<AboutScreen> {
               style: textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             const Divider(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // Data Source Section
             _buildInfoSection(
@@ -144,9 +144,8 @@ class _AboutScreenState extends State<AboutScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             const Divider(),
-            const SizedBox(height: 16),
 
             // Open Source Licenses
             ListTile(
@@ -187,7 +186,7 @@ class _AboutScreenState extends State<AboutScreen> {
               title: 'Terms of Service',
               url: 'YOUR_TERMS_URL_HERE',
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -202,31 +201,34 @@ class _AboutScreenState extends State<AboutScreen> {
     required Widget content,
   }) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: theme.colorScheme.secondary, size: 24),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: theme.colorScheme.secondary, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.only(left: 36.0), // Indent content
-          child: DefaultTextStyle(
-            // Ensure text style consistency
-            style: theme.textTheme.bodyMedium!,
-            child: content,
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 36.0), // Indent content
+            child: DefaultTextStyle(
+              // Ensure text style consistency
+              style: theme.textTheme.bodyMedium!,
+              child: content,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -1,26 +1,50 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ApiService {
-  static const String _CACHE_KEY = 'earthquake_data_cache';
   static const String _CACHE_TIMESTAMP_KEY = 'earthquake_data_cache_timestamp';
+  static const String _CACHE_FILENAME = 'earthquake_data_cache.json';
 
-  /// Process earthquakes in an isolate to improve performance
-  static List<Map<String, dynamic>> processEarthquakes(List<dynamic> args) {
-    List<dynamic> allEarthquakes = args[0];
+  /// Process earthquakes data in an isolate
+  static Map<String, dynamic> _processEarthquakesIsolate(List<dynamic> args) {
+    String rawData = args[0];
     double minMagnitude = args[1];
 
-    return allEarthquakes
-        .where((quake) {
-          var mag = quake["properties"]["mag"];
-          if (mag == null) return false; // Handling null values safely
-          double magnitude = (mag is int) ? mag.toDouble() : mag;
-          return magnitude >= minMagnitude;
-        })
-        .map((quake) => Map<String, dynamic>.from(quake))
-        .toList(); // Ensuring type safety
+    // Decode JSON within the isolate
+    final data = json.decode(rawData);
+    if (data["features"] == null) return {"processed": [], "encoded": "[]"};
+
+    final List<Map<String, dynamic>> processed =
+        (data["features"] as List)
+            .where((quake) {
+              var mag = quake["properties"]["mag"];
+              if (mag == null) return false;
+              double magnitude = (mag is int) ? mag.toDouble() : mag;
+              return magnitude >= minMagnitude;
+            })
+            .map((quake) => Map<String, dynamic>.from(quake))
+            .toList();
+
+    // Encode the processed data for caching within the isolate
+    final String encodedData = json.encode(processed);
+
+    return {"processed": processed, "encoded": encodedData};
+  }
+
+  /// Decode cached data in isolate
+  static List<Map<String, dynamic>> _decodeCacheIsolate(String cachedData) {
+    final List<dynamic> decoded = json.decode(cachedData);
+    return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Get cache file path
+  static Future<File> _getCacheFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/$_CACHE_FILENAME');
   }
 
   /// Fetches and caches earthquake data
@@ -30,18 +54,17 @@ class ApiService {
     bool forceRefresh = false,
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    final cacheFile = await _getCacheFile();
 
     // Check for cached data if not force refreshing
     if (!forceRefresh) {
-      final cachedData = prefs.getString(_CACHE_KEY);
       final cachedTimestamp = prefs.getInt(_CACHE_TIMESTAMP_KEY);
-
-      if (cachedData != null && cachedTimestamp != null) {
-        // Check if cache is less than 1 hour old
+      if (cachedTimestamp != null && await cacheFile.exists()) {
         final currentTime = DateTime.now().millisecondsSinceEpoch;
         if (currentTime - cachedTimestamp < 3600000) {
-          final List<dynamic> decodedCache = json.decode(cachedData);
-          return decodedCache.map((e) => Map<String, dynamic>.from(e)).toList();
+          // 1 hour cache
+          final String cachedData = await cacheFile.readAsString();
+          return compute(_decodeCacheIsolate, cachedData);
         }
       }
     }
@@ -56,45 +79,35 @@ class ApiService {
       "endtime": now.toIso8601String(),
     });
 
-    //debugPrint("Fetching data from: $url");
-
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 10));
       debugPrint("API Status Code: ${response.statusCode}");
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data["features"] == null || (data["features"] as List).isEmpty) {
-          debugPrint("No earthquakes found.");
-          return [];
-        }
-
-        // Process earthquakes in a separate isolate
-        final processedEarthquakes = await compute(processEarthquakes, [
-          data["features"],
+        // Process response in isolate
+        final result = await compute(_processEarthquakesIsolate, [
+          response.body,
           minMagnitude,
         ]);
 
-        // Cache the processed data
-        await prefs.setString(_CACHE_KEY, json.encode(processedEarthquakes));
+        // Save processed data to file cache
+        await cacheFile.writeAsString(result["encoded"] as String);
         await prefs.setInt(
           _CACHE_TIMESTAMP_KEY,
           DateTime.now().millisecondsSinceEpoch,
         );
 
-        return processedEarthquakes;
+        return (result["processed"] as List).cast<Map<String, dynamic>>();
       } else {
         throw Exception("API Error: ${response.statusCode}");
       }
     } catch (e) {
       debugPrint("Error fetching data: $e");
 
-      // Attempt to return cached data if network fails
-      final cachedData = prefs.getString(_CACHE_KEY);
-      if (cachedData != null) {
-        final List<dynamic> decodedCache = json.decode(cachedData);
-        return decodedCache.map((e) => Map<String, dynamic>.from(e)).toList();
+      // Try to return cached data if network fails
+      if (await cacheFile.exists()) {
+        final String cachedData = await cacheFile.readAsString();
+        return compute(_decodeCacheIsolate, cachedData);
       }
 
       throw Exception("Error fetching earthquake data: $e");
@@ -104,7 +117,10 @@ class ApiService {
   /// Clear cached earthquake data
   static Future<void> clearCache() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_CACHE_KEY);
+    final cacheFile = await _getCacheFile();
     await prefs.remove(_CACHE_TIMESTAMP_KEY);
+    if (await cacheFile.exists()) {
+      await cacheFile.delete();
+    }
   }
 }

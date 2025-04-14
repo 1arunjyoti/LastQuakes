@@ -65,7 +65,7 @@ class EarthquakeListItem extends StatelessWidget {
       child: Card(
         margin: cardMargin,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 4,
+        elevation: 2,
         child: IntrinsicHeight(
           // Ensure Row children have same height for the bar
           child: Row(

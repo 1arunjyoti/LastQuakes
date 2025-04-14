@@ -7,181 +7,166 @@ import 'package:lastquake/screens/subscreens/preparedness_screen.dart';
 import 'package:lastquake/screens/subscreens/quiz_screen.dart';
 import 'package:provider/provider.dart';
 
-class CustomDrawer extends StatelessWidget {
+// Define a simple structure for navigation destinations
+class NavigationItem {
+  final IconData icon;
+  final String label;
+  final Widget screen;
+
+  const NavigationItem(this.icon, this.label, this.screen);
+}
+
+class CustomDrawer extends StatefulWidget {
   const CustomDrawer({super.key});
+
+  @override
+  State<CustomDrawer> createState() => _CustomDrawerState();
+}
+
+class _CustomDrawerState extends State<CustomDrawer> {
+  int? _selectedIndex;
+
+  // List of primary navigation destinations
+  static final List<NavigationItem> _destinations = [
+    const NavigationItem(
+      Icons.warning_amber_rounded,
+      "Preparedness & Safety",
+      PreparednessScreen(),
+    ),
+    NavigationItem(
+      Icons.phone,
+      "Emergency Contacts",
+      EmergencyContactsScreen(),
+    ),
+    const NavigationItem(Icons.quiz, "Test Your Knowledge", QuizScreen()),
+    const NavigationItem(Icons.settings_outlined, "Settings", SettingsScreen()),
+    const NavigationItem(Icons.info_outline, "About", AboutScreen()),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
-    return Drawer(
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    // Using NavigationDrawer for Material 3
+    return Theme(
+      data: Theme.of(context).copyWith(
+        drawerTheme: const DrawerThemeData(
+          // Ensure no rounded corners by setting shape here
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+      ),
+      child: NavigationDrawer(
+        // Ensure no rounded corners
+        // Shape is now handled by the Theme wrapper
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        selectedIndex: _selectedIndex,
+        // Use onDestinationSelected for navigation logic
+        onDestinationSelected: (index) {
+          // Update the state to show selection highlight
+          setState(() {
+            _selectedIndex = index;
+          });
+
+          // Close the drawer first
+          Navigator.pop(context);
+
+          // Navigate to the selected screen
+          // Use a short delay to allow drawer to close before navigating,
+          // preventing potential visual glitches.
+          Future.delayed(const Duration(milliseconds: 150), () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => _destinations[index].screen,
+              ),
+            );
+            // Optionally, reset selection after navigation if you don't
+            // want the item to stay selected after returning to the main screen.
+            // setState(() {
+            //   _selectedIndex = null;
+            // });
+          });
+        },
         children: [
+          // Re-use the existing header, adapt padding if needed
           _buildDrawerHeader(context, themeProvider),
-          Expanded(child: _buildMenuItems(context)),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              // Use Column for footer items
-              children: [
-                _buildFooterItem(
-                  // Example helper
-                  context: context,
-                  icon: Icons.settings_outlined,
-                  text: "Settings",
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
-                      ),
-                    );
-                  },
+          Divider(),
+          // Map ALL destinations, separating footer items with a Divider
+
+          // Main destinations (first 3 items)
+          ..._destinations
+              .take(3)
+              .map(
+                (item) => NavigationDrawerDestination(
+                  icon: Icon(item.icon),
+                  label: Text(item.label),
                 ),
-                const SizedBox(height: 8),
-                _buildFooterItem(
-                  context: context,
-                  icon: Icons.info_outline,
-                  text: "About",
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AboutScreen(),
-                      ),
-                    );
-                  },
+              ),
+          // Add padding and a divider before footer items
+          Divider(),
+          // Footer destinations (remaining items)
+          ..._destinations
+              .skip(3)
+              .map(
+                (item) => NavigationDrawerDestination(
+                  icon: Icon(item.icon),
+                  label: Text(item.label),
                 ),
-              ],
-            ),
-          ),
+              ),
         ],
       ),
     );
   }
 
   Widget _buildDrawerHeader(BuildContext context, ThemeProvider themeProvider) {
+    // Keep header, maybe adjust padding/color if needed for M3 look
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      // Use M3 recommended padding for header content
+      padding: const EdgeInsets.fromLTRB(28, 16, 16, 10),
       width: double.infinity,
-      color: Theme.of(context).primaryColor,
-
+      // Remove explicit color to use NavigationDrawer's surface color
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [_buildAppInfo()],
+        children: [_buildAppInfo(context)],
       ),
     );
   }
 
-  Widget _buildAppInfo() {
-    return const Expanded(
+  Widget _buildAppInfo(BuildContext context) {
+    // Adjusted text styles slightly for M3 feel
+    return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.public,
-            size: 40,
-            color: Colors.white,
-            semanticLabel: 'Earthquake App Icon',
-          ),
-          SizedBox(height: 10),
           Text(
             "Earthquake App",
             style: TextStyle(
+              // Use headlineSmall or titleLarge from theme?
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color:
+                  Theme.of(
+                    context,
+                  ).colorScheme.onSurface, // Use onSurface color
             ),
           ),
           Text(
             "Stay Informed, Stay Safe",
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(
+              // Use bodyMedium from theme?
+              color:
+                  Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant, // Use onSurfaceVariant
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuItems(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        _buildDrawerItem(
-          icon: Icons.warning_amber_rounded,
-          text: "Preparedness & Safety",
-          context: context,
-          screen: const PreparednessScreen(),
-        ),
-        _buildDrawerItem(
-          icon: Icons.phone,
-          text: "Emergency Contacts",
-          context: context,
-          screen: EmergencyContactsScreen(),
-        ),
-        _buildDrawerItem(
-          icon: Icons.quiz,
-          text: "Test Your Knowledge",
-          context: context,
-          screen: const QuizScreen(),
-        ),
-      ],
-    );
-  }
+  // _buildMenuItems is no longer needed as items are built directly in build()
 
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String text,
-    required BuildContext context,
-    Widget? screen,
-    VoidCallback? onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, semanticLabel: text),
-      title: Text(text, style: const TextStyle(fontSize: 16)),
-      onTap:
-          onTap ??
-          () {
-            // Close the drawer first
-            Navigator.pop(context);
-
-            // Navigate to the specified screen
-            if (screen != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => screen),
-              );
-            }
-          },
-    );
-  }
-
-  // Helper for footer items (similar to _buildDrawerItem but maybe simpler)
-  Widget _buildFooterItem({
-    required BuildContext context,
-    required IconData icon,
-    required String text,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 16),
-            Text(text, style: Theme.of(context).textTheme.bodyLarge),
-          ],
-        ),
-      ),
-    );
-  }
+  // _buildDrawerItem is no longer needed, replaced by NavigationDrawerDestination
 }
