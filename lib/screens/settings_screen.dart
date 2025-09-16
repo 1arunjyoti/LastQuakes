@@ -3,10 +3,8 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:lastquake/models/safe_zone.dart';
 import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/widgets/appbar.dart';
@@ -42,14 +40,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<SafeZone> _safeZones = [];
 
   bool _isLoaded = false; // Track if initial load is complete
-  final LocationService _locationService =
-      LocationService(); // Instance for permission/location checks
+  /* final LocationService _locationService =
+      LocationService(); */ // Instance for permission/location checks
 
   // Expansion state
   bool _notificationSettingsExpanded = true; // Start expanded
   bool _themeExpanded = false;
   bool _unitsExpanded = false;
-  bool _clockExpanded = false;
+  //bool _clockExpanded = false;
 
   // Data for dropdowns/sliders (Can be potentially loaded from a config or kept static)
   final List<String> _countryList = [
@@ -777,8 +775,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return "Specific Country";
       case NotificationFilterType.worldwide:
         return "Worldwide";
-      default:
-        return type.name; // Fallback
+      // Fallback
     }
   }
 

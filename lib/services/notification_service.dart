@@ -37,7 +37,7 @@ class NotificationService {
       LocationService(); // For getting user location
 
   // Update with your Firebase Function URL
-  static const String _SERVER_URL = 'https://lastquakenotify.onrender.com';
+  static const String serverUrl = 'https://lastquakenotify.onrender.com';
 
   Future<void> initNotifications() async {
     const AndroidInitializationSettings androidSettings =
@@ -51,7 +51,7 @@ class NotificationService {
       // iOS: iosSettings,
     );
 
-    // TODO: Add onDidReceiveNotificationResponse for tap handling
+    // Add onDidReceiveNotificationResponse for tap handling
     await flutterLocalNotificationsPlugin.initialize(settings);
   }
 
@@ -178,7 +178,7 @@ class NotificationService {
 
     // 5. Send to Backend
     final Uri url = Uri.parse(
-      "$_SERVER_URL/api/devices/register",
+      "$serverUrl/api/devices/register",
     ); // Or a dedicated /update endpoint
     final body = json.encode({
       'token': fcmToken,

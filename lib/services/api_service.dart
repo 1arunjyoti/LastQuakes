@@ -6,8 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
 class ApiService {
-  static const String _CACHE_TIMESTAMP_KEY = 'earthquake_data_cache_timestamp';
-  static const String _CACHE_FILENAME = 'earthquake_data_cache.json';
+  static const String _cacheTimestampKey = 'earthquake_data_cache_timestamp';
+  static const String _cacheFilename = 'earthquake_data_cache.json';
 
   /// Process earthquakes data in an isolate
   static Map<String, dynamic> _processEarthquakesIsolate(List<dynamic> args) {
@@ -44,7 +44,7 @@ class ApiService {
   /// Get cache file path
   static Future<File> _getCacheFile() async {
     final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/$_CACHE_FILENAME');
+    return File('${directory.path}/$_cacheFilename');
   }
 
   /// Fetches and caches earthquake data
@@ -58,7 +58,7 @@ class ApiService {
 
     // Check for cached data if not force refreshing
     if (!forceRefresh) {
-      final cachedTimestamp = prefs.getInt(_CACHE_TIMESTAMP_KEY);
+      final cachedTimestamp = prefs.getInt(_cacheTimestampKey);
       if (cachedTimestamp != null && await cacheFile.exists()) {
         final currentTime = DateTime.now().millisecondsSinceEpoch;
         if (currentTime - cachedTimestamp < 3600000) {
@@ -93,7 +93,7 @@ class ApiService {
         // Save processed data to file cache
         await cacheFile.writeAsString(result["encoded"] as String);
         await prefs.setInt(
-          _CACHE_TIMESTAMP_KEY,
+          _cacheTimestampKey,
           DateTime.now().millisecondsSinceEpoch,
         );
 
@@ -118,7 +118,7 @@ class ApiService {
   static Future<void> clearCache() async {
     final prefs = await SharedPreferences.getInstance();
     final cacheFile = await _getCacheFile();
-    await prefs.remove(_CACHE_TIMESTAMP_KEY);
+    await prefs.remove(_cacheTimestampKey);
     if (await cacheFile.exists()) {
       await cacheFile.delete();
     }

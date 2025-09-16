@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:geolocator/geolocator.dart';
@@ -99,21 +100,19 @@ Map<String, dynamic> _filterAndSortEarthquakesIsolate(
 }
 
 class EarthquakeListScreen extends StatefulWidget {
-  const EarthquakeListScreen({Key? key}) : super(key: key);
+  const EarthquakeListScreen({super.key});
 
   @override
-  _EarthquakeListScreenState createState() => _EarthquakeListScreenState();
+  State<EarthquakeListScreen> createState() => _EarthquakeListScreenState();
 }
 
 class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
-  final _memoizedCountryExtraction = <String, String>{};
+  // Removed: country extraction memoization; we now rely on isolate-provided unique countries
 
   // State Variables
   List<Map<String, dynamic>> _unfilteredEarthquakes =
       []; // Holds data from API fetch
   List<Map<String, dynamic>> allEarthquakes = []; // FILTERED list
-  List<Map<String, dynamic>> displayedEarthquakes =
-      []; // Holds the paginated subset of filtered list
 
   bool showFilters = true;
   bool isRefreshing = false;
@@ -123,6 +122,14 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   bool _isLoading = true;
   bool _isFiltering = false;
   String? _error;
+
+  // --- Scroll throttling to reduce rebuilds ---
+  static const double _toggleDeltaThreshold =
+      100.0; // px scrolled before toggling
+  static const Duration _toggleMinInterval = Duration(milliseconds: 200);
+  double _lastTogglePixels = 0.0;
+  DateTime _lastToggleAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _snackbarHiddenOnScroll = false;
 
   // Pagination
   static const int _itemsPerPage = 20;
@@ -152,8 +159,8 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   List<DropdownMenuItem<String>>? _memoizedCountryItems;
   List<DropdownMenuItem<double>>? _memoizedMagnitudeItems;
 
-  // Debounce timer for filter changes (Optional)
-  // Timer? _filterDebounce;
+  // Debounce timer for filter changes
+  Timer? _filterDebounce;
 
   @override
   void initState() {
@@ -172,7 +179,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    // _filterDebounce?.cancel(); // Cancel debounce timer if used
+    _filterDebounce?.cancel(); // Cancel debounce timer if used
     super.dispose();
   }
 
@@ -203,10 +210,6 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
 
       // Store the raw fetched data
       _unfilteredEarthquakes = fetchedData;
-
-      // Update country list based on unfiltered data
-      countryList = ["All"] + _getUniqueCountries(_unfilteredEarthquakes);
-      _memoizedCountryItems = null; // Clear memoized dropdown
 
       // Apply filters using compute
       await _applyFiltersWithCompute(); // This will handle setting state
@@ -261,7 +264,6 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
         countryList = ["All"] + (result['uniqueCountries'] as List<String>);
         _memoizedCountryItems = null; // Clear memoized dropdown
         _currentPage = 1;
-        displayedEarthquakes = allEarthquakes.take(_itemsPerPage).toList();
         _hasMoreData = allEarthquakes.length > _itemsPerPage;
         _isLoading = false;
         isRefreshing = false;
@@ -288,19 +290,13 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   // --- Filter Change Handlers ---
 
   void _onFilterChanged() {
-    // Optional Debounce:
-    /*
-      _filterDebounce?.cancel();
-      _filterDebounce = Timer(const Duration(milliseconds: 400), () {
-         if (mounted) {
-             _applyFiltersWithCompute(); // Apply filters after debounce period
-         }
-      });
-      */
-
-    // Apply filters immediately using compute (without debounce)
-    _applyFiltersWithCompute();
-    _scrollToTop();
+    // Debounce to prevent back-to-back isolates while changing filters
+    _filterDebounce?.cancel();
+    _filterDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _applyFiltersWithCompute(); // Apply filters after debounce period
+      _scrollToTop();
+    });
   }
 
   void _onCountryChanged(String? value) {
@@ -361,21 +357,35 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   // --- Scrolling & Pagination ---
 
   void _onScroll() {
-    final currentScrollDirection =
-        _scrollController.position.userScrollDirection;
+    final position = _scrollController.position;
+    final direction = position.userScrollDirection;
+    final pixels = position.pixels;
+    final now = DateTime.now();
 
-    // Show/Hide Filters
-    if (currentScrollDirection == ScrollDirection.reverse && showFilters) {
-      setState(() => showFilters = false);
-    } else if (currentScrollDirection == ScrollDirection.forward &&
-        !showFilters) {
-      setState(() => showFilters = true);
+    // Throttled Show/Hide Filters based on direction + thresholds
+    final bool canToggle = now.difference(_lastToggleAt) >= _toggleMinInterval;
+    if (canToggle) {
+      if (direction == ScrollDirection.reverse && showFilters) {
+        if ((pixels - _lastTogglePixels).abs() >= _toggleDeltaThreshold) {
+          setState(() => showFilters = false);
+          _lastToggleAt = now;
+          _lastTogglePixels = pixels;
+        }
+      } else if (direction == ScrollDirection.forward && !showFilters) {
+        if ((pixels - _lastTogglePixels).abs() >= _toggleDeltaThreshold) {
+          setState(() => showFilters = true);
+          _lastToggleAt = now;
+          _lastTogglePixels = pixels;
+        }
+      }
     }
 
-    // Hide Snackbar
+    // Hide Snackbar only once per scroll session
     if (_showPullToRefreshSnackbar &&
-        currentScrollDirection != ScrollDirection.idle) {
+        !_snackbarHiddenOnScroll &&
+        direction != ScrollDirection.idle) {
       _hidePullToRefreshSnackBar(context);
+      _snackbarHiddenOnScroll = true;
     }
 
     // Lazy Loading Trigger
@@ -397,12 +407,6 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     //await Future.delayed(const Duration(milliseconds: 500));
 
     final startIndex = _currentPage * _itemsPerPage;
-    // Use the 'allEarthquakes' (filtered) list for pagination
-    final endIndex =
-        (startIndex + _itemsPerPage > allEarthquakes.length)
-            ? allEarthquakes.length
-            : startIndex + _itemsPerPage;
-
     if (startIndex >= allEarthquakes.length) {
       if (mounted) {
         setState(() {
@@ -412,15 +416,11 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       }
       return;
     }
-
-    final nextItems = allEarthquakes.sublist(startIndex, endIndex);
-
-    if (mounted && nextItems.isNotEmpty) {
+    if (mounted) {
       setState(() {
-        displayedEarthquakes.addAll(nextItems);
         _currentPage++;
         _isLoadingMore = false;
-        _hasMoreData = displayedEarthquakes.length < allEarthquakes.length;
+        _hasMoreData = (_currentPage * _itemsPerPage) < allEarthquakes.length;
       });
     } else if (mounted) {
       setState(() {
@@ -552,11 +552,18 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                     onRefresh: _refreshEarthquakes,
                     child: ListView.builder(
                       controller: _scrollController,
-                      itemCount:
-                          displayedEarthquakes.length +
-                          (_isLoadingMore && _hasMoreData ? 1 : 0),
+                      itemCount: (() {
+                        final visibleCount = (_currentPage * _itemsPerPage);
+                        final clampedCount = visibleCount > allEarthquakes.length
+                            ? allEarthquakes.length
+                            : visibleCount;
+                        return clampedCount + (_isLoadingMore && _hasMoreData ? 1 : 0);
+                      })(),
                       itemBuilder: (context, index) {
-                        if (index == displayedEarthquakes.length) {
+                        final visibleCount = (_currentPage * _itemsPerPage) > allEarthquakes.length
+                            ? allEarthquakes.length
+                            : (_currentPage * _itemsPerPage);
+                        if (index == visibleCount) {
                           return const Center(
                             child: Padding(
                               padding: EdgeInsets.all(16.0),
@@ -565,7 +572,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                           );
                         }
 
-                        final quakeData = displayedEarthquakes[index];
+                        final quakeData = allEarthquakes[index];
                         final properties =
                             quakeData["properties"] as Map<String, dynamic>? ??
                             {};
@@ -681,23 +688,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   }
 
   // --- Utility Methods ---
-
-  List<String> _getUniqueCountries(List data) {
-    return data
-        .whereType<Map>()
-        .map((quake) => _extractCountry(quake["properties"]?["place"] ?? ""))
-        .where((country) => country.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-  }
-
-  String _extractCountry(String place) {
-    return _memoizedCountryExtraction.putIfAbsent(
-      place,
-      () => place.contains(", ") ? place.split(", ").last.trim() : "",
-    );
-  }
+  // Removed duplicate country extraction helpers; isolate returns uniqueCountries
 
   Color _getMagnitudeColor(double magnitude) {
     if (magnitude >= 7.0) return Colors.red.shade900;

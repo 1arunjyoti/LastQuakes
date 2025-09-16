@@ -5,45 +5,22 @@ import 'package:lastquake/screens/earthquake_map_screen.dart';
 //import 'package:lastquake/screens/settings_screen.dart';
 
 class NavigationHandler extends StatefulWidget {
-  const NavigationHandler({Key? key}) : super(key: key);
+  const NavigationHandler({super.key});
 
   @override
-  _NavigationHandlerState createState() => _NavigationHandlerState();
+  State<NavigationHandler> createState() => _NavigationHandlerState();
 }
 
 class _NavigationHandlerState extends State<NavigationHandler> {
-  // Use a final list to store screen widgets for performance
-  late final List<Widget?> _screens;
   int _currentIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-
-    _screens = List.filled(2, null, growable: false);
-  }
-
-  Widget _loadScreen(int index) {
-    // Lazy load screens
-    if (_screens[index] == null) {
-      switch (index) {
-        case 0:
-          // Pass NO initial data, screen will fetch it
-          _screens[index] = const EarthquakeListScreen();
-          break;
-        case 1:
-          // Pass NO initial data, screen will fetch it
-          _screens[index] = const EarthquakeMapScreen();
-          break;
-        /* case 2:
-          _screens[index] = const SettingsScreen();
-          break; */
-        default: // Handle potential invalid index gracefully
-          _screens[index] = Center(child: Text("Invalid Screen Index: $index"));
-      }
-    }
-    return _screens[index]!;
-  }
+  // Store the screen widgets in a final list.
+  // They are only built once and their state is preserved by IndexedStack.
+  final List<Widget> _screens = const [
+    EarthquakeListScreen(),
+    EarthquakeMapScreen(),
+    // SettingsScreen(), // Uncomment if you add a settings screen
+  ];
 
   void _onBottomNavTap(int index) {
     if (_currentIndex != index) {
@@ -61,11 +38,7 @@ class _NavigationHandlerState extends State<NavigationHandler> {
     final responsiveNavBarHeight = (screenHeight * 0.08).clamp(60.0, 80.0);
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        // Screens are loaded via _loadScreen which handles lazy initialization
-        children: List.generate(_screens.length, (index) => _loadScreen(index)),
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _onBottomNavTap,

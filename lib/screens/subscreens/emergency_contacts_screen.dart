@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EmergencyContactsScreen extends StatefulWidget {
+  const EmergencyContactsScreen({super.key});
+
   @override
-  _EmergencyContactsScreenState createState() =>
+  State<EmergencyContactsScreen> createState() =>
       _EmergencyContactsScreenState();
 }
 
@@ -197,14 +200,18 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         launchUrl(Uri.parse("tel://$emergencyNumber"));
       } catch (e) {
         // Handle potential exceptions, e.g., show a snackbar
-        print("Could not launch dialer: $e");
+        if (kDebugMode) {
+          print("Could not launch dialer: $e");
+        }
         // ScaffoldMessenger.of(context).showSnackBar(
         //   SnackBar(content: Text("Could not open dialer.")),
         // );
       }
     } else {
       // Handle cases where the number is not found
-      print("Emergency number not found for $_selectedCountry");
+      if (kDebugMode) {
+        print("Emergency number not found for $_selectedCountry");
+      }
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(content: Text("Emergency number not found for $_selectedCountry.")),
       // );
@@ -221,7 +228,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12), // M3 recommended radius
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
@@ -257,7 +266,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(

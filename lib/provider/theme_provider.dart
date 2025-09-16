@@ -36,7 +36,6 @@ class ThemeProvider with ChangeNotifier {
         themeString = 'dark';
         break;
       case ThemeMode.system:
-      default:
         themeString = 'system';
         break;
     }
@@ -90,7 +89,7 @@ class ThemeProvider with ChangeNotifier {
       );
       return; // Cannot load if prefs is null
     }
-    final prefs = _prefs!;
+    final prefs = _prefs;
 
     // Load Theme
     final savedThemeString = prefs.getString(_themePrefKey);

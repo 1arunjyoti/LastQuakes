@@ -47,3 +47,5 @@ app.*.map.json
 
 
 my-firebase-backend
+android/app/google-services.json
+.vscode

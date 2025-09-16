@@ -37,7 +37,7 @@ class AppTheme {
         fontWeight: FontWeight.bold,
       ),
     ),
-    cardTheme: CardTheme(color: const Color(0xFF1E1E1E), elevation: 4),
+    cardTheme: const CardThemeData(color: Color(0xFF1E1E1E), elevation: 4),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: const Color(0xFF1E1E1E),
       selectedItemColor: Colors.blue,

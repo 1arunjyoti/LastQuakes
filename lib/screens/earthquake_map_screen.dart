@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' show pi;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -138,7 +137,7 @@ List<Map<String, dynamic>> _filterEarthquakesIsolate(FilterParameters params) {
 }
 
 class EarthquakeMapScreen extends StatefulWidget {
-  const EarthquakeMapScreen({Key? key}) : super(key: key);
+  const EarthquakeMapScreen({super.key});
 
   @override
   State<EarthquakeMapScreen> createState() => _EarthquakeMapScreenState();
@@ -729,8 +728,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           userAgentPackageName: 'com.example.lastquake',
           maxZoom: 20,
         );
-      case MapLayerType.osm: // Default case
-      default:
+      case MapLayerType.osm:
         return TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.example.lastquake',
@@ -746,12 +744,12 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       _isLoadingFaultLines = true;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    /* ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Loading fault line data...'),
         duration: Duration(seconds: 2),
       ),
-    );
+    ); */
 
     try {
       final response = await http
@@ -777,13 +775,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         ScaffoldMessenger.of(
           context,
         ).hideCurrentSnackBar(); // Hide loading message
-        ScaffoldMessenger.of(context).showSnackBar(
+        /* ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Fault lines loaded.'),
             duration: Duration(seconds: 2),
             backgroundColor: Colors.green,
           ),
-        );
+        ); */
       } else {
         throw Exception(
           'Failed to load fault line data: ${response.statusCode}',
@@ -960,12 +958,10 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                     }
                   }
                   //  zoom level update logic
-                  if (hasGesture &&
-                      position.zoom != null &&
-                      position.zoom != _zoomLevel) {
+                  if (hasGesture && position.zoom != _zoomLevel) {
                     if (mounted) {
                       setState(() {
-                        _zoomLevel = position.zoom!;
+                        _zoomLevel = position.zoom;
                       });
                     }
                   }
@@ -1208,7 +1204,7 @@ class _ZoomControls extends StatelessWidget {
   // Define min/max zoom constants locally or pass them
   static const double _minZoom = 2.0;
   static const double _maxZoom = 18.0;
-  static const double defaultBottomPadding = 90.0;
+  //static const double defaultBottomPadding = 90.0;
 
   const _ZoomControls({
     required this.zoomLevel,
@@ -1273,8 +1269,7 @@ class _ZoomButton extends StatelessWidget {
 class _EarthquakeDetailsDialog extends StatelessWidget {
   final Map<String, dynamic> quake; // Receives the properties map
 
-  const _EarthquakeDetailsDialog({Key? key, required this.quake})
-    : super(key: key);
+  const _EarthquakeDetailsDialog({required this.quake});
 
   // Static helper to determine color based on magnitude
   static Color _getMagnitudeColor(double magnitude) {
@@ -1450,11 +1445,10 @@ class _DetailRow extends StatelessWidget {
   final String text;
 
   const _DetailRow({
-    Key? key,
     required this.icon,
     required this.iconColor,
     required this.text,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

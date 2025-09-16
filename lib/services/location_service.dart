@@ -37,8 +37,10 @@ class LocationService {
     // Get current position with lower accuracy for faster retrieval
     try {
       _cachedPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10), // Limit location fetch time
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10), // Limit location fetch time
+        ),
       );
       _lastLocationFetchTime = DateTime.now();
       return _cachedPosition;

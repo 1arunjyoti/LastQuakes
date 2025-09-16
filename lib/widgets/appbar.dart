@@ -7,11 +7,11 @@ class LastQuakesAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool automaticallyImplyLeading;
 
   const LastQuakesAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.actions,
     this.automaticallyImplyLeading = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
