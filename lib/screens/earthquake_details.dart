@@ -54,6 +54,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     _mapController = MapController();
   }
 
+  // Extracts and processes earthquake data from the provided map
   _EarthquakeData _extractEarthquakeData() {
     final properties = widget.quakeData["properties"] ?? {};
     final geometry = widget.quakeData["geometry"] ?? {};
@@ -87,7 +88,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    // Format data using utilities
+    // --- Format data using utilities ---
     final dateTime = DateTime.fromMillisecondsSinceEpoch(
       _memoizedData.timestamp,
     );
@@ -129,7 +130,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               clipBehavior:
-                  Clip.antiAlias, // Ensures content respects border radius
+                  Clip.antiAlias, 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -140,7 +141,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                     tsunami: _memoizedData.tsunami,
                   ),
 
-                  // --- Main Content Padding ---
+                  // --- Details Section ---
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
@@ -149,6 +150,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+
                         // --- Location Title ---
                         Text(
                           displayLocationTitle,
@@ -173,6 +175,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                           lon: _memoizedData.lon,
                         ),
                         const SizedBox(height: 8),
+
                         // --- Time Details Group ---
                         _buildSectionHeader(context, "TIME"),
                         _buildDetailRow(
@@ -184,6 +187,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                         ),
 
                         const SizedBox(height: 8),
+
                         // --- Action Buttons ---
                         _buildActionButtons(
                           context: context,
@@ -289,7 +293,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     );
   }
 
-  // Generic row for displaying a detail with an icon, label, and value
+  // For displaying a detail with an icon, label, and value
   Widget _buildDetailRow({
     required BuildContext context,
     required IconData icon,
@@ -642,6 +646,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     );
   }
 
+  // Builds zoom buttons for the map
   Widget _buildZoomButton({
     required IconData icon,
     required String heroTag,

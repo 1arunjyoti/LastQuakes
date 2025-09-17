@@ -6,7 +6,7 @@ import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-// Define reasonable min/max zoom levels for button enabling/disabling
+// Define min/max zoom levels for button enabling/disabling
 const double _minZoom = 3.0;
 const double _maxZoom = 18.0;
 
@@ -26,7 +26,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   final LocationService _locationService = LocationService();
   bool _isLoadingLocation = false;
   bool _locationPermissionGranted = false;
-  bool _mapReady = false; // Flag to track if the map controller is ready
+  bool _mapReady = false; 
 
   @override
   void initState() {
@@ -39,7 +39,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
-          _mapReady = true; // Assume map is ready after first frame
+          _mapReady = true; 
         });
         // Now it's safer to check permissions and potentially move the map
         _checkPermissionAndCenter();
@@ -47,8 +47,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     });
   }
 
+  // Check permissions and center map if needed
   Future<void> _checkPermissionAndCenter() async {
-    // Ensure map is ready before trying to move it
     if (!_mapReady) return;
 
     _locationPermissionGranted = await _checkLocationPermission();
@@ -57,11 +57,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     }
   }
 
+  // Check if location permission is granted
   Future<bool> _checkLocationPermission() async {
     PermissionStatus status = await Permission.locationWhenInUse.status;
     return status.isGranted;
   }
 
+  // Center map on user's current location
   Future<void> _centerOnUserLocation() async {
     if (!_locationPermissionGranted) {
       debugPrint(
@@ -82,7 +84,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         setState(() {
           _currentCenter = userLatLng;
         });
-        // Ensure map is ready before moving
         if (_mapReady) {
           _mapController.move(userLatLng, 13.0);
         }
@@ -105,6 +106,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     }
   }
 
+  // Handle map tap to select location
   void _handleTap(TapPosition tapPosition, LatLng location) {
     setState(() {
       _selectedLocation = location;
@@ -125,7 +127,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   // --- Zoom Methods ---
   void _zoomIn() {
-    // Ensure map is ready before accessing camera
     if (!_mapReady) return;
     final currentZoom = _mapController.camera.zoom;
     final newZoom = currentZoom + 1;
@@ -135,7 +136,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   void _zoomOut() {
-    // Ensure map is ready before accessing camera
     if (!_mapReady) return;
     final currentZoom = _mapController.camera.zoom;
     final newZoom = currentZoom - 1;
@@ -143,7 +143,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       _mapController.move(_mapController.camera.center, newZoom);
     }
   }
-  // --- End Zoom Methods ---
 
   @override
   Widget build(BuildContext context) {
@@ -237,14 +236,15 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       ),
             ),
           ),
-          // --- Zoom Buttons --- Add this section
+
+          // --- Zoom Buttons ---
           Positioned(
-            bottom: 30, // Align with confirm button vertically
+            bottom: 30, 
             left: 30,
             child: Column(
               children: [
                 FloatingActionButton.small(
-                  heroTag: 'zoomInMapPicker', // Unique heroTag
+                  heroTag: 'zoomInMapPicker', 
                   tooltip: 'Zoom In',
                   onPressed:
                       _mapReady && (_mapController.camera.zoom < _maxZoom)
@@ -264,7 +264,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 ),
                 const SizedBox(height: 8),
                 FloatingActionButton.small(
-                  heroTag: 'zoomOutMapPicker', // Unique heroTag
+                  heroTag: 'zoomOutMapPicker', 
                   tooltip: 'Zoom Out',
                   onPressed:
                       _mapReady && (_mapController.camera.zoom > _minZoom)
@@ -285,7 +285,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               ],
             ),
           ),
-          // --- End Zoom Buttons ---
         ],
       ),
     );

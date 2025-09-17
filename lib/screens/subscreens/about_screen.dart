@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/widgets/appbar.dart'; // Your custom AppBar
+import 'package:lastquake/widgets/appbar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart'; // For links
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -20,7 +20,8 @@ class _AboutScreenState extends State<AboutScreen> {
     super.initState();
     _loadAppInfo();
   }
-
+  
+  // Load app info asynchronously
   Future<void> _loadAppInfo() async {
     try {
       final PackageInfo info = await PackageInfo.fromPlatform();
@@ -76,13 +77,14 @@ class _AboutScreenState extends State<AboutScreen> {
           children: <Widget>[
             /* const SizedBox(height: 20),
 
-            // App Icon (Using a generic one here, replace with your actual logo)
+            // App Icon
             Icon(
               Icons
-                  .track_changes_outlined, // Or Icons.public, or your custom logo asset
+                  .track_changes_outlined, // Or Icons.public, or custom logo asset
               size: 80,
               color: colorScheme.primary,
             ), */
+
             const SizedBox(height: 16),
 
             // App Name
@@ -107,7 +109,7 @@ class _AboutScreenState extends State<AboutScreen> {
 
             // App Description
             Text(
-              'Providing near real-time earthquake information from around the globe to help you stay informed and prepared.', // Customize this
+              'Providing near real-time earthquake information from around the globe to help you stay informed and prepared.',
               style: textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -136,7 +138,7 @@ class _AboutScreenState extends State<AboutScreen> {
                     child: Text(
                       'Visit USGS Earthquake Hazards Program',
                       style: TextStyle(
-                        color: colorScheme.primary, // Make it look like a link
+                        color: colorScheme.primary,
                         decoration: TextDecoration.underline,
                       ),
                     ),
@@ -163,7 +165,9 @@ class _AboutScreenState extends State<AboutScreen> {
                     context: context,
                     applicationName: _appName,
                     applicationVersion: _version,
-                    // Optional: Add your logo here too
+                    
+                    // Add your logo here
+
                     // applicationIcon: Padding(
                     //   padding: const EdgeInsets.all(8.0),
                     //   child: Icon(Icons.track_changes_outlined, size: 40, color: colorScheme.primary),
@@ -171,9 +175,11 @@ class _AboutScreenState extends State<AboutScreen> {
                   ),
             ),
 
-            // Optional: Add Privacy Policy / Terms of Service links if needed
             const SizedBox(height: 8),
             const Divider(),
+
+            // --- Add Privacy Policy / Terms of Service links ---
+
             _buildLinkItem(
               context: context,
               icon: Icons.privacy_tip_outlined,
@@ -220,9 +226,8 @@ class _AboutScreenState extends State<AboutScreen> {
           ),
           const SizedBox(height: 8),
           Padding(
-            padding: const EdgeInsets.only(left: 36.0), // Indent content
+            padding: const EdgeInsets.only(left: 36.0),
             child: DefaultTextStyle(
-              // Ensure text style consistency
               style: theme.textTheme.bodyMedium!,
               child: content,
             ),
@@ -232,7 +237,7 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  // Optional helper for simple link list items
+  // Helper for simple link list items
   Widget _buildLinkItem({
     required BuildContext context,
     required IconData icon,

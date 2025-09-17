@@ -19,6 +19,7 @@ class PreparednessScreen extends StatelessWidget {
 class _PreparednessList extends StatelessWidget {
   const _PreparednessList();
 
+  // Data for preparedness sections
   static const List<PreparednessSectionData> _preparednessData = [
     PreparednessSectionData(
       title: "Before an Earthquake",

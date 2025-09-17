@@ -47,22 +47,16 @@ class _CustomDrawerState extends State<CustomDrawer> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
-    // Using NavigationDrawer for Material 3
     return Theme(
       data: Theme.of(context).copyWith(
         drawerTheme: const DrawerThemeData(
-          // Ensure no rounded corners by setting shape here
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         ),
       ),
       child: NavigationDrawer(
-        // Ensure no rounded corners
-        // Shape is now handled by the Theme wrapper
         backgroundColor: Theme.of(context).colorScheme.surface,
         selectedIndex: _selectedIndex,
-        // Use onDestinationSelected for navigation logic
         onDestinationSelected: (index) {
-          // Update the state to show selection highlight
           setState(() {
             _selectedIndex = index;
           });
@@ -70,9 +64,6 @@ class _CustomDrawerState extends State<CustomDrawer> {
           // Close the drawer first
           Navigator.pop(context);
 
-          // Navigate to the selected screen
-          // Use a short delay to allow drawer to close before navigating,
-          // preventing potential visual glitches.
           Future.delayed(const Duration(milliseconds: 150), () {
             Navigator.push(
               context,
@@ -80,7 +71,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                 builder: (context) => _destinations[index].screen,
               ),
             );
-            // Optionally, reset selection after navigation if you don't
+            // Reset selection after navigation if you don't
             // want the item to stay selected after returning to the main screen.
             // setState(() {
             //   _selectedIndex = null;
@@ -88,12 +79,10 @@ class _CustomDrawerState extends State<CustomDrawer> {
           });
         },
         children: [
-          // Re-use the existing header, adapt padding if needed
           _buildDrawerHeader(context, themeProvider),
           Divider(),
-          // Map ALL destinations, separating footer items with a Divider
 
-          // Main destinations (first 3 items)
+          // Main destinations 
           ..._destinations
               .take(3)
               .map(
@@ -102,9 +91,8 @@ class _CustomDrawerState extends State<CustomDrawer> {
                   label: Text(item.label),
                 ),
               ),
-          // Add padding and a divider before footer items
           Divider(),
-          // Footer destinations (remaining items)
+          // Footer destinations
           ..._destinations
               .skip(3)
               .map(
@@ -118,13 +106,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
     );
   }
 
+  // Drawer header with app info
   Widget _buildDrawerHeader(BuildContext context, ThemeProvider themeProvider) {
-    // Keep header, maybe adjust padding/color if needed for M3 look
     return Container(
-      // Use M3 recommended padding for header content
       padding: const EdgeInsets.fromLTRB(28, 16, 16, 10),
       width: double.infinity,
-      // Remove explicit color to use NavigationDrawer's surface color
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [_buildAppInfo(context)],
@@ -132,8 +118,8 @@ class _CustomDrawerState extends State<CustomDrawer> {
     );
   }
 
+  // App info section in the drawer header
   Widget _buildAppInfo(BuildContext context) {
-    // Adjusted text styles slightly for M3 feel
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,31 +128,25 @@ class _CustomDrawerState extends State<CustomDrawer> {
           Text(
             "Earthquake App",
             style: TextStyle(
-              // Use headlineSmall or titleLarge from theme?
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color:
                   Theme.of(
                     context,
-                  ).colorScheme.onSurface, // Use onSurface color
+                  ).colorScheme.onSurface, 
             ),
           ),
           Text(
             "Stay Informed, Stay Safe",
             style: TextStyle(
-              // Use bodyMedium from theme?
               color:
                   Theme.of(
                     context,
-                  ).colorScheme.onSurfaceVariant, // Use onSurfaceVariant
+                  ).colorScheme.onSurfaceVariant, 
             ),
           ),
         ],
       ),
     );
   }
-
-  // _buildMenuItems is no longer needed as items are built directly in build()
-
-  // _buildDrawerItem is no longer needed, replaced by NavigationDrawerDestination
 }

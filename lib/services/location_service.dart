@@ -1,4 +1,3 @@
-//import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
@@ -12,7 +11,7 @@ class LocationService {
   static const Duration _cacheDuration = Duration(minutes: 10);
 
   Future<Position?> getCurrentLocation({bool forceRefresh = false}) async {
-    // Check if location services are enabled - critical first check
+    // Check if location services are enabled
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       //debugPrint('Location services are disabled.');
@@ -60,7 +59,7 @@ class LocationService {
     return permission;
   }
 
-  // Calculate distance between two coordinates (unchanged)
+  // Calculate distance between two coordinates
   double calculateDistance(
     double startLatitude,
     double startLongitude,

@@ -80,14 +80,12 @@ class ThemeProvider with ChangeNotifier {
 
   // --- Load Preferences (use the instance variable) ---
 
-  // Renamed to void as it doesn't need to return Future
-  // This should be called after the provider is created with prefs
   void loadPreferences() {
     if (_prefs == null) {
       debugPrint(
         "Warning: ThemeProvider created without SharedPreferences instance. Cannot load preferences.",
       );
-      return; // Cannot load if prefs is null
+      return;
     }
     final prefs = _prefs;
 
@@ -101,7 +99,7 @@ class ThemeProvider with ChangeNotifier {
         _themeMode = ThemeMode.dark;
         break;
       case 'system':
-      default: // Default to system if null or invalid
+      default:
         _themeMode = ThemeMode.system;
         break;
     }

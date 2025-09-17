@@ -14,7 +14,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Ensure Firebase is initialized for background handling
   await Firebase.initializeApp();
-  // Use a try-catch block for robustness in background isolate
   try {
     await NotificationService.instance.showFCMNotification(message);
   } catch (e) {
@@ -25,7 +24,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase first, as it's essential for core functionality
+  // Initialize Firebase first
   await Firebase.initializeApp();
 
   // Set up background message handler right after Firebase init
@@ -56,7 +55,7 @@ void main() async {
       debugPrint("❌ Error handling token refresh: \$e");
     }
   });
-
+  // End of Firebase Messaging setup
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(prefs: prefs)..loadPreferences(),
@@ -81,7 +80,7 @@ class _MyAppState extends State<MyApp> {
       _initializeServices();
     });
   }
-
+  // Consolidated initialization logic
   Future<void> _initializeServices() async {
     debugPrint("🚀 Starting post-frame initializations...");
     try {
@@ -124,6 +123,7 @@ class _MyAppState extends State<MyApp> {
     debugPrint("✅ Post-frame initializations complete.");
   }
 
+  // Build method with theme management
   @override
   Widget build(BuildContext context) {
     return Selector<ThemeProvider, ThemeMode>(
@@ -138,6 +138,7 @@ class _MyAppState extends State<MyApp> {
           home: child,
         );
       },
+      // Pre-build child widget to avoid unnecessary rebuilds
       child: const NavigationHandler(),
     );
   }

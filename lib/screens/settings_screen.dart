@@ -11,8 +11,8 @@ import 'package:lastquake/widgets/appbar.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:latlong2/latlong.dart'; // Added for LatLng
-import 'map_picker_screen.dart'; // Added for map picker
+import 'package:latlong2/latlong.dart';
+import 'map_picker_screen.dart';
 
 // Keys for SharedPreferences
 const String prefNotificationFilterType = 'notification_filter_type';
@@ -31,6 +31,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+
   // --- State Variables ---
   NotificationFilterType _selectedFilterType = NotificationFilterType.none;
   double _selectedMagnitude = 5.0;
@@ -39,17 +40,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _useCurrentLocationForDistance = false;
   List<SafeZone> _safeZones = [];
 
-  bool _isLoaded = false; // Track if initial load is complete
+  bool _isLoaded = false;
   /* final LocationService _locationService =
       LocationService(); */ // Instance for permission/location checks
 
   // Expansion state
-  bool _notificationSettingsExpanded = true; // Start expanded
+  bool _notificationSettingsExpanded = true;
   bool _themeExpanded = false;
   bool _unitsExpanded = false;
   //bool _clockExpanded = false;
 
-  // Data for dropdowns/sliders (Can be potentially loaded from a config or kept static)
+  // Data for dropdowns/sliders
   final List<String> _countryList = [
     "ALL",
     "India",
@@ -104,11 +105,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     "Vietnam",
   ];
 
+  // Magnitude options from 3.0 to 9.0 in 0.5 increments
   static final List<double> _magnitudeOptions = List.generate(
     13,
     (i) => 3.0 + i * 0.5,
-  ); // 3.0 to 9.0
-
+  );
+  
+  // Radius options in kilometers
   static final List<double> _radiusOptions = [
     100.0,
     200.0,
@@ -122,13 +125,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<DropdownMenuItem<String>>? _memoizedCountryItems;
   List<DropdownMenuItem<NotificationFilterType>>? _memoizedFilterTypeItems;
 
-  // --- Lifecycle Methods ---
   @override
   void initState() {
     super.initState();
     _initializeSettings();
   }
 
+  // --- Initialization ---
   Future<void> _initializeSettings() async {
     await _loadNotificationSettings();
     _buildMemoizedItems();
@@ -139,6 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // Build memoized dropdown items
   void _buildMemoizedItems() {
     _memoizedCountryItems =
         _countryList.map((country) {
@@ -190,8 +194,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  // Save settings to SharedPreferences
   Future<void> _saveNotificationSettings({bool showSnackbar = true}) async {
-    if (!_isLoaded) return; // Don't save before initial load completes
+    if (!_isLoaded) return; 
 
     final prefs = await SharedPreferences.getInstance();
 
@@ -212,6 +217,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Notify the backend service about the changes
     await NotificationService.instance.updateBackendRegistration();
 
+    // Show a snackbar confirmation
     if (showSnackbar && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -250,6 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --- Notification Settings Card ---
   Widget _buildNotificationSettingsCard() {
     return Card(
       margin: EdgeInsets.zero,
@@ -302,7 +309,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildMagnitudeSlider(), // Always shown when notifications aren't None
+                          _buildMagnitudeSlider(),
                           const SizedBox(height: 16),
                           if (_selectedFilterType ==
                               NotificationFilterType.country) ...[
@@ -330,6 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --- Individual Setting Widgets ---
   Widget _buildFilterTypeDropdown() {
     return DropdownButtonFormField<NotificationFilterType>(
       value: _selectedFilterType,
@@ -350,13 +358,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           }
 
           if (proceed) {
-            // Check mounted before setState
             if (!mounted) return;
             setState(() => _selectedFilterType = value);
             // Request notification permission if turning notifications ON from NONE
             if (_selectedFilterType != NotificationFilterType.none) {
               bool permissionGranted = await _requestNotificationPermission();
-              // Check mounted after await
               if (!mounted) return;
               if (!permissionGranted) {
                 if (!mounted) return;
@@ -375,6 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Slider for minimum magnitude
   Widget _buildMagnitudeSlider() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,6 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Dropdown for country selection
   Widget _buildCountryDropdown() {
     return DropdownButtonFormField<String>(
       value: _selectedCountry,
@@ -417,6 +425,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Slider for radius selection
   Widget _buildRadiusSlider() {
     // Find the index of the closest value in _radiusOptions to _selectedRadius
     int currentIndex = _radiusOptions.indexOf(
@@ -445,6 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Switch for using current location
   Widget _buildUseCurrentLocationSwitch() {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
@@ -459,14 +469,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
 
         if (proceed) {
-          // Check mounted before setState
           if (!mounted) return;
           setState(() => _useCurrentLocationForDistance = value);
-          // Check mounted after potential awaits inside _saveNotificationSettings
           if (!mounted) return;
           await _saveNotificationSettings();
         } else {
-          // Optionally revert the switch if permission was denied
+          // Revert the switch if permission was denied
           // setState(() => _useCurrentLocationForDistance = false);
         }
       },
@@ -474,7 +482,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // --- Safe Zones Section ---
-
   Widget _buildSafeZonesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -507,9 +514,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         if (_safeZones.isNotEmpty)
           ListView.builder(
-            shrinkWrap: true, // Important in a ListView
+            shrinkWrap: true, 
             physics:
-                const NeverScrollableScrollPhysics(), // Disable inner scrolling
+                const NeverScrollableScrollPhysics(),
             itemCount: _safeZones.length,
             itemBuilder: (context, index) {
               final zone = _safeZones[index];
@@ -525,41 +532,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   tooltip: "Delete Safe Zone",
                   onPressed: () => _deleteSafeZone(index),
                 ),
-                // Optional: onTap to edit?
               );
             },
           ),
       ],
     );
   }
-
+  
+  // --- Safe Zone Management ---
   Future<void> _addSafeZone() async {
     debugPrint("Opening map picker to add safe zone...");
 
-    // Navigate to Map Picker Screen
-    // Check mounted before navigating
     if (!mounted) return;
+
+    // Open map picker screen
     final selectedLatLng = await Navigator.push<LatLng>(
       context,
       MaterialPageRoute(
         builder:
             (context) =>
-                const MapPickerScreen(), // Can pass initial center if needed
+                const MapPickerScreen(), 
       ),
     );
 
-    // Check mounted after returning from navigation
     if (!mounted) return;
 
     if (selectedLatLng != null) {
       debugPrint("Map picker returned LatLng: $selectedLatLng");
-      // Now prompt for the name
       final String? zoneName = await showDialog<String>(
         context: context,
         builder: (context) => _EnterSafeZoneNameDialog(),
       );
 
-      // Check mounted after dialog
       if (!mounted) return;
 
       if (zoneName != null && zoneName.trim().isNotEmpty) {
@@ -583,6 +587,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // Delete a safe zone by index
   void _deleteSafeZone(int index) {
     setState(() {
       _safeZones.removeAt(index);
@@ -590,7 +595,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _saveNotificationSettings();
   }
 
-  // --- Other Build Methods (Theme, Units, Clock) - Assume unchanged ---
+  // --- Other Build Methods (Theme, Units, Clock) ---
+
   Widget _buildThemeSettingsCard(ThemeProvider prefsProvider) {
     return Card(
       margin: EdgeInsets.zero,
@@ -616,16 +622,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.only(
                 bottom: 8.0,
-              ), // Add padding below radios
+              ), 
               child: Column(
                 children: [
                   RadioListTile<ThemeMode>(
                     title: const Text("Same as Device"),
                     value: ThemeMode.system,
-                    groupValue: prefsProvider.themeMode, // Read from provider
+                    groupValue: prefsProvider.themeMode, 
                     onChanged: (ThemeMode? value) {
                       if (value != null) {
-                        // Use listen: false for actions
                         Provider.of<ThemeProvider>(
                           context,
                           listen: false,
@@ -697,7 +702,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text("Kilometers (km)"),
                     value: DistanceUnit.km,
                     groupValue:
-                        prefsProvider.distanceUnit, // Read from provider
+                        prefsProvider.distanceUnit, 
                     onChanged: (DistanceUnit? value) {
                       if (value != null) {
                         Provider.of<ThemeProvider>(
@@ -737,7 +742,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           "Use 24-Hour Clock",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        value: prefsProvider.use24HourClock, // Read from provider
+        value: prefsProvider.use24HourClock,
         onChanged: (bool value) {
           Provider.of<ThemeProvider>(
             context,
@@ -750,7 +755,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               : Icons.access_time,
         ),
       ),
-      // Optionally wrap in expansion tile like others if desired
       /*
        child: Column(
          children: [
@@ -775,7 +779,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return "Specific Country";
       case NotificationFilterType.worldwide:
         return "Worldwide";
-      // Fallback
     }
   }
 
@@ -790,18 +793,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<bool> _checkAndRequestLocationPermissionIfNeeded({
     bool showRationale = false,
   }) async {
-    debugPrint("Checking location permission..."); // Debug
+    debugPrint("Checking location permission..."); 
     PermissionStatus status = await Permission.locationWhenInUse.status;
-    debugPrint("Initial permission status: $status"); // Debug
+    debugPrint("Initial permission status: $status"); 
 
     if (status.isGranted) {
-      debugPrint("Permission already granted."); // Debug
+      debugPrint("Permission already granted."); 
       return true;
     }
 
     if (status.isPermanentlyDenied) {
-      debugPrint("Permission permanently denied. Showing dialog."); // Debug
-      if (!mounted) return false; // Check mounted before dialog
+      debugPrint("Permission permanently denied. Showing dialog."); 
+      if (!mounted) return false; 
       _showPermissionDeniedDialog('Location');
       return false; // Cannot request if permanently denied
     }
@@ -809,8 +812,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Show rationale if requested and permission not determined yet
     if (showRationale) {
       // Rationale needed if isDenied or not determined yet
-      debugPrint("Showing rationale dialog..."); // Debug
-      // Check mounted before showing dialog
+      debugPrint("Showing rationale dialog..."); 
       if (!mounted) return false;
       bool? userAgreed = await showDialog<bool>(
         context: context,
@@ -833,28 +835,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
       );
       if (userAgreed != true) {
-        debugPrint("User cancelled rationale."); // Debug
-        return false; // User cancelled rationale
+        debugPrint("User cancelled rationale."); 
+        return false; 
       }
     }
 
-    debugPrint("Requesting location permission..."); // Debug
+    debugPrint("Requesting location permission..."); 
     // Request permission
     status = await Permission.locationWhenInUse.request();
-    debugPrint("Status after request: $status"); // Debug
+    debugPrint("Status after request: $status"); 
 
     if (status.isGranted) {
-      debugPrint("Permission granted after request."); // Debug
+      debugPrint("Permission granted after request."); 
       return true;
     } else {
-      debugPrint("Permission denied after request. Showing dialog."); // Debug
+      debugPrint("Permission denied after request. Showing dialog."); 
       // Show dialog *before* returning false
-      if (!mounted) return false; // Check mounted before dialog
+      if (!mounted) return false; 
       _showPermissionDeniedDialog('Location');
       return false;
     }
   }
 
+  // Request notification permission
   Future<bool> _requestNotificationPermission() async {
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
@@ -888,8 +891,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return permissionGranted ?? false;
   }
 
+  // Show dialog guiding user to app settings
   void _showPermissionDeniedDialog(String permissionType) {
-    // No await before this, but good practice if context is used
     if (!mounted) return;
     showDialog(
       context: context,
@@ -907,7 +910,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  openAppSettings(); // Use permission_handler's method
+                  openAppSettings(); 
                 },
                 child: const Text('Open Settings'),
               ),
@@ -917,7 +920,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// --- NEW: Simple Dialog for entering Safe Zone Name ---
+// --- Simple Dialog for entering Safe Zone Name ---
 class _EnterSafeZoneNameDialog extends StatefulWidget {
   @override
   State<_EnterSafeZoneNameDialog> createState() =>
@@ -962,11 +965,11 @@ class _EnterSafeZoneNameDialogState extends State<_EnterSafeZoneNameDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(), // Cancel
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text("Cancel"),
         ),
         ElevatedButton(
-          onPressed: _submitName, // Save
+          onPressed: _submitName, 
           child: const Text("Save"),
         ),
       ],

@@ -36,7 +36,7 @@ class NotificationService {
   final LocationService locationService =
       LocationService(); // For getting user location
 
-  // Update with your Firebase Function URL
+  // --- Update with your Firebase Function URL ---
   static const String serverUrl = 'https://lastquakenotify.onrender.com';
 
   Future<void> initNotifications() async {
@@ -90,31 +90,30 @@ class NotificationService {
       title,
       body,
       notificationDetails,
-      // Optional: payload for notification tap handling (e.g., earthquake ID)
+      // Payload for notification tap handling (e.g., earthquake ID)
       payload: data['earthquakeId']?.toString(),
     );
   }
 
-  // Renamed and updated to send the new preference structure
+  // Send the new preference structure
   Future<void> updateBackendRegistration() async {
     debugPrint("🔄 Attempting to update backend registration...");
 
-    // 1. Get FCM Token
+    // Get FCM Token
     final String? fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken == null) {
       debugPrint("❌ FCM token is null, cannot update registration.");
       return;
     }
 
-    // 2. Load Preferences from SharedPreferences
+    // Load Preferences from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final filterType = NotificationFilterType.values.firstWhere(
       (e) => e.name == prefs.getString(prefNotificationFilterType),
       orElse: () => NotificationFilterType.none,
     );
 
-    // If notifications are disabled, we might still want to inform the backend
-    // or simply skip sending. Let's send the disabled state.
+    // If notifications are disabled, send the disabled state.
 
     final magnitude = prefs.getDouble(prefNotificationMagnitude) ?? 5.0;
     final country = prefs.getString(prefNotificationCountry) ?? "ALL";
@@ -127,7 +126,7 @@ class NotificationService {
             .map((json) => SafeZone.fromJson(jsonDecode(json)))
             .toList();
 
-    // 3. Get Current Location (Only if needed)
+    // Get Current Location 
     Position? currentPosition;
     bool locationPermissionOk = false;
     if (filterType == NotificationFilterType.distance && useCurrentLocation) {
@@ -138,7 +137,7 @@ class NotificationService {
         try {
           currentPosition =
               await locationService
-                  .getCurrentLocation(); // Assumes LocationService handles permissions internally or they are checked before calling this
+                  .getCurrentLocation(); 
           if (currentPosition == null) {
             debugPrint(
               "⚠️ Filter type is Distance+Current, but failed to get location.",
@@ -154,7 +153,7 @@ class NotificationService {
       }
     }
 
-    // 4. Prepare Data Payload for Backend
+    // Prepare Data Payload for Backend
     final Map<String, dynamic> preferencesPayload = {
       'filterType': filterType.name, // e.g., "distance", "country", "none"
       'minMagnitude': magnitude,
@@ -176,10 +175,10 @@ class NotificationService {
       },
     };
 
-    // 5. Send to Backend
+    // Send to Backend
     final Uri url = Uri.parse(
       "$serverUrl/api/devices/register",
-    ); // Or a dedicated /update endpoint
+    ); 
     final body = json.encode({
       'token': fcmToken,
       'preferences': preferencesPayload,
@@ -194,7 +193,7 @@ class NotificationService {
     try {
       final response = await http
           .post(url, headers: {'Content-Type': 'application/json'}, body: body)
-          .timeout(const Duration(seconds: 20)); // Increased timeout slightly
+          .timeout(const Duration(seconds: 20)); // timeout
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint("✅ Device registered/updated successfully with backend");

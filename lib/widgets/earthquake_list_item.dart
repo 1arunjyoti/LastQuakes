@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:lastquake/utils/formatting.dart';
-//import 'package:intl/intl.dart'; // Keep if formatting time here, otherwise remove
 
 class EarthquakeListItem extends StatelessWidget {
   final String location;
   final double magnitude;
   final Color magnitudeColor;
   final VoidCallback onTap;
-  final DateTime timestamp; // Pass DateTime instead of formatted string
-  final double? distanceKm; // Pass distance in KM (can be null)
+  final DateTime timestamp; 
+  final double? distanceKm; 
 
   const EarthquakeListItem({
     super.key,
@@ -28,7 +27,6 @@ class EarthquakeListItem extends StatelessWidget {
       displayDistance = FormattingUtils.formatDistance(context, distanceKm!);
       displayDistance = "$displayDistance from your location";
     } else {
-      // Or show placeholder if location services are off/unavailable
       displayDistance = "Enable location for distance";
     }
     final String displayTime = FormattingUtils.formatDateTime(
@@ -53,10 +51,10 @@ class EarthquakeListItem extends StatelessWidget {
     );
     const locationTextStyle = TextStyle(
       fontWeight: FontWeight.bold,
-      fontSize: 16,
+      fontSize: 17,
     );
-    const timeTextStyle = TextStyle(fontSize: 12);
-    const distanceTextStyle = TextStyle(color: Colors.blueAccent, fontSize: 12);
+    const timeTextStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w500);
+    const distanceTextStyle = TextStyle(color: Colors.blue, fontSize: 14);
     const indicatorBarWidth = 4.0;
 
     return GestureDetector(
@@ -64,11 +62,10 @@ class EarthquakeListItem extends StatelessWidget {
       child: Card(
         margin: cardMargin,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 2,
+        elevation: 4,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            // Use a left border instead of an intrinsic-height side bar
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(
@@ -82,6 +79,7 @@ class EarthquakeListItem extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+
                   // Left Section - Location & Time
                   Expanded(
                     child: Column(
@@ -110,7 +108,8 @@ class EarthquakeListItem extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8), // Spacing
+                  const SizedBox(width: 8),
+                   
                   // Right Section - Magnitude Box
                   Container(
                     padding: magnitudeBoxPadding,

@@ -1,4 +1,3 @@
-// lib/utils/formatting.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lastquake/utils/enums.dart';
@@ -7,17 +6,11 @@ import 'package:lastquake/provider/theme_provider.dart';
 
 class FormattingUtils {
   /// Formats distance in kilometers based on user preference (km or miles).
-  /// Requires BuildContext to access the ThemeProvider.
   static String formatDistance(BuildContext context, double distanceKm) {
-    // Use listen: false as this is usually called within a build method
-    // or callback where the value is needed once. If the widget displaying
-    // this needs to rebuild on unit change, use Provider.of<...>(context)
-    // or Consumer<...> in its build method.
     final prefsProvider = Provider.of<ThemeProvider>(context, listen: false);
 
     if (prefsProvider.distanceUnit == DistanceUnit.miles) {
       double distanceMiles = distanceKm * 0.621371;
-      // Use NumberFormat for locale-aware number formatting and control decimals
       return "${NumberFormat("0.#").format(distanceMiles)} mi";
     } else {
       return "${NumberFormat("0.#").format(distanceKm)} km";
@@ -25,7 +18,6 @@ class FormattingUtils {
   }
 
   /// Formats a DateTime object based on user preference (12/24 hour clock).
-  /// Requires BuildContext to access the ThemeProvider.
   static String formatDateTime(BuildContext context, DateTime dateTime) {
     final prefsProvider = Provider.of<ThemeProvider>(context, listen: false);
     final DateFormat formatter;
@@ -47,8 +39,8 @@ class FormattingUtils {
     final prefsProvider = Provider.of<ThemeProvider>(context, listen: false);
     final DateFormat formatter =
         prefsProvider.use24HourClock
-            ? DateFormat.Hm() // 24-hour format (e.g., 14:30)
-            : DateFormat.jm(); // 12-hour format (e.g., 2:30 PM)
+            ? DateFormat.Hm() // 24-hour format
+            : DateFormat.jm(); // 12-hour format
     return formatter.format(dateTime);
   }
 
@@ -59,15 +51,7 @@ class FormattingUtils {
     if (prefsProvider.distanceUnit == DistanceUnit.km) {
       return place;
     }
-
-    // Regex to find a number (integer or decimal) followed by optional space and "km"
-    // at the beginning of the string.
-    // - ^: Start of the string
-    // - (\d+(\.\d+)?): Group 1: Capture the number (one or more digits, optionally followed by '.' and more digits)
-    // - \s*: Match zero or more whitespace characters
-    // - km: Match the literal "km"
-    // - \b: Match a word boundary (ensures it's "km" not "kma" etc.)
-    // - (.*): Group 3: Capture the rest of the string
+    // Regex to find patterns like "123 km" or "12.3 km"
     final regex = RegExp(r'^(\d+(\.\d+)?)\s*km\b(.*)', caseSensitive: false);
     final match = regex.firstMatch(place);
 
@@ -93,13 +77,10 @@ class FormattingUtils {
           }
         }
       } catch (e) {
-        // If any error occurs during parsing/conversion, return original string
         debugPrint("Error parsing place string '$place': $e");
         return place;
       }
     }
-
-    // If no match or error occurred, return the original string
     return place;
   }
 }

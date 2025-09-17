@@ -85,7 +85,7 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
                       points: points,
                       color: Colors.orange.withValues(
                         alpha: 0.7,
-                      ), // Different color maybe?
+                      ), // Different color for MultiLineString
                       strokeWidth: 1.5,
                       //isDotted: false,
                     ),
@@ -176,7 +176,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   bool _isLoadingLocation = false;
   final LocationService _locationService = LocationService();
 
-  // --- NEW State Variables for Filtering ---
+  // --- State Variables for Filtering ---
   double _selectedMinMagnitude = 3.0;
   bool _isFilteringLocally = false;
   static final List<double> _magnitudeFilterOptions = [
@@ -195,6 +195,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   @override
   bool get wantKeepAlive => true;
 
+  // initialize state and load preferences
   @override
   void initState() {
     super.initState();
@@ -202,14 +203,14 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
     _loadMapPreferences();
 
-    // ADDED: Fetch initial data
+    // Fetch initial data
     _fetchInitialData();
 
     // automatic location fetching
     //_fetchUserLocation();
   }
 
-  // --- NEW: Helper to load preferences ---
+  // --- Helper to load preferences ---
   Future<void> _loadMapPreferences() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -241,7 +242,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         _selectedMapType = loadedMapType;
         _showFaultLines = loadedShowFaultLines;
 
-        // --- IMPORTANT: Load fault lines if preference was true ---
+        // --- Load fault lines if preference was true ---
         // If the preference was to show fault lines, AND they haven't been loaded yet,
         // trigger the load now.
         if (_showFaultLines && _faultLinePolylines.isEmpty) {
@@ -251,12 +252,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
+  // Save a boolean preference
   Future<void> _saveBoolPreference(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
   }
 
-  // ADDED: Fetch initial earthquake data
+  // Fetch initial earthquake data
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
     setState(() {
@@ -265,7 +267,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     });
 
     try {
-      // Fetch data (consider if filters are needed here, maybe default magnitude?)
+      // Fetch data from API
       // For simplicity, fetch recent significant ones initially
       final data = await ApiService.fetchEarthquakes(
         minMagnitude: 3.0, // Default initial fetch
@@ -292,6 +294,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
+  // Apply filters using isolate for performance
   Future<void> _applyFilters() async {
     if (!mounted) return;
     setState(() {
@@ -345,6 +348,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
+  // Update markers based on filtered earthquakes
   void _updateMarkers() {
     if (!mounted) return;
 
@@ -389,7 +393,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       } else {
         mutableProperties.remove("distance");
       }
-
+      // Create the marker with GestureDetector for taps
       newMarkers.add(
         Marker(
           point: LatLng(lat, lon),
@@ -426,6 +430,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     setState(() => _currentMarkers = newMarkers);
   }
 
+  // Show filter bottom sheet
   void _showFilterBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -500,9 +505,9 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                       }
                     },
                   ),
+
                   // --- Time Window Filter
                   Text(
-                    // Label for the time window section
                     "Time Window",
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
@@ -514,8 +519,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                           return ChoiceChip(
                             label: Text(timeWindowLabels[window] ?? "N/A"),
                             selected: currentTimeWindow == window,
-                            selectedColor:
-                                Theme.of(context).colorScheme.primaryContainer,
+                            /* selectedColor:
+                                Theme.of(context).colorScheme.primaryContainer, */
                             onSelected: (bool selected) {
                               if (selected) {
                                 setSheetState(() {
@@ -541,7 +546,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  // Optimized location fetching with error handling
+  // Fetch user location
   Future<void> _fetchUserLocation() async {
     if (!mounted) return;
 
@@ -574,7 +579,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         );
         _showLocationSuccessSnackBar();
 
-        // Update markers to reflect new distances
         _updateMarkers();
       } else {
         setState(() => _isLoadingLocation = false);
@@ -588,6 +592,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
+  // location services disabled dialog
   void _showLocationServicesDisabledDialog() {
     showDialog(
       context: context,
@@ -615,6 +620,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
+  // location error dialog
   void _showLocationErrorDialog() {
     showDialog(
       context: context,
@@ -634,7 +640,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  // ADDED: Snackbar for success
+  // Snackbar for success
   void _showLocationSuccessSnackBar() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -659,7 +665,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  /// Memoized marker color retrieval
+  // Memoized marker color retrieval
   Color _getMarkerColor(double magnitude) {
     return _markerColorCache.putIfAbsent(magnitude, () {
       if (magnitude >= 8.0) return Colors.red.shade900;
@@ -670,7 +676,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     });
   }
 
-  /// Optimized dialog construction with const and reduced computation
+  // Dialog construction with const and reduced computation
   void _showEarthquakeDetails(Map<String, dynamic> quake) {
     showGeneralDialog(
       context: context,
@@ -707,7 +713,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           // If tiles look wrong, you might need `tms: true`, but often not required.
           userAgentPackageName:
               'com.example.lastquake', // Replace with your package name
-          maxZoom: 19, // Esri supports higher zoom
+          maxZoom: 19, 
         );
       case MapLayerType.terrain:
         return TileLayer(
@@ -810,13 +816,12 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     if (_isLoadingFaultLines) return; // Prevent action while loading
 
     if (_showFaultLines) {
-      // Just hide if already shown
       setState(() {
         _showFaultLines = false;
       });
       await _saveBoolPreference(_showFaultLinesPrefKey, false);
     } else {
-      // Show: Load data if it hasn't been loaded yet
+      // Load data if it hasn't been loaded yet
       if (_faultLinePolylines.isNotEmpty) {
         setState(() {
           _showFaultLines = true;
@@ -848,6 +853,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
             onPressed: _isLoadingLocation ? null : _fetchUserLocation,
             tooltip: 'Find my location',
           ),
+
           // --- Map Layer Selection Button ---
           PopupMenuButton<dynamic>(
             icon: const Icon(Icons.layers_outlined),
@@ -864,7 +870,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 }
               } else if (result == 'toggle_fault_lines') {
                 // Handle Fault Line toggle
-                _toggleFaultLines(); // Call helper function
+                _toggleFaultLines(); 
               }
             },
             itemBuilder: (BuildContext context) {
@@ -889,7 +895,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                   ),
                 ),
                 const PopupMenuDivider(height: 1), // Divider after header */
-                // --- Map Type Options (Using CheckedPopupMenuItem) ---
+
+                // --- Map Type Options ---
                 CheckedPopupMenuItem<MapLayerType>(
                   value: MapLayerType.osm,
                   checked: _selectedMapType == MapLayerType.osm,
@@ -911,7 +918,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                   child: Text("Dark", style: textTheme.bodyMedium),
                 ),
 
-                // --- Divider before Features ---
                 const PopupMenuDivider(),
 
                 CheckedPopupMenuItem<String>(
@@ -957,6 +963,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                       });
                     }
                   }
+
                   //  zoom level update logic
                   if (hasGesture && position.zoom != _zoomLevel) {
                     if (mounted) {
@@ -986,21 +993,21 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 if (_zoomLevel < _clusteringThreshold)
                   MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
-                      maxClusterRadius: 45, // Slightly larger radius
+                      maxClusterRadius: 45, 
                       size: const Size(40, 40),
                       markers: _currentMarkers, // Use memoized markers
                       polygonOptions: const PolygonOptions(
                         borderColor: Colors.blueAccent,
-                        color: Colors.black12, // Less intrusive polygon color
+                        color: Colors.black12, 
                         borderStrokeWidth: 2,
                       ),
+                      
                       builder: (context, markers) {
                         return FloatingActionButton(
-                          // Use FAB for better look
-                          heroTag: null, // Avoid hero tag conflicts
+                          heroTag: null, 
                           mini: true,
                           backgroundColor: Colors.blue.withValues(alpha: 0.9),
-                          onPressed: null, // Not clickable itself
+                          onPressed: null, 
                           child: Text(
                             markers.length.toString(),
                             style: const TextStyle(
@@ -1014,6 +1021,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                   )
                 else
                   MarkerLayer(markers: _currentMarkers), // Use memoized markers
+                
+                // --- Attribution Widget ---
                 RichAttributionWidget(
                   showFlutterMapAttribution: false,
                   attributions: [
@@ -1091,10 +1100,10 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
               ),
             ),
 
-          // --- ADD LOCAL FILTERING INDICATOR ---
+          // --- LOCAL FILTERING INDICATOR ---
           // Show a subtle indicator below the AppBar when filtering locally
           if (_isFilteringLocally &&
-              !_isLoading) // Don't show if initial loading
+              !_isLoading) 
             Positioned(
               top: 0,
               left: 0,
@@ -1124,12 +1133,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 },
               ),
             ),
-          // --- ADD COMPASS BUTTON (Top-Right) ---
+          // --- COMPASS BUTTON (Top-Right) ---
           if (!_isLoading && _error == null) // Only show if map is visible
             _buildCompassButton(),
         ],
       ),
-      // --- ADD FLOATING ACTION BUTTON ---
+
+      // --- FLOATING ACTION BUTTON ---
       floatingActionButton: FloatingActionButton(
         onPressed: _showFilterBottomSheet, // Method to open the bottom sheet
         tooltip: 'Filter Earthquakes',
@@ -1138,25 +1148,23 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       //floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
-  // Inside _EarthquakeMapScreenState class:
 
+  // --- Compass Button Widget ---
   Widget _buildCompassButton() {
-    // Tolerance: Show button if rotation is more than ~1 degree off
+    // Show button if rotation is more than ~1 degree off
     final bool isRotated = _currentRotation.abs() > 1.0;
     // Convert degrees to radians for Transform.rotate
     final double rotationRadians = _currentRotation * (pi / 180.0);
 
     return Positioned(
-      top: 16, // Adjust positioning as needed
+      top: 16, 
       right: 16,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 200),
         opacity: isRotated ? 1.0 : 0.0, // Fade in/out
         child: IgnorePointer(
-          // Prevent interaction when invisible
           ignoring: !isRotated,
           child: Material(
-            // Provides elevation, ink splash etc.
             color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
             shape: const CircleBorder(),
             elevation: 4.0,
@@ -1191,7 +1199,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       _mapController.camera.zoom, // Keep current zoom
       0.0, // Target rotation (North up)
     );
-    // The onPositionChanged callback will automatically update _currentRotation state
   }
 }
 
@@ -1318,9 +1325,9 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
         (tsunamiCode == 1) ? Colors.blueAccent : colorScheme.onSurfaceVariant;
 
     return Align(
-      alignment: Alignment.topCenter, // Keep alignment
+      alignment: Alignment.topCenter, 
       child: Padding(
-        // Add padding around the dialog to avoid touching screen edges
+        // Padding around the dialog to avoid touching screen edges
         padding: const EdgeInsets.only(
           top: 60.0,
           left: 15,
@@ -1335,9 +1342,8 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
               maxWidth: 400,
             ), // Max width for larger screens
             decoration: BoxDecoration(
-              // Use a semi-transparent surface color from the theme
               color: colorScheme.surface.withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(16), // Slightly larger radius
+              borderRadius: BorderRadius.circular(16), 
               boxShadow: const [
                 BoxShadow(
                   color: Colors.black26,

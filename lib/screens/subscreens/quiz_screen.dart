@@ -167,12 +167,14 @@ class _QuizScreenState extends State<QuizScreen> {
     ),
   ];
 
+  // Initialize state and start the timer
   @override
   void initState() {
     super.initState();
     _startTimer();
   }
 
+  // Start or restart the countdown timer
   void _startTimer() {
     _timer?.cancel();
     setState(() {
@@ -190,6 +192,7 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
+  // Check the selected answer and update score
   void _checkAnswer(int selectedIndex) {
     if (_selectedAnswerIndex != null) return;
 
@@ -205,6 +208,7 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
+  // Move to the next question or show completion dialog
   void _moveToNextQuestion() {
     if (_currentQuestion < _questions.length - 1) {
       setState(() {
@@ -219,6 +223,7 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
+  // Show dialog when quiz is completed
   void _showQuizCompletedDialog() {
     showDialog(
       context: context,
@@ -239,6 +244,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  // Reset the quiz to initial state
   void _resetQuiz() {
     setState(() {
       _currentQuestion = 0;
@@ -308,7 +314,7 @@ class _QuizScreenState extends State<QuizScreen> {
             ),
             const SizedBox(height: 30),
 
-            // Options
+            // Options List
             ...List.generate(
               currentQuestionData.options.length,
               (index) => Padding(
@@ -379,6 +385,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  // Clean up the timer when the widget is disposed
   @override
   void dispose() {
     _timer?.cancel();
