@@ -39,7 +39,7 @@ class NotificationService {
       LocationService(); // For getting user location
 
   // Get server URL from environment variables
-  static String get serverUrl => dotenv.env['SERVER_URL'] ?? 'https://lastquakenotify.onrender.com';
+  static String? get serverUrl => dotenv.env['SERVER_URL'];
 
   Future<void> initNotifications() async {
     const AndroidInitializationSettings androidSettings =
