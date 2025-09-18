@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:lastquake/models/safe_zone.dart';
@@ -558,7 +559,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
 
     if (selectedLatLng != null) {
-      debugPrint("Map picker returned LatLng: $selectedLatLng");
+      if (kDebugMode) {
+        debugPrint("Map picker returned coordinates");
+      }
       final String? zoneName = await showDialog<String>(
         context: context,
         builder: (context) => _EnterSafeZoneNameDialog(),
@@ -793,9 +796,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<bool> _checkAndRequestLocationPermissionIfNeeded({
     bool showRationale = false,
   }) async {
-    debugPrint("Checking location permission..."); 
+    if (kDebugMode) {
+      debugPrint("Checking location permission");
+    }
     PermissionStatus status = await Permission.locationWhenInUse.status;
-    debugPrint("Initial permission status: $status"); 
+    if (kDebugMode) {
+      debugPrint("Initial permission status: $status");
+    } 
 
     if (status.isGranted) {
       debugPrint("Permission already granted."); 

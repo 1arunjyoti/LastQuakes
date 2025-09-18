@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lastquake/utils/enums.dart';
@@ -77,7 +78,9 @@ class FormattingUtils {
           }
         }
       } catch (e) {
-        debugPrint("Error parsing place string '$place': $e");
+        if (kDebugMode) {
+          debugPrint("Error parsing place string '$place': $e");
+        }
         return place;
       }
     }

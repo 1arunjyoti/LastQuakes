@@ -2,10 +2,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/home_screen.dart';
 import 'package:lastquake/services/notification_service.dart';
+import 'package:lastquake/services/secure_token_service.dart';
+import 'package:lastquake/services/token_migration_service.dart';
 import 'package:lastquake/theme/app_theme.dart';
+import 'package:lastquake/utils/secure_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,12 +21,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await NotificationService.instance.showFCMNotification(message);
   } catch (e) {
-    debugPrint('Error showing background notification: $e');
+    SecureLogger.error('Error showing background notification', e);
   }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
 
   // Initialize Firebase first
   await Firebase.initializeApp();
@@ -41,18 +48,18 @@ void main() async {
 
   // Set up foreground message listener
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    debugPrint("Foreground message received: \${message.messageId}");
+    SecureLogger.firebase("Foreground message received");
     NotificationService.instance.showFCMNotification(message);
   });
 
   // Set up token refresh listener
   FirebaseMessaging.instance.onTokenRefresh.listen((String token) async {
-    debugPrint("🔄 FCM Token refreshed: \${token.substring(0, 15)}...");
+    SecureLogger.token("FCM Token refreshed", token: token);
     try {
-      await prefs.setString('fcm_token', token);
+      await SecureTokenService.instance.storeFCMToken(token);
       await NotificationService.instance.updateBackendRegistration();
     } catch (e) {
-      debugPrint("❌ Error handling token refresh: \$e");
+      SecureLogger.error("Error handling token refresh", e);
     }
   });
   // End of Firebase Messaging setup
@@ -80,19 +87,22 @@ class _MyAppState extends State<MyApp> {
       _initializeServices();
     });
   }
+
   // Consolidated initialization logic
   Future<void> _initializeServices() async {
-    debugPrint("🚀 Starting post-frame initializations...");
+    SecureLogger.init("Starting post-frame initializations");
     try {
+      // Migrate existing tokens from SharedPreferences to secure storage
+      await TokenMigrationService.migrateTokenIfNeeded();
+
       // Initialize local notifications
       await NotificationService.instance.initNotifications();
 
-      // Store initial FCM token
+      // Store initial FCM token securely
       String? fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
-        debugPrint("📲 Initial FCM Token: \${fcmToken.substring(0, 15)}...");
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('fcm_token', fcmToken);
+        SecureLogger.token("Initial FCM Token obtained", token: fcmToken);
+        await SecureTokenService.instance.storeFCMToken(fcmToken);
       }
 
       // Request permissions and perform initial backend registration
@@ -103,24 +113,25 @@ class _MyAppState extends State<MyApp> {
         sound: true,
         provisional: false,
       );
-      debugPrint(
-        "ℹ️ FCM Notification permission status: \${settings.authorizationStatus}",
+      SecureLogger.permission(
+        "FCM Notification",
+        settings.authorizationStatus.toString(),
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        debugPrint("🚀 Triggering initial backend registration...");
+        SecureLogger.init("Triggering initial backend registration");
         await NotificationService.instance.initialRegisterOrUpdate();
       } else {
-        debugPrint(
-          "⚠️ FCM permission denied. Registration will be attempted, but notifications may not be received.",
+        SecureLogger.warning(
+          "FCM permission denied. Registration will be attempted, but notifications may not be received",
         );
         await NotificationService.instance.initialRegisterOrUpdate();
       }
     } catch (e) {
-      debugPrint("❌ Error during post-frame initializations: \$e");
+      SecureLogger.error("Error during post-frame initializations", e);
     }
-    debugPrint("✅ Post-frame initializations complete.");
+    SecureLogger.success("Post-frame initializations complete");
   }
 
   // Build method with theme management

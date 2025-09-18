@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:lastquake/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -81,7 +82,7 @@ class ApiService {
 
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      debugPrint("API Status Code: ${response.statusCode}");
+      SecureLogger.api("earthquake.usgs.gov/fdsnws/event/1/query", statusCode: response.statusCode, method: "GET");
 
       if (response.statusCode == 200) {
         // Process response in isolate
@@ -102,7 +103,7 @@ class ApiService {
         throw Exception("API Error: ${response.statusCode}");
       }
     } catch (e) {
-      debugPrint("Error fetching data: $e");
+      SecureLogger.error("Error fetching earthquake data", e);
 
       // Try to return cached data if network fails
       if (await cacheFile.exists()) {
