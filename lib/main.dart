@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/home_screen.dart';
 import 'package:lastquake/services/notification_service.dart';
+import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/services/secure_token_service.dart';
 import 'package:lastquake/services/token_migration_service.dart';
 import 'package:lastquake/theme/app_theme.dart';
@@ -92,6 +93,10 @@ class _MyAppState extends State<MyApp> {
   Future<void> _initializeServices() async {
     SecureLogger.init("Starting post-frame initializations");
     try {
+      // Initialize secure storage service for personal data encryption
+      await SecureStorageService.initialize();
+      SecureLogger.success("Secure storage service initialized");
+
       // Migrate existing tokens from SharedPreferences to secure storage
       await TokenMigrationService.migrateTokenIfNeeded();
 

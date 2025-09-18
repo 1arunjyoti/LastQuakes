@@ -3,8 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 import 'package:lastquake/models/safe_zone.dart';
+import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -191,9 +191,12 @@ class NotificationService {
     SecureLogger.info("Preferences: ${SecureLogger.sanitizeData(preferencesPayload)}");
 
     try {
-      final response = await http
-          .post(url, headers: {'Content-Type': 'application/json'}, body: body)
-          .timeout(const Duration(seconds: 20)); // timeout
+      final response = await SecureHttpClient.instance.post(
+        url, 
+        headers: {'Content-Type': 'application/json'}, 
+        body: body,
+        timeout: const Duration(seconds: 20),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         SecureLogger.success("Device registered/updated successfully with backend");

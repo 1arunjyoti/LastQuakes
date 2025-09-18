@@ -97,6 +97,17 @@ class SecureLogger {
     }
   }
 
+  /// Log security-related operations (certificate pinning, SSL/TLS, etc.)
+  static void security(String message, [Object? error]) {
+    if (kDebugMode) {
+      if (error != null) {
+        debugPrint('🔐 Security: $message: $error');
+      } else {
+        debugPrint('🔐 Security: $message');
+      }
+    }
+  }
+
   /// Sanitize sensitive data for logging
   static String sanitizeData(Map<String, dynamic> data) {
     if (!kDebugMode) return '[REDACTED]';

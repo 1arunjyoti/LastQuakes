@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
@@ -81,7 +81,7 @@ class ApiService {
     });
 
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      final response = await SecureHttpClient.instance.get(url, timeout: const Duration(seconds: 10));
       SecureLogger.api("earthquake.usgs.gov/fdsnws/event/1/query", statusCode: response.statusCode, method: "GET");
 
       if (response.statusCode == 200) {
