@@ -8,3 +8,10 @@ enum NotificationFilterType {
   country, // Within a specific country
   worldwide, // Any earthquake meeting magnitude threshold
 }
+
+enum MapLayerType {
+  osm, // OpenStreetMap Standard
+  satellite, // Satellite Imagery
+  terrain, // Topographic/Terrain Map
+  dark, // Dark Mode Map
+}

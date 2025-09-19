@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:lastquake/utils/formatting.dart';
 import 'package:lastquake/widgets/appbar.dart';
+import 'package:lastquake/widgets/components/zoom_controls.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -129,8 +130,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              clipBehavior:
-                  Clip.antiAlias, 
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -150,7 +150,6 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         // --- Location Title ---
                         Text(
                           displayLocationTitle,
@@ -430,26 +429,6 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     );
   }
 
-  // --- Map Zooming ---
-  void _zoomMap(bool zoomIn) {
-    setState(() {
-      if (zoomIn && _zoomLevel < _maxZoom) {
-        _zoomLevel += 1;
-      } else if (!zoomIn && _zoomLevel > _minZoom) {
-        _zoomLevel -= 1;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(zoomIn ? "Max zoom level!" : "Min zoom level!"),
-            duration: const Duration(milliseconds: 500),
-          ),
-        );
-        return;
-      }
-      _mapController.moveAndRotate(_mapController.camera.center, _zoomLevel, 0);
-    });
-  }
-
   // --- Copy Coordinates ---
   void _copyCoordinates() {
     if (_memoizedData.lat != null && _memoizedData.lon != null) {
@@ -621,49 +600,22 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                 // Zoom Controls
                 bottom: 10,
                 right: 10,
-                child: Column(
-                  children: [
-                    _buildZoomButton(
-                      icon: Icons.add,
-                      heroTag: "zoom_in",
-                      onPressed: () => _zoomMap(true),
-                      isEnabled: _zoomLevel < _maxZoom,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildZoomButton(
-                      icon: Icons.remove,
-                      heroTag: "zoom_out",
-                      onPressed: () => _zoomMap(false),
-                      isEnabled: _zoomLevel > _minZoom,
-                    ),
-                  ],
+                child: ZoomControls(
+                  zoomLevel: _zoomLevel,
+                  mapController: _mapController,
+                  minZoom: _minZoom,
+                  maxZoom: _maxZoom,
+                  onZoomChanged: (newZoom) {
+                    setState(() {
+                      _zoomLevel = newZoom;
+                    });
+                  },
                 ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  // Builds zoom buttons for the map
-  Widget _buildZoomButton({
-    required IconData icon,
-    required String heroTag,
-    required VoidCallback onPressed,
-    required bool isEnabled,
-  }) {
-    return FloatingActionButton(
-      heroTag: heroTag,
-      mini: true,
-      backgroundColor:
-          isEnabled
-              ? Colors.white.withValues(alpha: 0.8)
-              : Colors.grey.shade400.withValues(alpha: 0.8),
-      foregroundColor: isEnabled ? Colors.black : Colors.grey.shade600,
-      elevation: 2,
-      onPressed: isEnabled ? onPressed : null,
-      child: Icon(icon),
     );
   }
 }
