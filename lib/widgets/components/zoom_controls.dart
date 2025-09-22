@@ -25,7 +25,7 @@ class ZoomControls extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -47,7 +47,7 @@ class ZoomControls extends StatelessWidget {
                 onZoomChanged(newZoom);
               } : null,
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Icon(
                   Icons.add,
                   size: 24,
@@ -72,7 +72,7 @@ class ZoomControls extends StatelessWidget {
                 onZoomChanged(newZoom);
               } : null,
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Icon(
                   Icons.remove,
                   size: 24,

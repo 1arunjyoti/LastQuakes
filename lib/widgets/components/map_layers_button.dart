@@ -38,11 +38,11 @@ class MapLayersButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
+                  top: Radius.circular(20),
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,7 +63,7 @@ class MapLayersButton extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
 
                     // Map type options
                     Text(
@@ -72,7 +72,7 @@ class MapLayersButton extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 4),
 
                     ...MapLayerType.values.map((type) {
                       final isSelected = currentMapType == type;
@@ -98,52 +98,49 @@ class MapLayersButton extends StatelessWidget {
                           break;
                       }
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: ListTile(
-                          leading: Icon(iconData, color: colorScheme.primary),
-                          title: Text(title),
-                          trailing:
-                              isSelected
-                                  ? Icon(
-                                    Icons.check_circle,
-                                    color: colorScheme.primary,
-                                  )
-                                  : const Icon(Icons.radio_button_unchecked),
-                          onTap: () async {
-                            if (type != currentMapType) {
-                              // Update local state immediately for UI responsiveness
-                              setSheetState(() {
-                                currentMapType = type;
-                              });
-                              // Update parent state
-                              onMapTypeChanged(type);
-                              // Save preference
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              await prefs.setString(
-                                'map_layer_type_preference_v2',
-                                type.name,
-                              );
-                            }
-                            if (context.mounted) Navigator.pop(context);
-                          },
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          tileColor:
-                              isSelected
-                                  ? colorScheme.primaryContainer.withValues(
-                                    alpha: 0.3,
-                                  )
-                                  : null,
+                      return ListTile(
+                        leading: Icon(iconData, color: colorScheme.primary),
+                        title: Text(title),
+                        trailing:
+                            isSelected
+                                ? Icon(
+                                  Icons.check_circle,
+                                  color: colorScheme.primary,
+                                )
+                                : const Icon(Icons.radio_button_unchecked),
+                        onTap: () async {
+                          if (type != currentMapType) {
+                            // Update local state immediately for UI responsiveness
+                            setSheetState(() {
+                              currentMapType = type;
+                            });
+                            // Update parent state
+                            onMapTypeChanged(type);
+                            // Save preference
+                            final prefs =
+                                await SharedPreferences.getInstance();
+                            await prefs.setString(
+                              'map_layer_type_preference_v2',
+                              type.name,
+                            );
+                          }
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        tileColor:
+                            isSelected
+                                ? colorScheme.primaryContainer.withValues(
+                                  alpha: 0.3,
+                                )
+                                : null,
                       );
                     }),
 
-                    const SizedBox(height: 24),
+                    ///const SizedBox(height: 8),
                     const Divider(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
 
                     // Fault lines toggle
                     Text(
@@ -152,7 +149,7 @@ class MapLayersButton extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 4),
 
                     ListTile(
                       leading: Icon(
@@ -211,7 +208,7 @@ class MapLayersButton extends StatelessWidget {
                               : null,
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -231,7 +228,7 @@ class MapLayersButton extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -246,7 +243,7 @@ class MapLayersButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: () => _showMapLayersBottomSheet(context),
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Icon(
                 Icons.layers_outlined,
                 size: 24,

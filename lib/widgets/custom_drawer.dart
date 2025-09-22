@@ -88,7 +88,10 @@ class _CustomDrawerState extends State<CustomDrawer> {
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
-                  label: Text(item.label),
+                  label: Text(
+                    item.label, 
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
           Divider(),
@@ -98,7 +101,10 @@ class _CustomDrawerState extends State<CustomDrawer> {
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
-                  label: Text(item.label),
+                  label: Text(
+                    item.label,
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
         ],

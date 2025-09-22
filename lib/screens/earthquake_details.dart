@@ -1,10 +1,15 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:lastquake/utils/formatting.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/components/zoom_controls.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,6 +46,7 @@ class EarthquakeDetailsScreen extends StatefulWidget {
 
 class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   // State variables
+  final GlobalKey _globalKey = GlobalKey();
   late final MapController _mapController;
   double _zoomLevel = 4.0; // Initial map zoom
   static const double _minZoom = 1.0;
@@ -126,74 +132,87 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Card(
-              elevation: 3,
+              elevation: 2,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(20),
               ),
               clipBehavior: Clip.antiAlias,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- Impact Section Header (Magnitude & Tsunami) ---
-                  _buildMagnitudeHeader(
-                    context,
-                    magnitude: _memoizedData.magnitude,
-                    tsunami: _memoizedData.tsunami,
-                  ),
-
-                  // --- Details Section ---
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 12.0,
-                    ),
+                  RepaintBoundary(
+                    key: _globalKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // --- Location Title ---
-                        Text(
-                          displayLocationTitle,
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
+                        // --- Impact Section Header (Magnitude & Tsunami) ---
+                        _buildMagnitudeHeader(
+                          context,
+                          magnitude: _memoizedData.magnitude,
+                          tsunami: _memoizedData.tsunami,
+                        ),
+
+                        // --- Details Section ---
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 12.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // --- Location Title ---
+                              Text(
+                                displayLocationTitle,
+                                style: textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+
+                              // --- Location Details Group ---
+                              _buildSectionHeader(context, "LOCATION DETAILS"),
+                              _buildDetailRow(
+                                context: context,
+                                icon: Icons.layers_outlined,
+                                iconColor: colorScheme.secondary,
+                                label: "Depth",
+                                value: formattedDepth,
+                              ),
+                              _buildCoordinatesRow(
+                                context: context,
+                                lat: _memoizedData.lat,
+                                lon: _memoizedData.lon,
+                              ),
+                              const SizedBox(height: 8),
+
+                              // --- Time Details Group ---
+                              _buildSectionHeader(context, "TIME"),
+                              _buildDetailRow(
+                                context: context,
+                                icon: Icons.schedule_outlined,
+                                iconColor: colorScheme.tertiary,
+                                label: "Occurred",
+                                value: formattedTime,
+                              ),
+
+                              const SizedBox(height: 8),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-
-                        // --- Location Details Group ---
-                        _buildSectionHeader(context, "LOCATION DETAILS"),
-                        _buildDetailRow(
-                          context: context,
-                          icon: Icons.layers_outlined,
-                          iconColor: colorScheme.secondary,
-                          label: "Depth",
-                          value: formattedDepth,
-                        ),
-                        _buildCoordinatesRow(
-                          context: context,
-                          lat: _memoizedData.lat,
-                          lon: _memoizedData.lon,
-                        ),
-                        const SizedBox(height: 8),
-
-                        // --- Time Details Group ---
-                        _buildSectionHeader(context, "TIME"),
-                        _buildDetailRow(
-                          context: context,
-                          icon: Icons.schedule_outlined,
-                          iconColor: colorScheme.tertiary,
-                          label: "Occurred",
-                          value: formattedTime,
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // --- Action Buttons ---
-                        _buildActionButtons(
-                          context: context,
-                          hasValidUsgsUrl: hasValidUsgsUrl,
-                          hasCoordinates: hasCoordinates,
-                        ),
                       ],
+                    ),
+                  ),
+                  // --- Action Buttons ---
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 4.0,
+                    ),
+                    child: _buildActionButtons(
+                      context: context,
+                      hasValidUsgsUrl: hasValidUsgsUrl,
+                      hasCoordinates: hasCoordinates,
                     ),
                   ),
                 ],
@@ -446,27 +465,23 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
 
   // --- Share Details ---
   Future<void> _shareEarthquakeDetails() async {
-    final magnitude = _memoizedData.magnitude.toStringAsFixed(1);
-    final location = _memoizedData.location;
-    final dateTime = DateTime.fromMillisecondsSinceEpoch(
-      _memoizedData.timestamp,
-    );
-    final formattedTime = FormattingUtils.formatDateTime(context, dateTime);
-    final usgsUrl = _memoizedData.url;
-
-    String shareText =
-        "Earthquake Alert:\n"
-        "Magnitude: M $magnitude\n"
-        "Location: $location\n"
-        "Time: $formattedTime";
-    if (usgsUrl != null && usgsUrl.isNotEmpty) {
-      shareText += "\nMore Info: $usgsUrl";
-    }
-    shareText += "\n\nShared via LastQuakes App";
-
     try {
-      await Share.share(
-        shareText,
+      RenderRepaintBoundary boundary =
+          _globalKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
+
+      final directory = await getTemporaryDirectory();
+      final imagePath = await File('${directory.path}/earthquake_details.png').create();
+      await imagePath.writeAsBytes(pngBytes);
+
+      final magnitude = _memoizedData.magnitude.toStringAsFixed(1);
+      final location = _memoizedData.location;
+
+      await Share.shareXFiles(
+        [XFile(imagePath.path)],
         subject: 'Earthquake Information: M $magnitude near $location',
       );
     } catch (e) {
@@ -556,11 +571,11 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
 
   Widget _buildMapSection() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
       child: SizedBox(
         height: 250,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
               FlutterMap(

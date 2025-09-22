@@ -45,7 +45,7 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
                           coord.length >= 2 &&
                           coord[0] is num &&
                           coord[1] is num) {
-                        // IMPORTANT: GeoJSON is usually [longitude, latitude]
+                        // GeoJSON is usually [longitude, latitude]
                         return LatLng(coord[1].toDouble(), coord[0].toDouble());
                       }
                       return null;
@@ -57,7 +57,7 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
               polylines.add(
                 Polyline(
                   points: points,
-                  color: Colors.red.withValues(alpha: 0.8), // Style the lines
+                  color: Colors.red.withValues(alpha: 0.8), 
                   strokeWidth: 1.5,
                   //isDotted: false,
                 ),
@@ -244,10 +244,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         _showFaultLines = loadedShowFaultLines;
 
         // --- Load fault lines if preference was true ---
-        // If the preference was to show fault lines, AND they haven't been loaded yet,
-        // trigger the load now.
         if (_showFaultLines && _faultLinePolylines.isEmpty) {
-          _loadFaultLineData(); // Don't await here, let it load in background
+          _loadFaultLineData(); // load in background
         }
       });
     }
@@ -269,7 +267,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
     try {
       // Fetch data from API
-      // For simplicity, fetch recent significant ones initially
       final data = await ApiService.fetchEarthquakes(
         minMagnitude: 3.0, // Default initial fetch
         days: 45,
@@ -431,7 +428,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     setState(() => _currentMarkers = newMarkers);
   }
 
-  // Show modern filter bottom sheet
+  // Show filter bottom sheet
   void _showFilterBottomSheet() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -458,11 +455,11 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
+                  top: Radius.circular(20),
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +480,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 8),
 
                     // --- Minimum Magnitude Section ---
                     Text(
@@ -522,7 +519,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         trackHeight: 6,
@@ -559,7 +556,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                         },
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 8),
 
                     // --- Time Window Section ---
                     Text(
@@ -568,7 +565,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 8.0,
                       runSpacing: 8.0,
@@ -605,7 +602,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                             );
                           }).toList(),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -830,7 +827,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     return Scaffold(
       appBar: LastQuakesAppBar(
         title: "LastQuakes Map",
-        actions: const [], // Remove actions from app bar for cleaner look
+        actions: const [], 
       ),
       drawer: const CustomDrawer(),
       body: Stack(
@@ -853,6 +850,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 initialZoom: _zoomLevel,
                 minZoom: _minZoom,
                 maxZoom: _maxZoom,
+                // Constrain the map to world boundaries to prevent blank space
+                cameraConstraint: CameraConstraint.contain(
+                  bounds: LatLngBounds(
+                    const LatLng(-90.0, -180.0), // Southwest corner
+                    const LatLng(90.0, 180.0),   // Northeast corner
+                  ),
+                ),
                 onPositionChanged: (position, hasGesture) {
                   // --- UPDATE Rotation State ---
                   final newRotation =
@@ -935,6 +939,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                   )
                 else
                   MarkerLayer(markers: _currentMarkers), // Use memoized markers
+
                 // --- Attribution Widget ---
                 RichAttributionWidget(
                   showFlutterMapAttribution: false,
@@ -1092,7 +1097,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
               ),
             ),
 
-          // Modern floating controls panel
+          // floating controls panel
           if (!_isLoading && _error == null) _buildModernControlsPanel(context),
 
           // --- COMPASS BUTTON (Top-Right) ---
@@ -1103,7 +1108,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  // --- Modern Compass Button Widget ---
+  // --- Compass Button Widget ---
   Widget _buildModernCompassButton(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1154,7 +1159,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  // --- Modern Controls Panel ---
+  // --- Controls Panel ---
   Widget _buildModernControlsPanel(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1237,7 +1242,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   }
 }
 
-/// Modern Control Button Widget
+// Control Button Widget
 class _ModernControlButton extends StatelessWidget {
   final IconData? icon;
   final String tooltip;
@@ -1275,10 +1280,10 @@ class _ModernControlButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             onTap: onPressed,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Icon(
                 icon,
                 size: 24,
@@ -1293,7 +1298,7 @@ class _ModernControlButton extends StatelessWidget {
   }
 }
 
-/// Modern Earthquake Details Dialog
+// Earthquake Details Dialog
 class _EarthquakeDetailsDialog extends StatelessWidget {
   final Map<String, dynamic> quake;
   final Map<String, dynamic> fullQuakeData;
@@ -1360,10 +1365,10 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(maxWidth: 350),
             decoration: BoxDecoration(
               color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.15),
@@ -1373,7 +1378,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(24.0),
+              borderRadius: BorderRadius.circular(20.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1391,7 +1396,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1436,10 +1441,17 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                           // Close Button
                           IconButton(
                             onPressed: () => Navigator.pop(context),
-                            icon: const Icon(
-                              Icons.close_rounded,
-                              color: Colors.white,
-                              size: 28,
+                            icon: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
                           ),
                         ],
@@ -1449,7 +1461,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
 
                   // Content
                   Padding(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1461,7 +1473,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                             color: colorScheme.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 8),
 
                         // Details
                         _ModernDetailRow(
@@ -1474,7 +1486,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                         ),
 
                         if (distanceFormatted != null) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 8),
                           _ModernDetailRow(
                             icon: Icons.location_on_outlined,
                             iconColor: colorScheme.secondary,
@@ -1486,7 +1498,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                         ],
 
                         if (tsunamiCode != null) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 8),
                           _ModernDetailRow(
                             icon: Icons.tsunami_rounded,
                             iconColor: tsunamiColor,
@@ -1498,7 +1510,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                         ],
 
                         // Details Button
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
@@ -1508,7 +1520,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(16),
                               ),
                             ),
                           ),
@@ -1526,7 +1538,7 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
   }
 }
 
-/// Modern Detail Row Widget
+// Detail Row Widget
 class _ModernDetailRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;

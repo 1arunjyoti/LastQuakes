@@ -150,10 +150,10 @@ class _LocationButtonState extends State<LocationButton> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             onTap: _isLoadingLocation ? null : _fetchUserLocation,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: _isLoadingLocation
                   ? SizedBox(
                       width: 24,
