@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -24,54 +25,122 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     _loadCustomContacts();
   }
 
-  // Load last selected country from storage
+  // Load last selected country from secure storage
   Future<void> _loadSavedCountry() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? savedCountry = prefs.getString("selected_country");
+    try {
+      // Try to load from secure storage first
+      String? savedCountry = await SecureStorageService.retrieveSelectedCountry();
+      
+      if (savedCountry == null) {
+        // Migrate from SharedPreferences if not found in secure storage
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        savedCountry = prefs.getString("selected_country");
+        
+        if (savedCountry != null) {
+          // Save to secure storage and remove from SharedPreferences
+          await SecureStorageService.storeSelectedCountry(savedCountry);
+          await prefs.remove("selected_country");
+          if (kDebugMode) {
+            print('Migrated selected country to secure storage: $savedCountry');
+          }
+        }
+      }
 
-    setState(() {
-      _selectedCountry = savedCountry ?? "Global";
-      _contacts = emergencyNumbers[_selectedCountry]!;
-    });
-  }
-
-  // Save the selected country to storage
-  Future<void> _saveCountry(String country) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString("selected_country", country);
-  }
-
-  // Load custom contacts from storage
-  Future<void> _loadCustomContacts() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String>? savedContacts = prefs.getStringList("custom_contacts");
-    if (savedContacts != null) {
       setState(() {
-        _customContacts =
-            savedContacts.map((contact) {
-              List<String> parts = contact.split('|');
-              // Add validation in case the split doesn't yield two parts
-              if (parts.length == 2) {
-                return {"name": parts[0], "number": parts[1]};
-              }
-              return {"name": "Invalid Contact", "number": ""};
-            }).toList();
-        // Filter out invalid contacts
-        _customContacts.removeWhere(
-          (contact) => contact["name"] == "Invalid Contact",
-        );
+        _selectedCountry = savedCountry ?? "Global";
+        _contacts = emergencyNumbers[_selectedCountry]!;
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading saved country: $e');
+      }
+      setState(() {
+        _selectedCountry = "Global";
+        _contacts = emergencyNumbers[_selectedCountry]!;
+      });
+    }
+  }
+
+  // Save the selected country to secure storage
+  Future<void> _saveCountry(String country) async {
+    try {
+      await SecureStorageService.storeSelectedCountry(country);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving country: $e');
+      }
+      // Fallback to SharedPreferences on error
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString("selected_country", country);
+    }
+  }
+
+  // Load custom contacts from secure storage
+  Future<void> _loadCustomContacts() async {
+    try {
+      // Try to load from secure storage first
+      List<Map<String, String>> savedContacts = await SecureStorageService.retrieveEmergencyContacts();
+      
+      if (savedContacts.isEmpty) {
+        // Migrate from SharedPreferences if not found in secure storage
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        List<String>? legacyContacts = prefs.getStringList("custom_contacts");
+        
+        if (legacyContacts != null) {
+          savedContacts = legacyContacts.map((contact) {
+            List<String> parts = contact.split('|');
+            // Add validation in case the split doesn't yield two parts
+            if (parts.length == 2) {
+              return {"name": parts[0], "number": parts[1]};
+            }
+            return {"name": "Invalid Contact", "number": ""};
+          }).toList();
+          
+          // Filter out invalid contacts
+          savedContacts.removeWhere(
+            (contact) => contact["name"] == "Invalid Contact",
+          );
+          
+          // Save to secure storage and remove from SharedPreferences
+          if (savedContacts.isNotEmpty) {
+            await SecureStorageService.storeEmergencyContacts(savedContacts);
+            await prefs.remove("custom_contacts");
+            if (kDebugMode) {
+              print('Migrated ${savedContacts.length} emergency contacts to secure storage');
+            }
+          }
+        }
+      }
+
+      setState(() {
+        _customContacts = savedContacts;
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading custom contacts: $e');
+      }
+      setState(() {
+        _customContacts = [];
       });
     }
   }
   
-  // Save custom contacts to storage
+  // Save custom contacts to secure storage
   Future<void> _saveCustomContacts() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> contactsToSave =
-        _customContacts
-            .map((contact) => "${contact['name']}|${contact['number']}")
-            .toList();
-    await prefs.setStringList("custom_contacts", contactsToSave);
+    try {
+      await SecureStorageService.storeEmergencyContacts(_customContacts);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving custom contacts: $e');
+      }
+      // Fallback to SharedPreferences on error
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String> contactsToSave =
+          _customContacts
+              .map((contact) => "${contact['name']}|${contact['number']}")
+              .toList();
+      await prefs.setStringList("custom_contacts", contactsToSave);
+    }
   }
 
   // Add a custom contact

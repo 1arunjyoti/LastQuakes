@@ -1,16 +1,21 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:lastquake/screens/earthquake_details.dart';
 import 'package:lastquake/services/api_service.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/utils/formatting.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
+import 'package:lastquake/widgets/components/location_button.dart';
+import 'package:lastquake/widgets/components/map_layers_button.dart';
+import 'package:lastquake/widgets/components/zoom_controls.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -40,7 +45,7 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
                           coord.length >= 2 &&
                           coord[0] is num &&
                           coord[1] is num) {
-                        // IMPORTANT: GeoJSON is usually [longitude, latitude]
+                        // GeoJSON is usually [longitude, latitude]
                         return LatLng(coord[1].toDouble(), coord[0].toDouble());
                       }
                       return null;
@@ -52,7 +57,7 @@ List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
               polylines.add(
                 Polyline(
                   points: points,
-                  color: Colors.red.withValues(alpha: 0.8), // Style the lines
+                  color: Colors.red.withValues(alpha: 0.8), 
                   strokeWidth: 1.5,
                   //isDotted: false,
                 ),
@@ -173,7 +178,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   static const String _showFaultLinesPrefKey = 'show_fault_lines_preference';
 
   Position? _userPosition;
-  bool _isLoadingLocation = false;
   final LocationService _locationService = LocationService();
 
   // --- State Variables for Filtering ---
@@ -205,9 +209,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
     // Fetch initial data
     _fetchInitialData();
-
-    // automatic location fetching
-    //_fetchUserLocation();
   }
 
   // --- Helper to load preferences ---
@@ -243,10 +244,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         _showFaultLines = loadedShowFaultLines;
 
         // --- Load fault lines if preference was true ---
-        // If the preference was to show fault lines, AND they haven't been loaded yet,
-        // trigger the load now.
         if (_showFaultLines && _faultLinePolylines.isEmpty) {
-          _loadFaultLineData(); // Don't await here, let it load in background
+          _loadFaultLineData(); // load in background
         }
       });
     }
@@ -268,7 +267,6 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
     try {
       // Fetch data from API
-      // For simplicity, fetch recent significant ones initially
       final data = await ApiService.fetchEarthquakes(
         minMagnitude: 3.0, // Default initial fetch
         days: 45,
@@ -400,7 +398,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           width: markerSize,
           height: markerSize,
           child: GestureDetector(
-            onTap: () => _showEarthquakeDetails(mutableProperties),
+            onTap: () => _showEarthquakeDetails(mutableProperties, quake),
             child: Tooltip(
               message:
                   'M ${magnitude.toStringAsFixed(1)}\n${mutableProperties["place"] ?? 'Unknown'}',
@@ -432,12 +430,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
   // Show filter bottom sheet
   void _showFilterBottomSheet() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16.0)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
@@ -452,203 +451,165 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
               TimeWindow.last45Days: "All (45 Days)",
             };
 
-            return Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Wrap(
-                //runSpacing: 16.0,
-                children: <Widget>[
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Filter Earthquakes',
-                        style: Theme.of(context).textTheme.titleLarge,
+            return Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Filter Earthquakes',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // --- Minimum Magnitude Section ---
+                    Text(
+                      "Minimum Magnitude",
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
                       ),
-                    ],
-                  ),
-                  const Divider(),
-                  const SizedBox(height: 16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.3,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.waves,
+                            color: colorScheme.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "≥ ${currentSliderValue.toStringAsFixed(1)}",
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 6,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 12,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 20,
+                        ),
+                      ),
+                      child: Slider(
+                        value: currentSliderValue,
+                        min: _magnitudeFilterOptions.first,
+                        max: _magnitudeFilterOptions.last,
+                        divisions:
+                            (_magnitudeFilterOptions.last -
+                                    _magnitudeFilterOptions.first)
+                                .toInt() *
+                            2,
+                        label: "≥ ${currentSliderValue.toStringAsFixed(1)}",
+                        onChanged: (double value) {
+                          double newValue = (value * 2).round() / 2;
+                          setSheetState(() {
+                            currentSliderValue = newValue;
+                          });
+                          // Update parent state immediately for UI responsiveness
+                          setState(() {
+                            _selectedMinMagnitude = newValue;
+                          });
+                        },
+                        onChangeEnd: (double value) {
+                          // Apply filters only when user stops dragging
+                          _applyFilters();
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
 
-                  // --- Minimum Magnitude Slider ---
-                  Text(
-                    "Minimum Magnitude: ≥ ${currentSliderValue.toStringAsFixed(1)}",
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Slider(
-                    value: currentSliderValue,
-                    min: _magnitudeFilterOptions.first,
-                    max: _magnitudeFilterOptions.last,
-                    divisions:
-                        (_magnitudeFilterOptions.last -
-                                _magnitudeFilterOptions.first)
-                            .toInt() *
-                        2, // Finer steps (0.5)
-                    label: "≥ ${currentSliderValue.toStringAsFixed(1)}",
-                    onChanged: (double value) {
-                      setSheetState(() {
-                        currentSliderValue = (value * 2).round() / 2;
-                      });
-                    },
-                    onChangeEnd: (double value) {
-                      double finalValue = (value * 2).round() / 2;
-
-                      if (_selectedMinMagnitude != finalValue) {
-                        setState(() {
-                          _selectedMinMagnitude = finalValue;
-                        });
-                        _applyFilters();
-                      }
-                    },
-                  ),
-
-                  // --- Time Window Filter
-                  Text(
-                    "Time Window",
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Wrap(
-                    spacing: 8.0,
-                    runSpacing: 4.0,
-                    children:
-                        TimeWindow.values.map((window) {
-                          return ChoiceChip(
-                            label: Text(timeWindowLabels[window] ?? "N/A"),
-                            selected: currentTimeWindow == window,
-                            /* selectedColor:
-                                Theme.of(context).colorScheme.primaryContainer, */
-                            onSelected: (bool selected) {
-                              if (selected) {
-                                setSheetState(() {
-                                  currentTimeWindow = window;
-                                });
-                                if (_selectedTimeWindow != window) {
-                                  setState(() {
-                                    _selectedTimeWindow = window;
+                    // --- Time Window Section ---
+                    Text(
+                      "Time Window",
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8.0,
+                      runSpacing: 8.0,
+                      children:
+                          TimeWindow.values.map((window) {
+                            final isSelected = currentTimeWindow == window;
+                            return FilterChip(
+                              label: Text(timeWindowLabels[window] ?? "N/A"),
+                              selected: isSelected,
+                              onSelected: (bool selected) {
+                                if (selected) {
+                                  setSheetState(() {
+                                    currentTimeWindow = window;
                                   });
-                                  _applyFilters();
+                                  if (_selectedTimeWindow != window) {
+                                    setState(() {
+                                      _selectedTimeWindow = window;
+                                    });
+                                    _applyFilters();
+                                  }
                                 }
-                              }
-                            },
-                          );
-                        }).toList(),
-                  ),
-                ],
+                              },
+                              backgroundColor: colorScheme.surface,
+                              selectedColor: colorScheme.primaryContainer,
+                              checkmarkColor: colorScheme.primary,
+                              side: BorderSide(
+                                color:
+                                    isSelected
+                                        ? colorScheme.primary
+                                        : colorScheme.outline.withValues(
+                                          alpha: 0.5,
+                                        ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             );
           },
         );
       },
-    );
-  }
-
-  // Fetch user location
-  Future<void> _fetchUserLocation() async {
-    if (!mounted) return;
-
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-        _showLocationServicesDisabledDialog();
-        return;
-      }
-    }
-
-    setState(() => _isLoadingLocation = true);
-
-    try {
-      final position = await _locationService.getCurrentLocation(
-        forceRefresh: true,
-      );
-      if (!mounted) return;
-
-      if (position != null) {
-        setState(() {
-          _userPosition = position;
-          _isLoadingLocation = false;
-        });
-
-        _mapController.move(
-          LatLng(position.latitude, position.longitude),
-          _zoomLevel,
-        );
-        _showLocationSuccessSnackBar();
-
-        _updateMarkers();
-      } else {
-        setState(() => _isLoadingLocation = false);
-        _showLocationErrorDialog();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-        _showLocationErrorDialog();
-      }
-    }
-  }
-
-  // location services disabled dialog
-  void _showLocationServicesDisabledDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Location Services Disabled'),
-            content: const Text(
-              'Please enable location services on your device to use this feature. '
-              'Go to your device settings and turn on location services.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Geolocator.openLocationSettings();
-                },
-                child: const Text('Open Settings'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // location error dialog
-  void _showLocationErrorDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Location Error'),
-            content: const Text(
-              'Unable to fetch your location. Please check your device settings.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Snackbar for success
-  void _showLocationSuccessSnackBar() {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Location updated'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
     );
   }
 
@@ -676,8 +637,21 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     });
   }
 
+  // Navigate to earthquake details screen
+  void _navigateToEarthquakeDetails(Map<String, dynamic> quake) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EarthquakeDetailsScreen(quakeData: quake),
+      ),
+    );
+  }
+
   // Dialog construction with const and reduced computation
-  void _showEarthquakeDetails(Map<String, dynamic> quake) {
+  void _showEarthquakeDetails(
+    Map<String, dynamic> quakeProperties,
+    Map<String, dynamic> fullQuakeData,
+  ) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -695,7 +669,14 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         );
       },
       pageBuilder: (context, _, __) {
-        return _EarthquakeDetailsDialog(quake: quake);
+        return _EarthquakeDetailsDialog(
+          quake: quakeProperties,
+          fullQuakeData: fullQuakeData,
+          onDetailsPressed: () {
+            Navigator.pop(context); // Close dialog first
+            _navigateToEarthquakeDetails(fullQuakeData);
+          },
+        );
       },
     );
   }
@@ -713,7 +694,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           // If tiles look wrong, you might need `tms: true`, but often not required.
           userAgentPackageName:
               'com.example.lastquake', // Replace with your package name
-          maxZoom: 19, 
+          maxZoom: 19,
         );
       case MapLayerType.terrain:
         return TileLayer(
@@ -778,9 +759,11 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         });
         await _saveBoolPreference(_showFaultLinesPrefKey, true);
 
-        ScaffoldMessenger.of(
-          context,
-        ).hideCurrentSnackBar(); // Hide loading message
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).hideCurrentSnackBar(); // Hide loading message
+        }
         /* ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Fault lines loaded.'),
@@ -800,13 +783,15 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         _isLoadingFaultLines = false;
         _showFaultLines = false;
       });
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading fault lines: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading fault lines: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       await _saveBoolPreference(_showFaultLinesPrefKey, false);
     }
   }
@@ -836,99 +821,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: LastQuakesAppBar(
         title: "LastQuakes Map",
-        actions: [
-          IconButton(
-            icon:
-                _isLoadingLocation
-                    ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : const Icon(Icons.my_location),
-            onPressed: _isLoadingLocation ? null : _fetchUserLocation,
-            tooltip: 'Find my location',
-          ),
-
-          // --- Map Layer Selection Button ---
-          PopupMenuButton<dynamic>(
-            icon: const Icon(Icons.layers_outlined),
-            tooltip: "Map Layers and Features",
-            onSelected: (dynamic result) async {
-              final prefs = await SharedPreferences.getInstance();
-              if (result is MapLayerType) {
-                // Handle Map Layer Type selection
-                if (result != _selectedMapType) {
-                  setState(() {
-                    _selectedMapType = result;
-                  });
-                  await prefs.setString(_mapTypePrefKey, result.name);
-                }
-              } else if (result == 'toggle_fault_lines') {
-                // Handle Fault Line toggle
-                _toggleFaultLines(); 
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              final theme = Theme.of(context);
-              final textTheme = theme.textTheme;
-
-              // Build the list of menu entries directly
-              return <PopupMenuEntry<dynamic>>[
-                // --- Map Types Header ---
-                // Use a disabled item styled as a header
-                /* PopupMenuItem<dynamic>(
-                  enabled: false, // Not selectable
-                  height: 20, // Reduce height for header feel
-                  child: Center(
-                    child: Text(
-                      "Map Type",
-                      style: textTheme.labelMedium?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const PopupMenuDivider(height: 1), // Divider after header */
-
-                // --- Map Type Options ---
-                CheckedPopupMenuItem<MapLayerType>(
-                  value: MapLayerType.osm,
-                  checked: _selectedMapType == MapLayerType.osm,
-                  child: Text("Street Map", style: textTheme.bodyMedium),
-                ),
-                CheckedPopupMenuItem<MapLayerType>(
-                  value: MapLayerType.satellite,
-                  checked: _selectedMapType == MapLayerType.satellite,
-                  child: Text("Satellite", style: textTheme.bodyMedium),
-                ),
-                CheckedPopupMenuItem<MapLayerType>(
-                  value: MapLayerType.terrain,
-                  checked: _selectedMapType == MapLayerType.terrain,
-                  child: Text("Terrain", style: textTheme.bodyMedium),
-                ),
-                CheckedPopupMenuItem<MapLayerType>(
-                  value: MapLayerType.dark,
-                  checked: _selectedMapType == MapLayerType.dark,
-                  child: Text("Dark", style: textTheme.bodyMedium),
-                ),
-
-                const PopupMenuDivider(),
-
-                CheckedPopupMenuItem<String>(
-                  value: 'toggle_fault_lines',
-                  checked: _showFaultLines,
-                  child: Text("Show Fault Lines", style: textTheme.bodyMedium),
-                ),
-              ];
-            },
-          ),
-        ],
+        actions: const [], 
       ),
       drawer: const CustomDrawer(),
       body: Stack(
@@ -951,6 +850,13 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 initialZoom: _zoomLevel,
                 minZoom: _minZoom,
                 maxZoom: _maxZoom,
+                // Constrain the map to world boundaries to prevent blank space
+                cameraConstraint: CameraConstraint.contain(
+                  bounds: LatLngBounds(
+                    const LatLng(-90.0, -180.0), // Southwest corner
+                    const LatLng(90.0, 180.0),   // Northeast corner
+                  ),
+                ),
                 onPositionChanged: (position, hasGesture) {
                   // --- UPDATE Rotation State ---
                   final newRotation =
@@ -993,26 +899,38 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 if (_zoomLevel < _clusteringThreshold)
                   MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
-                      maxClusterRadius: 45, 
+                      maxClusterRadius: 45,
                       size: const Size(40, 40),
                       markers: _currentMarkers, // Use memoized markers
                       polygonOptions: const PolygonOptions(
                         borderColor: Colors.blueAccent,
-                        color: Colors.black12, 
+                        color: Colors.black12,
                         borderStrokeWidth: 2,
                       ),
-                      
+
                       builder: (context, markers) {
-                        return FloatingActionButton(
-                          heroTag: null, 
-                          mini: true,
-                          backgroundColor: Colors.blue.withValues(alpha: 0.9),
-                          onPressed: null, 
-                          child: Text(
-                            markers.length.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.3,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              markers.length.toString(),
+                              style: TextStyle(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         );
@@ -1021,7 +939,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                   )
                 else
                   MarkerLayer(markers: _currentMarkers), // Use memoized markers
-                
+
                 // --- Attribution Widget ---
                 RichAttributionWidget(
                   showFlutterMapAttribution: false,
@@ -1071,122 +989,244 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
           // Show Loading Indicator Centered
           if (_isLoading)
-            const Center(child: CircularProgressIndicator.adaptive()),
-
-          // Show Error Message Centered
-          if (_error != null)
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                color: Colors.red.withValues(alpha: 0.8),
+            Container(
+              color: colorScheme.surface.withValues(alpha: 0.8),
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_error!, style: const TextStyle(color: Colors.white)),
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: _fetchInitialData,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.red,
-                      ), // Retry button
-                      child: const Text("Retry"),
+                    CircularProgressIndicator.adaptive(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Loading earthquake data...',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
 
+          // Show Error Message Centered
+          if (_error != null)
+            Container(
+              color: colorScheme.surface.withValues(alpha: 0.9),
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Connection Error',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _error!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onErrorContainer,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _fetchInitialData,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text("Retry"),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           // --- LOCAL FILTERING INDICATOR ---
-          // Show a subtle indicator below the AppBar when filtering locally
-          if (_isFilteringLocally &&
-              !_isLoading) 
+          if (_isFilteringLocally && !_isLoading)
             Positioned(
               top: 0,
               left: 0,
               right: 0,
-              child: LinearProgressIndicator(
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).colorScheme.secondary,
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primary.withValues(alpha: 0.0),
+                      colorScheme.primary,
+                      colorScheme.primary.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    colorScheme.primary,
+                  ),
                 ),
               ),
             ),
-          // Zoom Controls
-          if (!_isLoading &&
-              _error == null) // Only show controls when map is visible
-            Positioned(
-              right: 16,
-              bottom: 90,
-              child: _ZoomControls(
-                zoomLevel: _zoomLevel,
-                mapController: _mapController,
-                onZoomChanged: (newZoom) {
-                  if (mounted && newZoom != _zoomLevel) {
-                    setState(() {
-                      _zoomLevel = newZoom;
-                    });
-                  }
-                },
-              ),
-            ),
+
+          // floating controls panel
+          if (!_isLoading && _error == null) _buildModernControlsPanel(context),
+
           // --- COMPASS BUTTON (Top-Right) ---
           if (!_isLoading && _error == null) // Only show if map is visible
-            _buildCompassButton(),
+            _buildModernCompassButton(context),
         ],
       ),
-
-      // --- FLOATING ACTION BUTTON ---
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showFilterBottomSheet, // Method to open the bottom sheet
-        tooltip: 'Filter Earthquakes',
-        child: const Icon(Icons.filter_list),
-      ),
-      //floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 
   // --- Compass Button Widget ---
-  Widget _buildCompassButton() {
-    // Show button if rotation is more than ~1 degree off
+  Widget _buildModernCompassButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final bool isRotated = _currentRotation.abs() > 1.0;
-    // Convert degrees to radians for Transform.rotate
-    final double rotationRadians = _currentRotation * (pi / 180.0);
+    final double rotationRadians = _currentRotation * (math.pi / 180.0);
 
     return Positioned(
-      top: 16, 
+      top: 16,
       right: 16,
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: isRotated ? 1.0 : 0.0, // Fade in/out
+        duration: const Duration(milliseconds: 300),
+        opacity: isRotated ? 1.0 : 0.0,
         child: IgnorePointer(
           ignoring: !isRotated,
-          child: Material(
-            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-            shape: const CircleBorder(),
-            elevation: 4.0,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(30),
-              onTap: _resetRotation, // Call reset function on tap
-              child: Container(
-                padding: const EdgeInsets.all(8.0),
-                child: Transform.rotate(
-                  angle:
-                      -rotationRadians, // Rotate needle opposite to map rotation
-                  child: Icon(
-                    Icons
-                        .navigation_rounded, // Navigation arrow looks like compass needle
-                    size: 24.0,
-                    color: Theme.of(context).colorScheme.primary,
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.9),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: _resetRotation,
+                child: Container(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Transform.rotate(
+                    angle: -rotationRadians,
+                    child: Icon(
+                      Icons.navigation_rounded,
+                      size: 24.0,
+                      color: colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // --- Controls Panel ---
+  Widget _buildModernControlsPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Positioned(
+      right: 16,
+      bottom: 16,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Map layers button
+          MapLayersButton(
+            selectedMapType: _selectedMapType,
+            showFaultLines: _showFaultLines,
+            isLoadingFaultLines: _isLoadingFaultLines,
+            onMapTypeChanged: (mapType) {
+              setState(() {
+                _selectedMapType = mapType;
+              });
+            },
+            onFaultLinesToggled: (show) {
+              _toggleFaultLines();
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Location button
+          LocationButton(
+            mapController: _mapController,
+            zoomLevel: _zoomLevel,
+            onLocationFound: (position) {
+              setState(() {
+                _userPosition = position;
+              });
+              _updateMarkers();
+            },
+            onLocationError: () {
+              // Handle location error if needed
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Zoom controls
+          ZoomControls(
+            zoomLevel: _zoomLevel,
+            mapController: _mapController,
+            minZoom: _minZoom,
+            maxZoom: _maxZoom,
+            onZoomChanged: (newZoom) {
+              if (mounted && newZoom != _zoomLevel) {
+                setState(() {
+                  _zoomLevel = newZoom;
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Filter button (replaces FAB)
+          _ModernControlButton(
+            icon: Icons.tune,
+            tooltip: 'Filter Earthquakes',
+            onPressed: _showFilterBottomSheet,
+            colorScheme: colorScheme,
+            isPrimary: true,
+          ),
+        ],
       ),
     );
   }
@@ -1202,85 +1242,75 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   }
 }
 
-/// Extracted zoom controls widget for better separation of concerns
-class _ZoomControls extends StatelessWidget {
-  final double zoomLevel;
-  final MapController mapController;
-  final ValueChanged<double> onZoomChanged;
+// Control Button Widget
+class _ModernControlButton extends StatelessWidget {
+  final IconData? icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final ColorScheme colorScheme;
+  final bool isPrimary;
 
-  // Define min/max zoom constants locally or pass them
-  static const double _minZoom = 2.0;
-  static const double _maxZoom = 18.0;
-  //static const double defaultBottomPadding = 90.0;
-
-  const _ZoomControls({
-    required this.zoomLevel,
-    required this.mapController,
-    required this.onZoomChanged,
+  const _ModernControlButton({
+    this.icon,
+    required this.tooltip,
+    this.onPressed,
+    required this.colorScheme,
+    this.isPrimary = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ZoomButton(
-          icon: Icons.add,
-          isEnabled: zoomLevel <= _maxZoom,
-          onPressed: () {
-            final newZoom = (zoomLevel + 1).clamp(_minZoom, _maxZoom);
-            mapController.move(mapController.camera.center, newZoom);
-            onZoomChanged(newZoom);
-          },
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        decoration: BoxDecoration(
+          color:
+              isPrimary
+                  ? colorScheme.primary
+                  : colorScheme.surface.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        _ZoomButton(
-          icon: Icons.remove,
-          isEnabled: zoomLevel >= _minZoom,
-          onPressed: () {
-            final newZoom = (zoomLevel - 1).clamp(_minZoom, _maxZoom);
-            mapController.move(mapController.camera.center, newZoom);
-            onZoomChanged(newZoom);
-          },
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: onPressed,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              child: Icon(
+                icon,
+                size: 24,
+                color:
+                    isPrimary ? colorScheme.onPrimary : colorScheme.onSurface,
+              ),
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }
 
-/// Simplified zoom button widget
-class _ZoomButton extends StatelessWidget {
-  final IconData icon;
-  final bool isEnabled;
-  final VoidCallback onPressed;
-
-  const _ZoomButton({
-    required this.icon,
-    required this.isEnabled,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FloatingActionButton(
-      heroTag: icon.toString(),
-      mini: true,
-      backgroundColor: isEnabled ? Colors.white : Colors.grey.shade300,
-      onPressed: isEnabled ? onPressed : null,
-      child: Icon(icon, color: isEnabled ? Colors.black : Colors.grey),
-    );
-  }
-}
-
-/// Extracted details dialog for cleaner code - Modernized Look
+// Earthquake Details Dialog
 class _EarthquakeDetailsDialog extends StatelessWidget {
-  final Map<String, dynamic> quake; // Receives the properties map
+  final Map<String, dynamic> quake;
+  final Map<String, dynamic> fullQuakeData;
+  final VoidCallback onDetailsPressed;
 
-  const _EarthquakeDetailsDialog({required this.quake});
+  const _EarthquakeDetailsDialog({
+    required this.quake,
+    required this.fullQuakeData,
+    required this.onDetailsPressed,
+  });
 
-  // Static helper to determine color based on magnitude
   static Color _getMagnitudeColor(double magnitude) {
-    // Keep consistent with the map screen's logic
     if (magnitude >= 8.0) return Colors.red.shade900;
     if (magnitude >= 7.0) return Colors.red.shade700;
     if (magnitude >= 6.0) return Colors.orange.shade800;
@@ -1290,7 +1320,6 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Extract theme data for consistent styling
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
@@ -1325,116 +1354,181 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
         (tsunamiCode == 1) ? Colors.blueAccent : colorScheme.onSurfaceVariant;
 
     return Align(
-      alignment: Alignment.topCenter, 
+      alignment: Alignment.topCenter,
       child: Padding(
-        // Padding around the dialog to avoid touching screen edges
         padding: const EdgeInsets.only(
-          top: 60.0,
-          left: 15,
-          right: 15,
+          top: 80.0,
+          left: 20,
+          right: 20,
           bottom: 20,
         ),
         child: Material(
-          // Material provides elevation and ink effects container
-          color: Colors.transparent, // Dialog container handles color
+          color: Colors.transparent,
           child: Container(
-            constraints: const BoxConstraints(
-              maxWidth: 400,
-            ), // Max width for larger screens
+            constraints: const BoxConstraints(maxWidth: 350),
             decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(16), 
-              boxShadow: const [
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            // Clip the backdrop filter effect to the rounded corners
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16.0),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    //Header Row (Close Button & Magnitude Chip)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Magnitude Chip (more prominent)
-                        Chip(
-                          backgroundColor: magColor.withValues(alpha: 0.8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
+              borderRadius: BorderRadius.circular(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header with gradient background
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          magColor.withValues(alpha: 0.8),
+                          magColor.withValues(alpha: 0.6),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Magnitude display
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.waves,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Magnitude",
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    magnitude.toStringAsFixed(1),
+                                    style: textTheme.headlineMedium?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          label: Text(
-                            "M ${magnitude.toStringAsFixed(1)}",
-                            style: textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                          // Close Button
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Content
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Location
+                        Text(
+                          displayLocationTitle,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
-                        // Close Button
-                        InkWell(
-                          onTap: () => Navigator.pop(context),
-                          borderRadius: BorderRadius.circular(15),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 24,
-                              color: colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 8),
+
+                        // Details
+                        _ModernDetailRow(
+                          icon: Icons.access_time_rounded,
+                          iconColor: colorScheme.primary,
+                          title: "Time",
+                          value: timeFormatted,
+                          colorScheme: colorScheme,
+                          textTheme: textTheme,
+                        ),
+
+                        if (distanceFormatted != null) ...[
+                          const SizedBox(height: 8),
+                          _ModernDetailRow(
+                            icon: Icons.location_on_outlined,
+                            iconColor: colorScheme.secondary,
+                            title: "Distance",
+                            value: "$distanceFormatted from your location",
+                            colorScheme: colorScheme,
+                            textTheme: textTheme,
+                          ),
+                        ],
+
+                        if (tsunamiCode != null) ...[
+                          const SizedBox(height: 8),
+                          _ModernDetailRow(
+                            icon: Icons.tsunami_rounded,
+                            iconColor: tsunamiColor,
+                            title: "Tsunami Warning",
+                            value: tsunamiText,
+                            colorScheme: colorScheme,
+                            textTheme: textTheme,
+                          ),
+                        ],
+
+                        // Details Button
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: onDetailsPressed,
+                            icon: const Icon(Icons.info_outline),
+                            label: const Text("View Full Details"),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-
-                    // --- Location Title ---
-                    Text(
-                      displayLocationTitle,
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    const Divider(height: 1),
-                    // --- Details Section ---
-                    _DetailRow(
-                      icon: Icons.schedule,
-                      iconColor: colorScheme.secondary,
-                      text: timeFormatted,
-                    ),
-                    if (distanceFormatted != null) ...[
-                      const Divider(height: 1, indent: 30),
-                      _DetailRow(
-                        icon: Icons.social_distance_outlined,
-                        iconColor: colorScheme.tertiary,
-                        text: "$distanceFormatted from your location",
-                      ),
-                    ],
-
-                    // --- ADDED TSUNAMI ---
-                    if (tsunamiCode != null) ...[
-                      const Divider(height: 1, indent: 30),
-                      _DetailRow(
-                        icon: Icons.tsunami_rounded,
-                        iconColor: tsunamiColor,
-                        text: "Tsunami Warning: $tsunamiText",
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1444,46 +1538,67 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
   }
 }
 
-/// Refined Helper widget for details row
-class _DetailRow extends StatelessWidget {
+// Detail Row Widget
+class _ModernDetailRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
-  final String text;
+  final String title;
+  final String value;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
 
-  const _DetailRow({
+  const _ModernDetailRow({
     required this.icon,
     required this.iconColor,
-    required this.text,
+    required this.title,
+    required this.value,
+    required this.colorScheme,
+    required this.textTheme,
   });
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              text,
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-}
-
-enum MapLayerType {
-  osm, // OpenStreetMap Standard
-  satellite, // Satellite Imagery
-  terrain, // Topographic/Terrain Map
-  dark, // Dark Mode Map
 }

@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:lastquake/models/safe_zone.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/services/notification_service.dart';
+import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:provider/provider.dart';
@@ -160,71 +162,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // --- Load & Save Settings ---
   Future<void> _loadNotificationSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    try {
+      // Load from secure storage first, fallback to SharedPreferences for migration
+      final secureSettings = await SecureStorageService.retrieveNotificationSettings();
+      final secureSafeZones = await SecureStorageService.retrieveSafeZones();
+      
+      if (secureSettings != null) {
+        // Use secure storage data
+        if (!mounted) return;
+        setState(() {
+          _selectedFilterType = NotificationFilterType.values.firstWhere(
+            (e) => e.name == secureSettings['filterType'],
+            orElse: () => NotificationFilterType.none,
+          );
+          _selectedMagnitude = (secureSettings['magnitude'] as num?)?.toDouble() ?? 5.0;
+          _selectedCountry = secureSettings['country'] as String? ?? "ALL";
+          _selectedRadius = (secureSettings['radius'] as num?)?.toDouble() ?? 500.0;
+          _useCurrentLocationForDistance = secureSettings['useCurrentLocation'] as bool? ?? false;
+          _safeZones = secureSafeZones;
 
-    setState(() {
-      _selectedFilterType = NotificationFilterType.values.firstWhere(
-        (e) => e.name == prefs.getString(prefNotificationFilterType),
-        orElse: () => NotificationFilterType.none,
-      );
-      _selectedMagnitude = prefs.getDouble(prefNotificationMagnitude) ?? 5.0;
-      _selectedCountry = prefs.getString(prefNotificationCountry) ?? "ALL";
-      _selectedRadius = prefs.getDouble(prefNotificationRadius) ?? 500.0;
-      _useCurrentLocationForDistance =
-          prefs.getBool(prefNotificationUseCurrentLoc) ?? false;
-
-      // Load safe zones
-      final List<String>? safeZonesJson = prefs.getStringList(
-        prefNotificationSafeZones,
-      );
-      if (safeZonesJson != null) {
-        _safeZones =
-            safeZonesJson
-                .map((jsonString) => SafeZone.fromJson(jsonDecode(jsonString)))
-                .toList();
+          // Ensure country selection is valid
+          if (!_countryList.contains(_selectedCountry)) {
+            _selectedCountry = "ALL";
+          }
+        });
       } else {
-        _safeZones = [];
+        // Migrate from SharedPreferences to secure storage
+        await _migrateFromSharedPreferences();
       }
-
-      // Ensure country selection is valid
-      if (!_countryList.contains(_selectedCountry)) {
-        _selectedCountry = "ALL";
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading notification settings: $e');
       }
-    });
+      // Fallback to SharedPreferences on error
+      await _migrateFromSharedPreferences();
+    }
   }
 
-  // Save settings to SharedPreferences
+  // Migrate existing data from SharedPreferences to secure storage
+  Future<void> _migrateFromSharedPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+
+      setState(() {
+        _selectedFilterType = NotificationFilterType.values.firstWhere(
+          (e) => e.name == prefs.getString(prefNotificationFilterType),
+          orElse: () => NotificationFilterType.none,
+        );
+        _selectedMagnitude = prefs.getDouble(prefNotificationMagnitude) ?? 5.0;
+        _selectedCountry = prefs.getString(prefNotificationCountry) ?? "ALL";
+        _selectedRadius = prefs.getDouble(prefNotificationRadius) ?? 500.0;
+        _useCurrentLocationForDistance =
+            prefs.getBool(prefNotificationUseCurrentLoc) ?? false;
+
+        // Load safe zones from SharedPreferences
+        final List<String>? safeZonesJson = prefs.getStringList(
+          prefNotificationSafeZones,
+        );
+        if (safeZonesJson != null) {
+          _safeZones =
+              safeZonesJson
+                  .map((jsonString) => SafeZone.fromJson(jsonDecode(jsonString)))
+                  .toList();
+        } else {
+          _safeZones = [];
+        }
+
+        // Ensure country selection is valid
+        if (!_countryList.contains(_selectedCountry)) {
+          _selectedCountry = "ALL";
+        }
+      });
+
+      // Save to secure storage and clear from SharedPreferences
+      await _saveNotificationSettings(showSnackbar: false);
+      
+      // Clear sensitive data from SharedPreferences
+      await prefs.remove(prefNotificationSafeZones);
+      
+      if (kDebugMode) {
+        print('Successfully migrated notification settings to secure storage');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error during migration: $e');
+      }
+    }
+  }
+
+  // Save settings to secure storage
   Future<void> _saveNotificationSettings({bool showSnackbar = true}) async {
     if (!_isLoaded) return; 
 
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      // Save to secure storage
+      final settings = {
+        'filterType': _selectedFilterType.name,
+        'magnitude': _selectedMagnitude,
+        'country': _selectedCountry,
+        'radius': _selectedRadius,
+        'useCurrentLocation': _useCurrentLocationForDistance,
+      };
+      
+      await SecureStorageService.storeNotificationSettings(settings);
+      await SecureStorageService.storeSafeZones(_safeZones);
 
-    await prefs.setString(prefNotificationFilterType, _selectedFilterType.name);
-    await prefs.setDouble(prefNotificationMagnitude, _selectedMagnitude);
-    await prefs.setString(prefNotificationCountry, _selectedCountry);
-    await prefs.setDouble(prefNotificationRadius, _selectedRadius);
-    await prefs.setBool(
-      prefNotificationUseCurrentLoc,
-      _useCurrentLocationForDistance,
-    );
-
-    // Save safe zones
-    final List<String> safeZonesJson =
-        _safeZones.map((zone) => jsonEncode(zone.toJson())).toList();
-    await prefs.setStringList(prefNotificationSafeZones, safeZonesJson);
-
-    // Notify the backend service about the changes
-    await NotificationService.instance.updateBackendRegistration();
-
-    // Show a snackbar confirmation
-    if (showSnackbar && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Notification settings saved'),
-          duration: Duration(seconds: 2),
-        ),
+      // Also save non-sensitive settings to SharedPreferences for backward compatibility
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(prefNotificationFilterType, _selectedFilterType.name);
+      await prefs.setDouble(prefNotificationMagnitude, _selectedMagnitude);
+      await prefs.setString(prefNotificationCountry, _selectedCountry);
+      await prefs.setDouble(prefNotificationRadius, _selectedRadius);
+      await prefs.setBool(
+        prefNotificationUseCurrentLoc,
+        _useCurrentLocationForDistance,
       );
+
+      // Notify the backend service about the changes
+      await NotificationService.instance.updateBackendRegistration();
+
+      // Show a snackbar confirmation
+      if (showSnackbar && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notification settings saved securely'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving notification settings: $e');
+      }
+      
+      if (showSnackbar && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error saving settings. Please try again.'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -558,7 +638,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
 
     if (selectedLatLng != null) {
-      debugPrint("Map picker returned LatLng: $selectedLatLng");
+      if (kDebugMode) {
+        debugPrint("Map picker returned coordinates");
+      }
       final String? zoneName = await showDialog<String>(
         context: context,
         builder: (context) => _EnterSafeZoneNameDialog(),
@@ -793,9 +875,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<bool> _checkAndRequestLocationPermissionIfNeeded({
     bool showRationale = false,
   }) async {
-    debugPrint("Checking location permission..."); 
+    if (kDebugMode) {
+      debugPrint("Checking location permission");
+    }
     PermissionStatus status = await Permission.locationWhenInUse.status;
-    debugPrint("Initial permission status: $status"); 
+    if (kDebugMode) {
+      debugPrint("Initial permission status: $status");
+    } 
 
     if (status.isGranted) {
       debugPrint("Permission already granted."); 

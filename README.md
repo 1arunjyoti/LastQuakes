@@ -37,4 +37,46 @@ A Flutter application providing real-time global earthquake monitoring using dat
 4.  **Backend Service Deployment:**
     *   Push notifications **will not function** without a running backend service.
     *   Deploy the corresponding backend code to a hosting provider.
-5.  **Run the App:** `flutter run`
+5. **Environment Setup:**
+```bash
+# Verify .env file exists with backend URL
+echo "SERVER_URL=" > .env
+```
+6.  **Run the App:** `flutter run`
+7. **Certificate Pins (Production)**
+```bash
+# Extract current certificate pins
+dart run scripts/get_certificate_pins.dart
+
+# Update pins in lib/services/secure_http_client.dart
+# Change development mode to production in certificate validation
+```
+
+## Architechture
+
+```
+├── lib/
+│   ├── main.dart                 # App entry point & Firebase setup
+│   ├── models/                   # Data models
+│   │   └── safe_zone.dart       # Safe zone location model
+│   ├── screens/                  # UI screens
+│   │   ├── home_screen.dart     # Navigation handler
+│   │   ├── earthquake_list.dart # List view with filtering
+│   │   ├── earthquake_map_screen.dart # Interactive map
+│   │   ├── earthquake_details.dart # Event details
+│   │   ├── settings_screen.dart # User preferences
+│   │   └── subscreens/          # Sub-screens
+│   ├── services/                # Business logic layer
+│   │   ├── api_service.dart     # USGS API integration
+│   │   ├── notification_service.dart # FCM & local notifications
+│   │   ├── location_service.dart # GPS & location handling
+│   │   ├── secure_http_client.dart # Certificate pinning
+│   │   ├── encryption_service.dart # AES encryption
+│   │   ├── secure_storage_service.dart # Encrypted storage
+│   │   └── secure_token_service.dart # Token management
+│   ├── provider/                # State management
+│   │   └── theme_provider.dart  # Theme state management
+│   ├── widgets/                 # Reusable UI components
+│   ├── utils/                   # Utilities & helpers
+│   └── theme/                   # App theming
+```

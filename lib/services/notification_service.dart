@@ -1,13 +1,15 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 import 'package:lastquake/models/safe_zone.dart';
+import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/utils/enums.dart';
+import 'package:lastquake/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lastquake/services/location_service.dart';
+import 'package:lastquake/services/secure_token_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // Keys need to match settings_screen.dart
@@ -36,8 +38,8 @@ class NotificationService {
   final LocationService locationService =
       LocationService(); // For getting user location
 
-  // --- Update with your Firebase Function URL ---
-  static const String serverUrl = 'https://lastquakenotify.onrender.com';
+  // Get server URL from environment variables
+  static String? get serverUrl => dotenv.env['SERVER_URL'];
 
   Future<void> initNotifications() async {
     const AndroidInitializationSettings androidSettings =
@@ -97,12 +99,20 @@ class NotificationService {
 
   // Send the new preference structure
   Future<void> updateBackendRegistration() async {
-    debugPrint("🔄 Attempting to update backend registration...");
+    SecureLogger.info("Attempting to update backend registration");
 
-    // Get FCM Token
-    final String? fcmToken = await FirebaseMessaging.instance.getToken();
+    // Get FCM Token from secure storage first, fallback to Firebase if needed
+    String? fcmToken = await SecureTokenService.instance.getFCMToken();
     if (fcmToken == null) {
-      debugPrint("❌ FCM token is null, cannot update registration.");
+      // Fallback: get fresh token from Firebase and store it securely
+      fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await SecureTokenService.instance.storeFCMToken(fcmToken);
+      }
+    }
+    
+    if (fcmToken == null) {
+      SecureLogger.error("FCM token is null, cannot update registration");
       return;
     }
 
@@ -126,7 +136,7 @@ class NotificationService {
             .map((json) => SafeZone.fromJson(jsonDecode(json)))
             .toList();
 
-    // Get Current Location 
+    // Get Current Location
     Position? currentPosition;
     bool locationPermissionOk = false;
     if (filterType == NotificationFilterType.distance && useCurrentLocation) {
@@ -135,21 +145,15 @@ class NotificationService {
       if (status.isGranted) {
         locationPermissionOk = true;
         try {
-          currentPosition =
-              await locationService
-                  .getCurrentLocation(); 
+          currentPosition = await locationService.getCurrentLocation();
           if (currentPosition == null) {
-            debugPrint(
-              "⚠️ Filter type is Distance+Current, but failed to get location.",
-            );
+            SecureLogger.warning("Filter type is Distance+Current, but failed to get location");
           }
         } catch (e) {
-          debugPrint("❌ Error getting current location for registration: $e");
+          SecureLogger.error("Error getting current location for registration", e);
         }
       } else {
-        debugPrint(
-          "⚠️ Location permission not granted for Distance+Current filter.",
-        );
+        SecureLogger.warning("Location permission not granted for Distance+Current filter");
       }
     }
 
@@ -176,34 +180,31 @@ class NotificationService {
     };
 
     // Send to Backend
-    final Uri url = Uri.parse(
-      "$serverUrl/api/devices/register",
-    ); 
+    final Uri url = Uri.parse("$serverUrl/api/devices/register");
     final body = json.encode({
       'token': fcmToken,
       'preferences': preferencesPayload,
     });
 
-    debugPrint("⬆️ Sending registration update to backend: $url");
-    debugPrint("   Token: ${fcmToken.substring(0, 15)}...");
-    debugPrint(
-      "   Prefs: ${json.encode(preferencesPayload)}",
-    ); // Log the structured payload
+    SecureLogger.api("/api/devices/register", method: "POST");
+    SecureLogger.token("Sending registration with token", token: fcmToken);
+    SecureLogger.info("Preferences: ${SecureLogger.sanitizeData(preferencesPayload)}");
 
     try {
-      final response = await http
-          .post(url, headers: {'Content-Type': 'application/json'}, body: body)
-          .timeout(const Duration(seconds: 20)); // timeout
+      final response = await SecureHttpClient.instance.post(
+        url, 
+        headers: {'Content-Type': 'application/json'}, 
+        body: body,
+        timeout: const Duration(seconds: 20),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint("✅ Device registered/updated successfully with backend");
+        SecureLogger.success("Device registered/updated successfully with backend");
       } else {
-        debugPrint(
-          "❌ Failed to register/update device with backend: ${response.statusCode} - ${response.body}",
-        );
+        SecureLogger.error("Failed to register/update device with backend: ${response.statusCode}");
       }
     } catch (e) {
-      debugPrint("❌ Error sending registration update to backend: $e");
+      SecureLogger.error("Error sending registration update to backend", e);
     }
   }
 
