@@ -10,6 +10,7 @@ import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/widgets/appbar.dart';
+import 'package:lastquake/services/multi_source_api_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -48,9 +49,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Expansion state
   bool _notificationSettingsExpanded = true;
+  bool _dataSourcesExpanded = false;
   bool _themeExpanded = false;
   bool _unitsExpanded = false;
   //bool _clockExpanded = false;
+
+  // Data sources
+  Set<DataSource> _selectedDataSources = {DataSource.usgs};
 
   // Data for dropdowns/sliders
   final List<String> _countryList = [
@@ -136,11 +141,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // --- Initialization ---
   Future<void> _initializeSettings() async {
     await _loadNotificationSettings();
+    await _loadDataSourceSettings();
     _buildMemoizedItems();
     if (mounted) {
       setState(() {
         _isLoaded = true;
       });
+    }
+  }
+
+  // Load data source settings
+  Future<void> _loadDataSourceSettings() async {
+    try {
+      final sources = await MultiSourceApiService.getSelectedSources();
+      if (mounted) {
+        setState(() {
+          _selectedDataSources = sources;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading data source settings: $e');
+      }
+    }
+  }
+
+  // Save data source settings
+  Future<void> _saveDataSourceSettings() async {
+    if (!_isLoaded) return;
+    
+    try {
+      await MultiSourceApiService.setSelectedSources(_selectedDataSources);
+      // Clear cache when sources change to force refresh
+      await MultiSourceApiService.clearCache();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data source settings saved'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving data source settings: $e');
+      }
     }
   }
 
@@ -324,6 +370,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(12.0),
                 children: [
                   _buildNotificationSettingsCard(),
+                  const SizedBox(height: 12),
+                  _buildDataSourcesCard(),
                   const SizedBox(height: 12),
                   _buildThemeSettingsCard(prefsProvider),
                   const SizedBox(height: 12),
@@ -675,6 +723,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _safeZones.removeAt(index);
     });
     _saveNotificationSettings();
+  }
+
+  // --- Data Sources Settings Card ---
+  Widget _buildDataSourcesCard() {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 2,
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text(
+              'Data Sources',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '${_selectedDataSources.length} source${_selectedDataSources.length != 1 ? 's' : ''} selected',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            trailing: IconButton(
+              icon: Icon(
+                _dataSourcesExpanded
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
+              ),
+              onPressed: () => setState(() => _dataSourcesExpanded = !_dataSourcesExpanded),
+            ),
+            onTap: () => setState(() => _dataSourcesExpanded = !_dataSourcesExpanded),
+          ),
+          if (_dataSourcesExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select earthquake data sources:',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('USGS (United States Geological Survey)'),
+                    subtitle: const Text('Comprehensive global earthquake data'),
+                    value: _selectedDataSources.contains(DataSource.usgs),
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          _selectedDataSources.add(DataSource.usgs);
+                        } else {
+                          // Ensure at least one source is selected
+                          if (_selectedDataSources.length > 1) {
+                            _selectedDataSources.remove(DataSource.usgs);
+                          }
+                        }
+                      });
+                      _saveDataSourceSettings();
+                    },
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('EMSC (European-Mediterranean Seismological Centre)'),
+                    subtitle: const Text('European and Mediterranean region focus'),
+                    value: _selectedDataSources.contains(DataSource.emsc),
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          _selectedDataSources.add(DataSource.emsc);
+                        } else {
+                          // Ensure at least one source is selected
+                          if (_selectedDataSources.length > 1) {
+                            _selectedDataSources.remove(DataSource.emsc);
+                          }
+                        }
+                      });
+                      _saveDataSourceSettings();
+                    },
+                  ),
+                  if (_selectedDataSources.length <= 1)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'At least one data source must be selected.',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   // --- Other Build Methods (Theme, Units, Clock) ---

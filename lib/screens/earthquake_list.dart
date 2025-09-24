@@ -8,7 +8,8 @@ import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
 import 'package:lastquake/widgets/earthquake_list_item.dart';
-import '../services/api_service.dart';
+import '../services/multi_source_api_service.dart';
+import '../models/earthquake.dart';
 
 // --- Top-level function for Isolate Processing ---
 // LocationService cannot be directly used here. Pass necessary primitives.
@@ -34,7 +35,10 @@ Map<String, dynamic> _filterAndSortEarthquakesIsolate(
             if (properties is! Map) return false;
 
             final magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
-            final place = properties["place"] as String? ?? "";
+            final place =
+                properties["place"] as String? ??
+                properties["flynn_region"] as String? ??
+                "";
             // Extract country and add to set
             final String country =
                 place.contains(", ") ? place.split(", ").last.trim() : "";
@@ -107,7 +111,6 @@ class EarthquakeListScreen extends StatefulWidget {
 }
 
 class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
-
   // State Variables
   List<Map<String, dynamic>> _unfilteredEarthquakes =
       []; // Holds data from API fetch
@@ -194,11 +197,46 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     });
 
     try {
-      final fetchedData = await ApiService.fetchEarthquakes(
-        minMagnitude: 3.0,
-        days: 45,
-        forceRefresh: forceRefresh,
-      );
+      final List<Earthquake> fetchedEarthquakes =
+          await MultiSourceApiService.fetchEarthquakes(
+            minMagnitude: 3.0,
+            days: 45,
+            forceRefresh: forceRefresh,
+          );
+
+      // Convert to the old format for compatibility with existing UI code, but preserve source info
+      final fetchedData =
+          fetchedEarthquakes.map((eq) {
+            Map<String, dynamic> rawData;
+
+            if (eq.source == 'USGS') {
+              // USGS data is already in GeoJSON format
+              rawData = Map<String, dynamic>.from(eq.rawData);
+              // Ensure source is available in properties for easy access
+              if (rawData['properties'] is Map<String, dynamic>) {
+                rawData['properties']['source'] = eq.source;
+              }
+            } else {
+              // EMSC data needs to be converted to GeoJSON format
+              rawData = {
+                'type': 'Feature',
+                'id': eq.id,
+                'properties': {
+                  ...Map<String, dynamic>.from(eq.rawData),
+                  'source': eq.source,
+                  'mag': eq.magnitude,
+                  'place': eq.place,
+                  'time': eq.time.millisecondsSinceEpoch,
+                },
+                'geometry': {
+                  'type': 'Point',
+                  'coordinates': [eq.longitude, eq.latitude, eq.depth ?? 0],
+                },
+              };
+            }
+
+            return rawData;
+          }).toList();
 
       if (!mounted) return;
 
@@ -206,7 +244,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       _unfilteredEarthquakes = fetchedData;
 
       // Apply filters using compute
-      await _applyFiltersWithCompute(); 
+      await _applyFiltersWithCompute();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -252,8 +290,10 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
 
       if (!mounted) return;
 
+      final filteredList = result['filteredList'] as List<Map<String, dynamic>>;
+
       setState(() {
-        allEarthquakes = result['filteredList'] as List<Map<String, dynamic>>;
+        allEarthquakes = filteredList;
         // Update country list with the results from isolate
         countryList = ["All"] + (result['uniqueCountries'] as List<String>);
         _currentPage = 1;
@@ -300,7 +340,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     _filterDebounce?.cancel();
     _filterDebounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
-      _applyFiltersWithCompute(); 
+      _applyFiltersWithCompute();
       _scrollToTop();
     });
   }
@@ -310,7 +350,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     setState(() {
       selectedCountry = value;
     });
-    _onFilterChanged(); 
+    _onFilterChanged();
   }
 
   void _onMagnitudeChanged(double? value) {
@@ -318,7 +358,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     setState(() {
       selectedMagnitude = value;
     });
-    _onFilterChanged(); 
+    _onFilterChanged();
   }
 
   // --- Location Handling ---
@@ -624,12 +664,16 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                           }
                         }
 
+                        // Get source information
+                        final String? source = properties["source"] as String?;
+
                         return EarthquakeListItem(
                           location: place,
                           distanceKm: distanceKm,
                           timestamp: time,
                           magnitude: magnitude,
                           magnitudeColor: magnitudeColor,
+                          source: source,
                           onTap: () {
                             Navigator.push(
                               context,

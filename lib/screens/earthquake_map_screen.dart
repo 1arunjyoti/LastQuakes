@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,7 +8,8 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:lastquake/screens/earthquake_details.dart';
-import 'package:lastquake/services/api_service.dart';
+import 'package:lastquake/services/multi_source_api_service.dart';
+import 'package:lastquake/models/earthquake.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/utils/formatting.dart';
@@ -20,102 +22,133 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// --- Top-level function for parsing in an isolate ---
+// Optimized GeoJSON parsing with memory and performance improvements
 List<Polyline> _parseGeoJsonFaultLines(String geoJsonString) {
   try {
+    // Validate input size to prevent memory issues
+    if (geoJsonString.length > 100 * 1024 * 1024) {
+      debugPrint('GeoJSON too large: ${geoJsonString.length} characters');
+      return [];
+    }
+
     final decodedJson = json.decode(geoJsonString);
+    if (decodedJson is! Map || !decodedJson.containsKey('features')) {
+      debugPrint('Invalid GeoJSON format: missing features');
+      return [];
+    }
+
+    final features = decodedJson['features'];
+    if (features is! List) {
+      debugPrint('Invalid GeoJSON format: features is not a list');
+      return [];
+    }
+
     final List<Polyline> polylines = [];
+    const int maxPolylines = 1000; // Limit to prevent memory issues
+    const int maxPointsPerLine = 500; // Limit points per polyline
 
-    // Assuming GeoJSON format is a FeatureCollection
-    if (decodedJson is Map && decodedJson.containsKey('features')) {
-      final features = decodedJson['features'] as List;
+    // Pre-define colors for better performance
+    const Color lineStringColor = Color(0xCCFF0000); // Red with alpha
+    const Color multiLineStringColor = Color(0xB3FF9800); // Orange with alpha
 
-      for (final feature in features) {
-        if (feature is Map && feature.containsKey('geometry')) {
-          final geometry = feature['geometry'] as Map;
-          final type = geometry['type'];
-          final coordinates = geometry['coordinates'] as List;
+    int processedCount = 0;
+    for (final feature in features) {
+      if (processedCount >= maxPolylines) break;
 
-          if (type == 'LineString') {
-            // Coordinates for LineString: [[lon, lat], [lon, lat], ...]
-            final points =
-                coordinates
-                    .map<LatLng?>((coord) {
-                      if (coord is List &&
-                          coord.length >= 2 &&
-                          coord[0] is num &&
-                          coord[1] is num) {
-                        // GeoJSON is usually [longitude, latitude]
-                        return LatLng(coord[1].toDouble(), coord[0].toDouble());
-                      }
-                      return null;
-                    })
-                    .whereType<LatLng>() // Filter out any nulls from bad coords
-                    .toList();
+      if (feature is! Map || !feature.containsKey('geometry')) continue;
 
+      final geometry = feature['geometry'];
+      if (geometry is! Map) continue;
+
+      final type = geometry['type'];
+      final coordinates = geometry['coordinates'];
+      if (coordinates is! List) continue;
+
+      try {
+        if (type == 'LineString') {
+          final points = _parseLineStringCoordinates(
+            coordinates,
+            maxPointsPerLine,
+          );
+          if (points.isNotEmpty) {
+            polylines.add(
+              Polyline(
+                points: points,
+                color: lineStringColor,
+                strokeWidth: 1.5,
+              ),
+            );
+            processedCount++;
+          }
+        } else if (type == 'MultiLineString') {
+          for (final line in coordinates) {
+            if (processedCount >= maxPolylines) break;
+            if (line is! List) continue;
+
+            final points = _parseLineStringCoordinates(line, maxPointsPerLine);
             if (points.isNotEmpty) {
               polylines.add(
                 Polyline(
                   points: points,
-                  color: Colors.red.withValues(alpha: 0.8), 
+                  color: multiLineStringColor,
                   strokeWidth: 1.5,
-                  //isDotted: false,
                 ),
               );
-            }
-          } else if (type == 'MultiLineString') {
-            // Coordinates for MultiLineString: [[[lon, lat], ...], [[lon, lat], ...]]
-            for (final line in coordinates) {
-              if (line is List) {
-                final points =
-                    line
-                        .map<LatLng?>((coord) {
-                          if (coord is List &&
-                              coord.length >= 2 &&
-                              coord[0] is num &&
-                              coord[1] is num) {
-                            return LatLng(
-                              coord[1].toDouble(),
-                              coord[0].toDouble(),
-                            );
-                          }
-                          return null;
-                        })
-                        .whereType<LatLng>()
-                        .toList();
-
-                if (points.isNotEmpty) {
-                  polylines.add(
-                    Polyline(
-                      points: points,
-                      color: Colors.orange.withValues(
-                        alpha: 0.7,
-                      ), // Different color for MultiLineString
-                      strokeWidth: 1.5,
-                      //isDotted: false,
-                    ),
-                  );
-                }
-              }
+              processedCount++;
             }
           }
         }
+      } catch (e) {
+        debugPrint('Error parsing feature: $e');
+        continue; // Skip problematic features
       }
     }
+
+    debugPrint('Parsed ${polylines.length} fault line polylines');
     return polylines;
   } catch (e) {
     debugPrint('Error parsing GeoJSON: $e');
-    return []; // Return empty list on error
+    return [];
   }
 }
 
-// Top level isolate function and data class for filtering
+// Helper function to parse LineString coordinates with validation
+List<LatLng> _parseLineStringCoordinates(List coordinates, int maxPoints) {
+  final List<LatLng> points = [];
+
+  for (int i = 0; i < coordinates.length && i < maxPoints; i++) {
+    final coord = coordinates[i];
+    if (coord is! List || coord.length < 2) continue;
+
+    final lon = coord[0];
+    final lat = coord[1];
+
+    if (lon is! num || lat is! num) continue;
+
+    final lonDouble = lon.toDouble();
+    final latDouble = lat.toDouble();
+
+    // Validate coordinate ranges
+    if (latDouble < -90 ||
+        latDouble > 90 ||
+        lonDouble < -180 ||
+        lonDouble > 180) {
+      continue;
+    }
+
+    points.add(LatLng(latDouble, lonDouble));
+  }
+
+  return points;
+}
+
+// Optimized filtering with better validation and performance
 class FilterParameters {
   final List<Map<String, dynamic>> earthquakes;
   final double minMagnitude;
   final DateTime? cutoffTime;
 
-  FilterParameters({
+  const FilterParameters({
     required this.earthquakes,
     required this.minMagnitude,
     this.cutoffTime,
@@ -123,22 +156,58 @@ class FilterParameters {
 }
 
 List<Map<String, dynamic>> _filterEarthquakesIsolate(FilterParameters params) {
-  return params.earthquakes.where((quake) {
-    final properties = quake['properties'];
-    if (properties == null || properties is! Map) return false;
+  try {
+    final List<Map<String, dynamic>> filtered = [];
+    final cutoffMillis = params.cutoffTime?.millisecondsSinceEpoch;
 
-    final magnitude = (properties['mag'] as num?)?.toDouble() ?? 0.0;
-    final timeMillis = (properties['time'] as int?) ?? 0;
+    for (final quake in params.earthquakes) {
+      try {
+        final properties = quake['properties'];
+        if (properties is! Map<String, dynamic>) continue;
 
-    bool passesMagnitude = magnitude >= params.minMagnitude;
-    bool passesTime = true;
-    if (params.cutoffTime != null && timeMillis > 0) {
-      final quakeDateTime = DateTime.fromMillisecondsSinceEpoch(timeMillis);
-      passesTime = quakeDateTime.isAfter(params.cutoffTime!);
+        // Validate magnitude
+        final magValue = properties['mag'];
+        if (magValue is! num) continue;
+        final magnitude = magValue.toDouble();
+        if (magnitude < params.minMagnitude || magnitude > 10.0) continue;
+
+        // Validate time if cutoff is specified
+        if (cutoffMillis != null) {
+          final timeValue = properties['time'];
+          if (timeValue is! int || timeValue <= 0) continue;
+          if (timeValue <= cutoffMillis) continue;
+        }
+
+        // Validate geometry for safety
+        final geometry = quake['geometry'];
+        if (geometry is Map<String, dynamic>) {
+          final coordinates = geometry['coordinates'];
+          if (coordinates is List && coordinates.length >= 2) {
+            final lon = coordinates[0];
+            final lat = coordinates[1];
+            if (lon is num && lat is num) {
+              final lonDouble = lon.toDouble();
+              final latDouble = lat.toDouble();
+              if (latDouble >= -90 &&
+                  latDouble <= 90 &&
+                  lonDouble >= -180 &&
+                  lonDouble <= 180) {
+                filtered.add(quake);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Skip invalid earthquakes
+        continue;
+      }
     }
 
-    return passesMagnitude && passesTime;
-  }).toList();
+    return filtered;
+  } catch (e) {
+    debugPrint('Error in filter isolate: $e');
+    return [];
+  }
 }
 
 class EarthquakeMapScreen extends StatefulWidget {
@@ -149,13 +218,13 @@ class EarthquakeMapScreen extends StatefulWidget {
 }
 
 class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
-    with AutomaticKeepAliveClientMixin {
-  // State Variables
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+  // State Variables - Optimized for memory efficiency
   bool _isLoading = true;
   String? _error;
-  List<Map<String, dynamic>> _allFetchedEarthquakes = []; // Store fetched data
+  List<Map<String, dynamic>> _allFetchedEarthquakes = [];
   List<Map<String, dynamic>> _filteredEarthquakes = [];
-  List<Marker> _currentMarkers = []; // Memoized markers list
+  List<Marker> _currentMarkers = [];
 
   late final MapController _mapController;
   double _zoomLevel = 2.0;
@@ -163,27 +232,33 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   static const double _maxZoom = 18.0;
   double _currentRotation = 0.0;
   static const double _clusteringThreshold = 3.0;
-  static final Map<double, Color> _markerColorCache = {};
+
+  // Performance optimizations
+  static final Map<double, Color> _markerColorCache = <double, Color>{};
+  static final Map<String, Marker> _markerCache = <String, Marker>{};
+  Timer? _debounceTimer;
+  Timer? _memoryCleanupTimer;
+  bool _isDisposed = false;
+
   MapLayerType _selectedMapType = MapLayerType.osm;
 
-  // --- State for Fault Lines ---
-  bool _showFaultLines = false; // Initially hidden
+  // Fault Lines - Optimized
+  bool _showFaultLines = false;
   bool _isLoadingFaultLines = false;
-  List<Polyline> _faultLinePolylines = []; // To store parsed polylines
+  List<Polyline> _faultLinePolylines = [];
   static const String _faultLineDataUrl =
       'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json';
 
-  static const String _mapTypePrefKey =
-      'map_layer_type_preference_v2'; // Use v2 for enum name storage
+  // Preferences keys
+  static const String _mapTypePrefKey = 'map_layer_type_preference_v2';
   static const String _showFaultLinesPrefKey = 'show_fault_lines_preference';
 
+  // Location and filtering
   Position? _userPosition;
   final LocationService _locationService = LocationService();
-
-  // --- State Variables for Filtering ---
   double _selectedMinMagnitude = 3.0;
   bool _isFilteringLocally = false;
-  static final List<double> _magnitudeFilterOptions = [
+  static const List<double> _magnitudeFilterOptions = [
     3.0,
     4.0,
     5.0,
@@ -192,23 +267,68 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     8.0,
     9.0,
   ];
-  // --- State for Time Window
-  TimeWindow _selectedTimeWindow =
-      TimeWindow.last45Days; // Default to show all fetched data
+  TimeWindow _selectedTimeWindow = TimeWindow.last24Hours;
+
+  // Performance constants
+  static const int _maxMarkersToRender = 5000;
+  static const int _markerBatchSize = 100;
+  static const Duration _debounceDelay = Duration(milliseconds: 300);
+  static const Duration _memoryCleanupInterval = Duration(minutes: 5);
 
   @override
   bool get wantKeepAlive => true;
 
-  // initialize state and load preferences
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _mapController = MapController();
 
-    _loadMapPreferences();
+    // Start memory cleanup timer
+    _startMemoryCleanupTimer();
 
-    // Fetch initial data
+    // Load preferences and fetch data
+    _loadMapPreferences();
     _fetchInitialData();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _debounceTimer?.cancel();
+    _memoryCleanupTimer?.cancel();
+    _clearCaches();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused) {
+      _performMemoryCleanup();
+    }
+  }
+
+  // Memory management
+  void _startMemoryCleanupTimer() {
+    _memoryCleanupTimer = Timer.periodic(_memoryCleanupInterval, (_) {
+      if (!_isDisposed) _performMemoryCleanup();
+    });
+  }
+
+  void _performMemoryCleanup() {
+    if (_markerCache.length > _maxMarkersToRender) {
+      _markerCache.clear();
+    }
+    if (_markerColorCache.length > 100) {
+      _markerColorCache.clear();
+    }
+  }
+
+  void _clearCaches() {
+    _markerCache.clear();
+    _markerColorCache.clear();
   }
 
   // --- Helper to load preferences ---
@@ -257,34 +377,61 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     await prefs.setBool(key, value);
   }
 
-  // Fetch initial earthquake data
+  // Fetch initial earthquake data with enhanced error handling
   Future<void> _fetchInitialData() async {
-    if (!mounted) return;
+    if (!mounted || _isDisposed) return;
+
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      // Fetch data from API
-      final data = await ApiService.fetchEarthquakes(
-        minMagnitude: 3.0, // Default initial fetch
-        days: 45,
-        forceRefresh: false,
-      );
-      if (!mounted) return;
+      // Fetch data from multi-source API with timeout
+      final List<Earthquake> earthquakes =
+          await MultiSourceApiService.fetchEarthquakes(
+            minMagnitude: 3.0,
+            days: 45,
+            forceRefresh: false,
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout:
+                () =>
+                    throw TimeoutException(
+                      'Request timed out',
+                      const Duration(seconds: 30),
+                    ),
+          );
 
-      _allFetchedEarthquakes = data;
-      _applyFilters();
+      if (!mounted || _isDisposed) return;
+
+      // Convert to format with null safety and validation
+      _allFetchedEarthquakes =
+          earthquakes
+              .where((eq) => _isValidEarthquake(eq))
+              .map((eq) => _convertEarthquakeToMap(eq))
+              .toList();
+
+      await _applyFilters();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _isDisposed) return;
+
+      String errorMessage;
+      if (e is TimeoutException) {
+        errorMessage = "Request timed out. Please check your connection.";
+      } else if (e.toString().contains('SocketException')) {
+        errorMessage = "No internet connection. Please check your network.";
+      } else {
+        errorMessage = "Failed to load map data: ${e.toString()}";
+      }
+
       setState(() {
-        _error = "Failed to load map data: ${e.toString()}";
+        _error = errorMessage;
         _isLoading = false;
         _isFilteringLocally = false;
       });
     } finally {
-      if (mounted && _isLoading) {
+      if (mounted && !_isDisposed && _isLoading) {
         setState(() {
           _isLoading = false;
         });
@@ -292,91 +439,256 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
-  // Apply filters using isolate for performance
-  Future<void> _applyFilters() async {
-    if (!mounted) return;
-    setState(() {
-      _isFilteringLocally = true;
-    });
+  // Validate earthquake data
+  bool _isValidEarthquake(Earthquake eq) {
+    return eq.latitude >= -90 &&
+        eq.latitude <= 90 &&
+        eq.longitude >= -180 &&
+        eq.longitude <= 180 &&
+        eq.magnitude >= 0 &&
+        eq.magnitude <= 10;
+  }
 
-    // Calculate Time Cutoff
-    final now = DateTime.now();
-    DateTime? cutoffTime;
-
-    switch (_selectedTimeWindow) {
-      case TimeWindow.lastHour:
-        cutoffTime = now.subtract(const Duration(hours: 1));
-        break;
-      case TimeWindow.last24Hours:
-        cutoffTime = now.subtract(const Duration(days: 1));
-        break;
-      case TimeWindow.last7Days:
-        cutoffTime = now.subtract(const Duration(days: 7));
-        break;
-      case TimeWindow.last45Days:
-        cutoffTime = null;
-        break;
-    }
-
-    // Create filter parameters for isolate
-    final params = FilterParameters(
-      earthquakes: _allFetchedEarthquakes,
-      minMagnitude: _selectedMinMagnitude,
-      cutoffTime: cutoffTime,
-    );
-
-    try {
-      // Run filtering in isolate
-      final filteredResults = await compute(_filterEarthquakesIsolate, params);
-
-      if (!mounted) return;
-      setState(() {
-        _filteredEarthquakes = filteredResults;
-        _isFilteringLocally = false;
-      });
-
-      // Update markers after filtering
-      _updateMarkers();
-    } catch (e) {
-      debugPrint('Error during filtering: $e');
-      if (!mounted) return;
-      setState(() {
-        _isFilteringLocally = false;
-      });
+  // Convert earthquake to map format safely
+  Map<String, dynamic> _convertEarthquakeToMap(Earthquake eq) {
+    if (eq.source == 'USGS') {
+      final rawData = Map<String, dynamic>.from(eq.rawData);
+      if (rawData['properties'] is Map<String, dynamic>) {
+        rawData['properties']['source'] = eq.source;
+      }
+      return rawData;
+    } else {
+      return {
+        'type': 'Feature',
+        'id': eq.id,
+        'properties': {
+          ...Map<String, dynamic>.from(eq.rawData),
+          'source': eq.source,
+          'mag': eq.magnitude,
+          'place': eq.place,
+          'time': eq.time.millisecondsSinceEpoch,
+        },
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [eq.longitude, eq.latitude, eq.depth ?? 0],
+        },
+      };
     }
   }
 
-  // Update markers based on filtered earthquakes
-  void _updateMarkers() {
-    if (!mounted) return;
+  // Refresh earthquake data with optimizations
+  Future<void> _refreshData() async {
+    if (!mounted || _isDisposed) return;
+
+    // Clear caches for fresh data
+    _clearCaches();
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Force refresh from multi-source API with timeout
+      final List<Earthquake> earthquakes =
+          await MultiSourceApiService.fetchEarthquakes(
+            minMagnitude: 3.0,
+            days: 45,
+            forceRefresh: true,
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout:
+                () =>
+                    throw TimeoutException(
+                      'Refresh timed out',
+                      const Duration(seconds: 30),
+                    ),
+          );
+
+      if (!mounted || _isDisposed) return;
+
+      // Convert with validation
+      _allFetchedEarthquakes =
+          earthquakes
+              .where((eq) => _isValidEarthquake(eq))
+              .map((eq) => _convertEarthquakeToMap(eq))
+              .toList();
+
+      await _applyFilters();
+    } catch (e) {
+      if (!mounted || _isDisposed) return;
+
+      String errorMessage;
+      if (e is TimeoutException) {
+        errorMessage = "Refresh timed out. Please try again.";
+      } else if (e.toString().contains('SocketException')) {
+        errorMessage = "No internet connection. Please check your network.";
+      } else {
+        errorMessage = "Failed to refresh map data: ${e.toString()}";
+      }
+
+      setState(() {
+        _error = errorMessage;
+        _isLoading = false;
+        _isFilteringLocally = false;
+      });
+    } finally {
+      if (mounted && !_isDisposed && _isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Apply filters with debouncing and error handling
+  Future<void> _applyFilters() async {
+    if (!mounted || _isDisposed) return;
+
+    // Cancel previous debounce timer
+    _debounceTimer?.cancel();
+
+    _debounceTimer = Timer(_debounceDelay, () async {
+      if (!mounted || _isDisposed) return;
+
+      setState(() {
+        _isFilteringLocally = true;
+      });
+
+      try {
+        // Calculate Time Cutoff
+        final now = DateTime.now();
+        DateTime? cutoffTime;
+
+        switch (_selectedTimeWindow) {
+          case TimeWindow.lastHour:
+            cutoffTime = now.subtract(const Duration(hours: 1));
+            break;
+          case TimeWindow.last24Hours:
+            cutoffTime = now.subtract(const Duration(days: 1));
+            break;
+          case TimeWindow.last7Days:
+            cutoffTime = now.subtract(const Duration(days: 7));
+            break;
+          case TimeWindow.last45Days:
+            cutoffTime = null;
+            break;
+        }
+
+        // Create filter parameters for isolate
+        final params = FilterParameters(
+          earthquakes: List.from(
+            _allFetchedEarthquakes,
+          ), // Create defensive copy
+          minMagnitude: _selectedMinMagnitude,
+          cutoffTime: cutoffTime,
+        );
+
+        // Run filtering in isolate with timeout
+        final filteredResults = await compute(
+          _filterEarthquakesIsolate,
+          params,
+        ).timeout(const Duration(seconds: 10));
+
+        if (!mounted || _isDisposed) return;
+
+        setState(() {
+          _filteredEarthquakes = filteredResults;
+          _isFilteringLocally = false;
+        });
+
+        // Update markers after filtering
+        await _updateMarkersOptimized();
+      } catch (e) {
+        debugPrint('Error during filtering: $e');
+        if (!mounted || _isDisposed) return;
+        setState(() {
+          _isFilteringLocally = false;
+        });
+      }
+    });
+  }
+
+  // Optimized marker updates with batching and caching
+  Future<void> _updateMarkersOptimized() async {
+    if (!mounted || _isDisposed) return;
 
     final List<Marker> newMarkers = [];
+
     if (_filteredEarthquakes.isEmpty) {
-      setState(() => _currentMarkers = newMarkers);
+      if (mounted) setState(() => _currentMarkers = newMarkers);
       return;
     }
 
-    // Create markers from filtered earthquakes
-    for (final quake in _filteredEarthquakes) {
+    // Limit markers for performance
+    final earthquakesToProcess =
+        _filteredEarthquakes.length > _maxMarkersToRender
+            ? _filteredEarthquakes.take(_maxMarkersToRender).toList()
+            : _filteredEarthquakes;
+
+    // Process markers in batches to avoid blocking UI
+    for (int i = 0; i < earthquakesToProcess.length; i += _markerBatchSize) {
+      if (!mounted || _isDisposed) return;
+
+      final end = math.min(i + _markerBatchSize, earthquakesToProcess.length);
+      final batch = earthquakesToProcess.sublist(i, end);
+
+      for (final quake in batch) {
+        try {
+          final marker = await _createMarkerOptimized(quake);
+          if (marker != null) newMarkers.add(marker);
+        } catch (e) {
+          debugPrint('Error creating marker: $e');
+          continue; // Skip problematic markers
+        }
+      }
+
+      // Yield control to prevent ANR
+      if (i + _markerBatchSize < earthquakesToProcess.length) {
+        await Future.delayed(const Duration(microseconds: 1));
+      }
+    }
+
+    // Add user location marker if available
+    final userMarker = _buildUserLocationMarker();
+    if (userMarker != null) {
+      newMarkers.add(userMarker);
+    }
+
+    if (mounted && !_isDisposed) {
+      setState(() => _currentMarkers = newMarkers);
+    }
+  }
+
+  // Create optimized marker with caching
+  Future<Marker?> _createMarkerOptimized(Map<String, dynamic> quake) async {
+    try {
       final properties = quake["properties"];
       final geometry = quake["geometry"];
-      if (properties == null || geometry == null) continue;
+      if (properties == null || geometry == null) return null;
+
       final coordinates = geometry["coordinates"];
-      if (coordinates is! List || coordinates.length < 2) continue;
+      if (coordinates is! List || coordinates.length < 2) return null;
 
       final double? lon =
           (coordinates[0] is num) ? coordinates[0].toDouble() : null;
       final double? lat =
           (coordinates[1] is num) ? coordinates[1].toDouble() : null;
-      if (lat == null || lon == null) continue;
+      if (lat == null || lon == null) return null;
 
       final double magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
-      final double markerSize = 2 + (magnitude * 4.0).clamp(0, 30);
-      final Color markerColor = _getMarkerColor(
-        magnitude,
-      ).withValues(alpha: 0.85);
+      final String id =
+          properties["id"]?.toString() ?? '${lat}_${lon}_$magnitude';
 
-      // Create a mutable copy of properties to add distance
+      // Check cache first
+      if (_markerCache.containsKey(id)) {
+        return _markerCache[id];
+      }
+
+      final double markerSize = (2 + (magnitude * 4.0)).clamp(4.0, 30.0);
+      final Color markerColor = _getMarkerColorOptimized(magnitude);
+
+      // Create mutable properties copy
       final Map<String, dynamic> mutableProperties = Map.from(properties);
 
       // Calculate distance if user location is available
@@ -388,44 +700,44 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
           lon,
         );
         mutableProperties["distance"] = distanceKm.round();
-      } else {
-        mutableProperties.remove("distance");
       }
-      // Create the marker with GestureDetector for taps
-      newMarkers.add(
-        Marker(
-          point: LatLng(lat, lon),
-          width: markerSize,
-          height: markerSize,
-          child: GestureDetector(
-            onTap: () => _showEarthquakeDetails(mutableProperties, quake),
-            child: Tooltip(
-              message:
-                  'M ${magnitude.toStringAsFixed(1)}\n${mutableProperties["place"] ?? 'Unknown'}',
-              preferBelow: false,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: markerColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    width: 1.0,
-                  ),
+
+      final String? source = mutableProperties["source"] as String?;
+      final String tooltipMessage =
+          'M ${magnitude.toStringAsFixed(1)}\n'
+          '${mutableProperties["place"] ?? 'Unknown'}'
+          '${source != null ? '\nSource: $source' : ''}';
+
+      final marker = Marker(
+        point: LatLng(lat, lon),
+        width: markerSize,
+        height: markerSize,
+        child: GestureDetector(
+          onTap: () => _showEarthquakeDetails(mutableProperties, quake),
+          child: Tooltip(
+            message: tooltipMessage,
+            preferBelow: false,
+            child: Container(
+              decoration: BoxDecoration(
+                color: markerColor.withValues(alpha: 0.85),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  width: 1.0,
                 ),
               ),
             ),
           ),
         ),
       );
-    }
 
-    // Add user location marker if available
-    final userMarker = _buildUserLocationMarker();
-    if (userMarker != null) {
-      newMarkers.add(userMarker);
+      // Cache the marker
+      _markerCache[id] = marker;
+      return marker;
+    } catch (e) {
+      debugPrint('Error in _createMarkerOptimized: $e');
+      return null;
     }
-
-    setState(() => _currentMarkers = newMarkers);
   }
 
   // Show filter bottom sheet
@@ -459,7 +771,10 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,6 +918,39 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                           }).toList(),
                     ),
                     const SizedBox(height: 8),
+
+                    // --- Current Data Info ---
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.2,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: colorScheme.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Showing ${_filteredEarthquakes.length} earthquakes',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -626,14 +974,25 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  // Memoized marker color retrieval
-  Color _getMarkerColor(double magnitude) {
-    return _markerColorCache.putIfAbsent(magnitude, () {
-      if (magnitude >= 8.0) return Colors.red.shade900;
-      if (magnitude >= 7.0) return Colors.red.shade700;
-      if (magnitude >= 6.0) return Colors.orange.shade800;
-      if (magnitude >= 5.0) return Colors.amber.shade700;
-      return Colors.green.shade600;
+  // Optimized marker color with better caching
+  Color _getMarkerColorOptimized(double magnitude) {
+    // Round to 1 decimal place for better cache efficiency
+    final roundedMag = (magnitude * 10).round() / 10;
+
+    return _markerColorCache.putIfAbsent(roundedMag, () {
+      if (magnitude >= 8.0) {
+        return const Color(0xFFB71C1C); // Colors.red.shade900
+      }
+      if (magnitude >= 7.0) {
+        return const Color(0xFFD32F2F); // Colors.red.shade700
+      }
+      if (magnitude >= 6.0) {
+        return const Color(0xFFEF6C00); // Colors.orange.shade800
+      }
+      if (magnitude >= 5.0) {
+        return const Color(0xFFFF8F00); // Colors.amber.shade700
+      }
+      return const Color(0xFF2E7D32); // Colors.green.shade600
     });
   }
 
@@ -724,74 +1083,95 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     }
   }
 
-  // --- Function to Load Fault Line Data ---
+  // Optimized fault line data loading with better error handling
   Future<void> _loadFaultLineData() async {
-    if (!mounted) return;
+    if (!mounted || _isDisposed || _isLoadingFaultLines) return;
+
     setState(() {
       _isLoadingFaultLines = true;
     });
 
-    /* ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Loading fault line data...'),
-        duration: Duration(seconds: 2),
-      ),
-    ); */
-
     try {
       final response = await http
           .get(Uri.parse(_faultLineDataUrl))
-          .timeout(const Duration(seconds: 20)); // Add timeout
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout:
+                () =>
+                    throw TimeoutException(
+                      'Fault line request timed out',
+                      const Duration(seconds: 30),
+                    ),
+          );
+
+      if (!mounted || _isDisposed) return;
 
       if (response.statusCode == 200) {
-        // Parse the data in a separate isolate using compute
+        // Validate response size to prevent memory issues
+        if (response.contentLength != null &&
+            response.contentLength! > 50 * 1024 * 1024) {
+          throw Exception(
+            'Fault line data too large (${response.contentLength} bytes)',
+          );
+        }
+
+        // Parse the data in isolate with timeout
         final List<Polyline> parsedPolylines = await compute(
           _parseGeoJsonFaultLines,
-          response.body, // Pass the raw JSON string
+          response.body,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout:
+              () =>
+                  throw TimeoutException(
+                    'Fault line parsing timed out',
+                    const Duration(seconds: 15),
+                  ),
         );
 
-        if (!mounted) return; // Check again after async gap
+        if (!mounted || _isDisposed) return;
 
         setState(() {
           _faultLinePolylines = parsedPolylines;
           _showFaultLines = true;
           _isLoadingFaultLines = false;
         });
-        await _saveBoolPreference(_showFaultLinesPrefKey, true);
 
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).hideCurrentSnackBar(); // Hide loading message
-        }
-        /* ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Fault lines loaded.'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        ); */
+        await _saveBoolPreference(_showFaultLinesPrefKey, true);
       } else {
         throw Exception(
-          'Failed to load fault line data: ${response.statusCode}',
+          'Failed to load fault line data: HTTP ${response.statusCode}',
         );
       }
     } catch (e) {
       debugPrint('Error loading fault lines: $e');
-      if (!mounted) return;
+      if (!mounted || _isDisposed) return;
+
       setState(() {
         _isLoadingFaultLines = false;
         _showFaultLines = false;
       });
+
+      String errorMessage;
+      if (e is TimeoutException) {
+        errorMessage = 'Fault line loading timed out';
+      } else if (e.toString().contains('SocketException')) {
+        errorMessage = 'No internet connection for fault lines';
+      } else {
+        errorMessage = 'Error loading fault lines: $e';
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading fault lines: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
+
       await _saveBoolPreference(_showFaultLinesPrefKey, false);
     }
   }
@@ -827,7 +1207,21 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     return Scaffold(
       appBar: LastQuakesAppBar(
         title: "LastQuakes Map",
-        actions: const [], 
+        actions: [
+          // Refresh button
+          IconButton(
+            icon:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _refreshData,
+            tooltip: 'Refresh earthquake data',
+          ),
+        ],
       ),
       drawer: const CustomDrawer(),
       body: Stack(
@@ -854,29 +1248,32 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 cameraConstraint: CameraConstraint.contain(
                   bounds: LatLngBounds(
                     const LatLng(-90.0, -180.0), // Southwest corner
-                    const LatLng(90.0, 180.0),   // Northeast corner
+                    const LatLng(90.0, 180.0), // Northeast corner
                   ),
                 ),
                 onPositionChanged: (position, hasGesture) {
-                  // --- UPDATE Rotation State ---
-                  final newRotation =
-                      position.rotation; // Rotation is in degrees
-                  if (newRotation != _currentRotation) {
-                    if (mounted) {
-                      // Check if widget is still mounted
-                      setState(() {
-                        _currentRotation = newRotation;
-                      });
-                    }
+                  if (!mounted || _isDisposed) return;
+
+                  // Debounce position updates to prevent excessive rebuilds
+                  final newRotation = position.rotation;
+                  final newZoom = position.zoom;
+
+                  bool shouldUpdate = false;
+
+                  // Update rotation with threshold to prevent micro-updates
+                  if ((newRotation - _currentRotation).abs() > 0.5) {
+                    _currentRotation = newRotation;
+                    shouldUpdate = true;
                   }
 
-                  //  zoom level update logic
-                  if (hasGesture && position.zoom != _zoomLevel) {
-                    if (mounted) {
-                      setState(() {
-                        _zoomLevel = position.zoom;
-                      });
-                    }
+                  // Update zoom level with gesture check
+                  if (hasGesture && (newZoom - _zoomLevel).abs() > 0.1) {
+                    _zoomLevel = newZoom;
+                    shouldUpdate = true;
+                  }
+
+                  if (shouldUpdate) {
+                    setState(() {});
                   }
                 },
                 interactionOptions: InteractionOptions(
@@ -895,51 +1292,63 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                     //polylineCulling: true,
                   ),
 
-                // --- Marker Layer (Clustered or Normal) ---
-                if (_zoomLevel < _clusteringThreshold)
-                  MarkerClusterLayerWidget(
-                    options: MarkerClusterLayerOptions(
-                      maxClusterRadius: 45,
-                      size: const Size(40, 40),
-                      markers: _currentMarkers, // Use memoized markers
-                      polygonOptions: const PolygonOptions(
-                        borderColor: Colors.blueAccent,
-                        color: Colors.black12,
-                        borderStrokeWidth: 2,
-                      ),
-
-                      builder: (context, markers) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.primary.withValues(
-                                  alpha: 0.3,
+                // Optimized marker layer with performance considerations
+                if (_currentMarkers.isNotEmpty) ...[
+                  if (_zoomLevel < _clusteringThreshold)
+                    MarkerClusterLayerWidget(
+                      options: MarkerClusterLayerOptions(
+                        maxClusterRadius: math.max(
+                          30,
+                          60 - (_zoomLevel * 10).round(),
+                        ),
+                        size: const Size(40, 40),
+                        markers: _currentMarkers,
+                        polygonOptions: const PolygonOptions(
+                          borderColor: Colors.blueAccent,
+                          color: Colors.black12,
+                          borderStrokeWidth: 1,
+                        ),
+                        builder: (context, markers) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
                                 ),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              markers.length.toString(),
-                              style: TextStyle(
-                                color: colorScheme.onPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                markers.length > 999
+                                    ? '999+'
+                                    : markers.length.toString(),
+                                style: TextStyle(
+                                  color: colorScheme.onPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: markers.length > 99 ? 10 : 12,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
+                    )
+                  else
+                    MarkerLayer(
+                      markers:
+                          _currentMarkers.length > _maxMarkersToRender
+                              ? _currentMarkers
+                                  .take(_maxMarkersToRender)
+                                  .toList()
+                              : _currentMarkers,
                     ),
-                  )
-                else
-                  MarkerLayer(markers: _currentMarkers), // Use memoized markers
-
+                ],
                 // --- Attribution Widget ---
                 RichAttributionWidget(
                   showFlutterMapAttribution: false,
@@ -1194,7 +1603,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
               setState(() {
                 _userPosition = position;
               });
-              _updateMarkers();
+              _updateMarkersOptimized();
             },
             onLocationError: () {
               // Handle location error if needed
@@ -1396,7 +1805,10 @@ class _EarthquakeDetailsDialog extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

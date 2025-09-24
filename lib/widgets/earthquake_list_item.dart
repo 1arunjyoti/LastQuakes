@@ -7,7 +7,8 @@ class EarthquakeListItem extends StatelessWidget {
   final Color magnitudeColor;
   final VoidCallback onTap;
   final DateTime timestamp; 
-  final double? distanceKm; 
+  final double? distanceKm;
+  final String? source; // Add source parameter
 
   const EarthquakeListItem({
     super.key,
@@ -17,6 +18,7 @@ class EarthquakeListItem extends StatelessWidget {
     required this.onTap,
     required this.timestamp,
     required this.distanceKm,
+    this.source,
   });
 
   @override
@@ -110,17 +112,47 @@ class EarthquakeListItem extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                    
-                  // Right Section - Magnitude Box
-                  Container(
-                    padding: magnitudeBoxPadding,
-                    decoration: BoxDecoration(
-                      color: magnitudeColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      magnitude.toStringAsFixed(1),
-                      style: magnitudeTextStyle,
-                    ),
+                  // Right Section - Magnitude Box and Source
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: magnitudeBoxPadding,
+                        decoration: BoxDecoration(
+                          color: magnitudeColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          magnitude.toStringAsFixed(1),
+                          style: magnitudeTextStyle,
+                        ),
+                      ),
+                      if (source != null) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: source == 'USGS' ? Colors.blue.shade100 : Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: source == 'USGS' ? Colors.blue.shade300 : Colors.green.shade300,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            source!,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: source == 'USGS' ? Colors.blue.shade700 : Colors.green.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
