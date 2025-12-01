@@ -88,9 +88,15 @@ class _CustomDrawerState extends State<CustomDrawer> {
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
-                  label: Text(
-                    item.label, 
-                    style: const TextStyle(fontSize: 16),
+                  label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(fontSize: 15),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    ),
                   ),
                 ),
               ),
@@ -101,9 +107,15 @@ class _CustomDrawerState extends State<CustomDrawer> {
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
-                  label: Text(
-                    item.label,
-                    style: const TextStyle(fontSize: 16),
+                  label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(fontSize: 15),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    ),
                   ),
                 ),
               ),

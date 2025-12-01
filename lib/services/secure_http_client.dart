@@ -1,10 +1,11 @@
-import 'dart:io';
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:lastquake/utils/secure_logger.dart';
+import 'package:meta/meta.dart';
 
 /// Secure HTTP client with certificate pinning implementation
 class SecureHttpClient {
@@ -18,6 +19,11 @@ class SecureHttpClient {
 
   SecureHttpClient._() {
     _client = _createSecureClient();
+  }
+
+  @visibleForTesting
+  SecureHttpClient.testing(http.Client client) {
+    _client = client;
   }
 
   // Certificate pins for your domains (SHA-256 hashes of certificates)
@@ -39,19 +45,43 @@ class SecureHttpClient {
     ],
   };
 
+  /// Get certificate pins for a specific host (for debugging/setup)
+  static List<String>? getPinsForHost(String host) {
+    return _certificatePins[host];
+  }
+
+  /// Dispose of the HTTP client
+  void dispose() {
+    _client.close();
+  }
+
+  @visibleForTesting
+  static void setMockInstance(SecureHttpClient? client) {
+    if (client == null) {
+      _instance?.dispose();
+    }
+    _instance = client;
+  }
+
   /// Create HTTP client with certificate pinning
   http.Client _createSecureClient() {
     final httpClient = HttpClient();
-    
+
     // Configure certificate validation with pinning
-    httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
+    httpClient.badCertificateCallback = (
+      X509Certificate cert,
+      String host,
+      int port,
+    ) {
       // Verify certificate pin for the host
       final isValidPin = _verifyCertificatePin(host, cert);
-      
+
       if (!isValidPin) {
-        SecureLogger.security('Certificate pinning failed for $host:$port - connection rejected');
+        SecureLogger.security(
+          'Certificate pinning failed for $host:$port - connection rejected',
+        );
       }
-      
+
       return isValidPin;
     };
 
@@ -62,7 +92,9 @@ class SecureHttpClient {
   bool _verifyCertificatePin(String host, X509Certificate cert) {
     final pins = _certificatePins[host];
     if (pins == null || pins.isEmpty) {
-      SecureLogger.warning('No certificate pins configured for host: $host - allowing connection');
+      SecureLogger.warning(
+        'No certificate pins configured for host: $host - allowing connection',
+      );
       // In development, you might want to allow connections without pins
       // In production, you should return false here
       return false; // TODO: Change to false in production
@@ -75,11 +107,13 @@ class SecureHttpClient {
       final publicKeyPin = 'sha256/${base64.encode(publicKeyHash.bytes)}';
 
       final isValid = pins.contains(publicKeyPin);
-      
+
       if (isValid) {
         SecureLogger.security('Certificate pin verified for host: $host');
       } else {
-        SecureLogger.security('Certificate pin verification FAILED for host: $host');
+        SecureLogger.security(
+          'Certificate pin verification FAILED for host: $host',
+        );
         SecureLogger.security('Expected one of: $pins');
         SecureLogger.security('Actual pin: $publicKeyPin');
       }
@@ -126,33 +160,35 @@ class SecureHttpClient {
   ) async {
     try {
       final response = await requestFunction().timeout(timeout);
-      
+
       // Log successful secure request
-      SecureLogger.security('Secure HTTP request completed for host: $host (Status: ${response.statusCode})');
-      
+      SecureLogger.security(
+        'Secure HTTP request completed for host: $host (Status: ${response.statusCode})',
+      );
+
       return response;
     } on SocketException catch (e) {
       SecureLogger.error('Network error for host $host', e);
       throw Exception('Network error: Unable to connect to $host');
     } on HandshakeException catch (e) {
-      SecureLogger.security('SSL/TLS handshake failed for host $host - possible certificate pinning rejection', e);
+      SecureLogger.security(
+        'SSL/TLS handshake failed for host $host - possible certificate pinning rejection',
+        e,
+      );
       throw Exception('SSL/TLS error: Certificate validation failed for $host');
     } on TimeoutException catch (e) {
       SecureLogger.error('Request timeout for host $host', e);
-      throw Exception('Request timeout: $host did not respond within ${timeout.inSeconds} seconds');
+      throw Exception(
+        'Request timeout: $host did not respond within ${timeout.inSeconds} seconds',
+      );
     } catch (e) {
       SecureLogger.error('Unexpected error for host $host', e);
       rethrow;
     }
   }
 
-  /// Get certificate pins for a specific host (for debugging/setup)
-  static List<String>? getPinsForHost(String host) {
-    return _certificatePins[host];
-  }
-
-  /// Dispose of the HTTP client
-  void dispose() {
-    _client.close();
+  @visibleForTesting
+  static void reset() {
+    setMockInstance(null);
   }
 }

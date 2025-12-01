@@ -19,75 +19,33 @@ Map<String, dynamic> _filterAndSortEarthquakesIsolate(
   final List<Map<String, dynamic>> inputList = args['list'];
   final double minMagnitude = args['minMagnitude'];
   final String countryFilter = args['countryFilter'];
-  final double? userLat = args['userLat'];
-  final double? userLon = args['userLon'];
 
-  List<Map<String, dynamic>> correctlyTypedInput =
-      inputList.whereType<Map<String, dynamic>>().toList();
+  final Set<String> uniqueCountries = {};
+  final List<Map<String, dynamic>> filteredList = [];
 
-  // Extract unique countries while filtering
-  Set<String> uniqueCountries = {};
+  for (final quake in inputList.whereType<Map<String, dynamic>>()) {
+    final properties = quake["properties"];
+    if (properties is! Map) continue;
 
-  final List<Map<String, dynamic>> filteredList =
-      correctlyTypedInput
-          .where((quake) {
-            final properties = quake["properties"];
-            if (properties is! Map) return false;
+    final magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
+    final place =
+        properties["place"] as String? ??
+        properties["flynn_region"] as String? ??
+        "";
+    final String country =
+        place.contains(", ") ? place.split(", ").last.trim() : "";
+    if (country.isNotEmpty) {
+      uniqueCountries.add(country);
+    }
 
-            final magnitude = (properties["mag"] as num?)?.toDouble() ?? 0.0;
-            final place =
-                properties["place"] as String? ??
-                properties["flynn_region"] as String? ??
-                "";
-            // Extract country and add to set
-            final String country =
-                place.contains(", ") ? place.split(", ").last.trim() : "";
-            if (country.isNotEmpty) {
-              uniqueCountries.add(country);
-            }
+    final bool passesMagnitude = magnitude >= minMagnitude;
+    final bool passesCountry =
+        countryFilter == "All" || country == countryFilter;
 
-            bool passesMagnitude = magnitude >= minMagnitude;
-            bool passesCountry =
-                (countryFilter == "All" || country == countryFilter);
-
-            return passesMagnitude && passesCountry;
-          })
-          .map((quake) {
-            // Create a mutable copy IF distance calculation is done here
-            final Map<String, dynamic> currentQuake = Map<String, dynamic>.from(
-              quake,
-            );
-            final Map<String, dynamic> properties = Map<String, dynamic>.from(
-              currentQuake["properties"] ?? {},
-            );
-
-            // --- Distance Calculation in Isolate (Adds Overhead) ---
-            if (userLat != null && userLon != null) {
-              final geometry = currentQuake["geometry"];
-              if (geometry is Map && geometry["coordinates"] is List) {
-                final coordinates = geometry["coordinates"] as List;
-                if (coordinates.length >= 2 &&
-                    coordinates[0] is num &&
-                    coordinates[1] is num) {
-                  final double longitude = coordinates[0].toDouble();
-                  final double latitude = coordinates[1].toDouble();
-                  final distance =
-                      Geolocator.distanceBetween(
-                        userLat,
-                        userLon,
-                        latitude,
-                        longitude,
-                      ) /
-                      1000.0; // km
-                  properties["distance"] = distance.round();
-                  currentQuake["properties"] = properties;
-                }
-              }
-            }
-
-            return currentQuake;
-          })
-          .toList();
+    if (passesMagnitude && passesCountry) {
+      filteredList.add(quake);
+    }
+  }
 
   // Sort by time
   filteredList.sort((a, b) {
@@ -157,6 +115,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   Position? _userPosition;
   bool _isLoadingLocation = false;
   final LocationService _locationService = LocationService();
+  final Map<String, double> _distanceCache = <String, double>{};
 
   // Debounce timer for filter changes
   Timer? _filterDebounce;
@@ -242,6 +201,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
 
       // Store the raw fetched data
       _unfilteredEarthquakes = fetchedData;
+      _distanceCache.clear();
 
       // Apply filters using compute
       await _applyFiltersWithCompute();
@@ -278,8 +238,6 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
       'list': _unfilteredEarthquakes,
       'minMagnitude': selectedMagnitude,
       'countryFilter': selectedCountry,
-      'userLat': _userPosition?.latitude,
-      'userLon': _userPosition?.longitude,
     };
 
     try {
@@ -382,7 +340,7 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
 
       setState(() {
         _userPosition = position;
-        _applyFiltersWithCompute(); // Re-run filtering to update distances
+        _distanceCache.clear();
       });
 
       if (position != null) {
@@ -656,13 +614,9 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                         );
 
                         // --- Use distance calculated in isolate
-                        double? distanceKm;
-                        if (_userPosition != null) {
-                          if (properties.containsKey("distance")) {
-                            distanceKm =
-                                (properties["distance"] as num?)?.toDouble();
-                          }
-                        }
+                        final double? distanceKm = _getDistanceForQuake(
+                          quakeData,
+                        );
 
                         // Get source information
                         final String? source = properties["source"] as String?;
@@ -755,6 +709,45 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     if (magnitude >= 7.0) return Colors.red.shade900;
     if (magnitude >= 5.0) return Colors.orange;
     return Colors.green;
+  }
+
+  double? _getDistanceForQuake(Map<String, dynamic> quakeData) {
+    if (_userPosition == null) return null;
+
+    final String? quakeId = _extractQuakeId(quakeData);
+    if (quakeId == null) return null;
+
+    final cachedDistance = _distanceCache[quakeId];
+    if (cachedDistance != null) {
+      return cachedDistance;
+    }
+
+    final coordinates = quakeData['geometry']?['coordinates'];
+    if (coordinates is! List || coordinates.length < 2) return null;
+    final lon = coordinates[0];
+    final lat = coordinates[1];
+    if (lon is! num || lat is! num) return null;
+
+    final double computedDistance = _locationService.calculateDistance(
+      _userPosition!.latitude,
+      _userPosition!.longitude,
+      lat.toDouble(),
+      lon.toDouble(),
+    );
+
+    _distanceCache[quakeId] = computedDistance;
+    return computedDistance;
+  }
+
+  String? _extractQuakeId(Map<String, dynamic> quakeData) {
+    final properties = quakeData['properties'];
+    if (properties is Map && properties['id'] != null) {
+      return properties['id'].toString();
+    }
+    if (quakeData['id'] != null) {
+      return quakeData['id'].toString();
+    }
+    return null;
   }
 
   // --- Bottom Sheets for Filters ---

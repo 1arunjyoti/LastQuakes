@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/utils/secure_logger.dart';
+import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -53,9 +54,24 @@ class ApiService {
     double minMagnitude = 3.0,
     int days = 45,
     bool forceRefresh = false,
+    SharedPreferences? prefsOverride,
+    File? cacheFileOverride,
+    DateTime Function()? nowProvider,
+    Future<Map<String, dynamic>> Function(List<dynamic> args)? processExecutor,
+    Future<List<Map<String, dynamic>>> Function(String cachedData)? decodeExecutor,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final cacheFile = await _getCacheFile();
+    final prefs = prefsOverride ?? await SharedPreferences.getInstance();
+    final cacheFile = cacheFileOverride ?? await _getCacheFile();
+    final process = processExecutor ??
+        ((args) => compute<List<dynamic>, Map<String, dynamic>>(
+              _processEarthquakesIsolate,
+              args,
+            ));
+    final decode = decodeExecutor ??
+        ((data) => compute<String, List<Map<String, dynamic>>>(
+              _decodeCacheIsolate,
+              data,
+            ));
 
     // Check for cached data if not force refreshing
     if (!forceRefresh) {
@@ -65,12 +81,12 @@ class ApiService {
         if (currentTime - cachedTimestamp < 3600000) {
           // 1 hour cache
           final String cachedData = await cacheFile.readAsString();
-          return compute(_decodeCacheIsolate, cachedData);
+          return await decode(cachedData);
         }
       }
     }
 
-    final DateTime now = DateTime.now();
+    final DateTime now = nowProvider?.call() ?? DateTime.now();
     final DateTime startDate = now.subtract(Duration(days: days));
 
     final Uri url = Uri.https("earthquake.usgs.gov", "/fdsnws/event/1/query", {
@@ -86,7 +102,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         // Process response in isolate
-        final result = await compute(_processEarthquakesIsolate, [
+        final result = await process([
           response.body,
           minMagnitude,
         ]);
@@ -108,7 +124,7 @@ class ApiService {
       // Try to return cached data if network fails
       if (await cacheFile.exists()) {
         final String cachedData = await cacheFile.readAsString();
-        return compute(_decodeCacheIsolate, cachedData);
+        return await decode(cachedData);
       }
 
       throw Exception("Error fetching earthquake data: $e");
@@ -116,12 +132,20 @@ class ApiService {
   }
 
   /// Clear cached earthquake data
-  static Future<void> clearCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cacheFile = await _getCacheFile();
+  static Future<void> clearCache({
+    SharedPreferences? prefsOverride,
+    File? cacheFileOverride,
+  }) async {
+    final prefs = prefsOverride ?? await SharedPreferences.getInstance();
+    final cacheFile = cacheFileOverride ?? await _getCacheFile();
     await prefs.remove(_cacheTimestampKey);
     if (await cacheFile.exists()) {
       await cacheFile.delete();
     }
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    // no-op: helper to signal static dependencies can be reset elsewhere
   }
 }

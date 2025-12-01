@@ -7,6 +7,7 @@ import 'package:lastquake/models/earthquake.dart';
 import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/utils/secure_logger.dart';
+import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -30,8 +31,28 @@ class MultiSourceApiService {
   static final Map<String, List<Earthquake>> _memoryCache = {};
 
   /// Get cached SharedPreferences instance
+  static Future<SharedPreferences> Function()? _prefsProvider;
+  static Future<Directory> Function()? _directoryProvider;
+  static SecureHttpClient? _httpClientOverride;
+
   static Future<SharedPreferences> _getPrefs() async {
+    if (_prefsProvider != null) {
+      return _prefsCache ??= await _prefsProvider!.call();
+    }
     return _prefsCache ??= await SharedPreferences.getInstance();
+  }
+
+  static Future<List<Earthquake>> _fetchSource(
+    DataSource source, {
+    required double minMagnitude,
+    required int days,
+  }) {
+    switch (source) {
+      case DataSource.usgs:
+        return _fetchFromUsgs(minMagnitude: minMagnitude, days: days);
+      case DataSource.emsc:
+        return _fetchFromEmsc(minMagnitude: minMagnitude, days: days);
+    }
   }
 
   /// Get selected data sources from preferences with caching
@@ -103,7 +124,9 @@ class MultiSourceApiService {
   /// Get cache file path for specific sources
   static Future<File> _getCacheFile(Set<DataSource> sources) async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
+      final directory =
+          await (_directoryProvider?.call() ??
+              getApplicationDocumentsDirectory());
       final sourceKey = sources.map((s) => s.name).toList()..sort();
       final filename = 'multi_source_cache_${sourceKey.join('_')}.json';
       return File('${directory.path}/$filename');
@@ -161,10 +184,8 @@ class MultiSourceApiService {
             "limit": _maxEarthquakesPerSource.toString(),
           });
 
-      final response = await SecureHttpClient.instance.get(
-        url,
-        timeout: const Duration(seconds: 30),
-      );
+      final response = await (_httpClientOverride ?? SecureHttpClient.instance)
+          .get(url, timeout: const Duration(seconds: 30));
 
       SecureLogger.api(
         "earthquake.usgs.gov/fdsnws/event/1/query",
@@ -451,9 +472,12 @@ class MultiSourceApiService {
         selectedSources.add(DataSource.usgs);
       }
 
+      final List<DataSource> sourcesList =
+          selectedSources.toList()..sort((a, b) => a.index.compareTo(b.index));
+      final String sourcesKey = sourcesList.map((s) => s.name).join('_');
+
       // Check memory cache first
-      final cacheKey =
-          '${selectedSources.map((s) => s.name).join('_')}_${minMagnitude}_$days';
+      final cacheKey = '${sourcesKey}_${minMagnitude}_$days';
       if (!forceRefresh && _memoryCache.containsKey(cacheKey)) {
         final cached = _memoryCache[cacheKey]!;
         if (cached.isNotEmpty) {
@@ -492,41 +516,47 @@ class MultiSourceApiService {
       }
 
       // Fetch from APIs concurrently for better performance
-      final List<Future<List<Earthquake>>> futures = [];
       final List<String> errors = [];
 
-      for (final source in selectedSources) {
-        switch (source) {
-          case DataSource.usgs:
-            futures.add(_fetchFromUsgs(minMagnitude: minMagnitude, days: days));
-            break;
-          case DataSource.emsc:
-            futures.add(_fetchFromEmsc(minMagnitude: minMagnitude, days: days));
-            break;
-        }
+      if (sourcesList.isEmpty) {
+        return [];
       }
 
-      // Wait for all API calls to complete
-      final results = await Future.wait(futures, eagerError: false);
+      final stopwatch = Stopwatch()..start();
+      final results = await Future.wait(
+        sourcesList.map((source) async {
+          try {
+            final data = await _fetchSource(
+              source,
+              minMagnitude: minMagnitude,
+              days: days,
+            );
+            SecureLogger.info(
+              "${source.name.toUpperCase()}: ${data.length} earthquakes",
+            );
+            return MapEntry(source, data);
+          } catch (e) {
+            errors.add("${source.name.toUpperCase()}: $e");
+            SecureLogger.error("Error from ${source.name}", e);
+            return MapEntry(source, <Earthquake>[]);
+          }
+        }),
+        eagerError: false,
+      );
+      stopwatch.stop();
+
+      SecureLogger.info(
+        "Multi-source fetch (${sourcesKey.toUpperCase()}) completed in ${stopwatch.elapsedMilliseconds}ms",
+      );
+
       List<Earthquake> allEarthquakes = [];
 
-      for (int i = 0; i < results.length; i++) {
-        try {
-          allEarthquakes.addAll(results[i]);
-          final sourceName = selectedSources.elementAt(i).name.toUpperCase();
-          SecureLogger.info("$sourceName: ${results[i].length} earthquakes");
-        } catch (e) {
-          final sourceName = selectedSources.elementAt(i).name.toUpperCase();
-          errors.add("$sourceName: $e");
-          SecureLogger.error(
-            "Error from ${selectedSources.elementAt(i).name}",
-            e,
-          );
-        }
+      for (final result in results) {
+        allEarthquakes.addAll(result.value);
       }
 
       // Remove duplicates only if multiple sources
-      if (selectedSources.length > 1 && allEarthquakes.isNotEmpty) {
+      if (sourcesList.length > 1 && allEarthquakes.isNotEmpty) {
         final beforeCount = allEarthquakes.length;
         allEarthquakes = _removeDuplicatesOptimized(allEarthquakes);
         SecureLogger.info(
@@ -585,7 +615,9 @@ class MultiSourceApiService {
       _sourceCache.clear();
 
       final prefs = await _getPrefs();
-      final directory = await getApplicationDocumentsDirectory();
+      final directory =
+          await (_directoryProvider?.call() ??
+              getApplicationDocumentsDirectory());
 
       // Clear all cache timestamps
       final allKeys =
@@ -624,5 +656,28 @@ class MultiSourceApiService {
     } catch (e) {
       SecureLogger.error("Error clearing cache", e);
     }
+  }
+
+  @visibleForTesting
+  static void setPrefsProvider(Future<SharedPreferences> Function()? provider) {
+    _prefsProvider = provider;
+    _prefsCache = null;
+  }
+
+  @visibleForTesting
+  static void setDirectoryProvider(Future<Directory> Function()? provider) {
+    _directoryProvider = provider;
+  }
+
+  @visibleForTesting
+  static void setHttpClientOverride(SecureHttpClient? client) {
+    _httpClientOverride = client;
+  }
+
+  @visibleForTesting
+  static void resetCaches() {
+    _sourceCache.clear();
+    _memoryCache.clear();
+    _prefsCache = null;
   }
 }

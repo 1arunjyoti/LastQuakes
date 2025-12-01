@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:meta/meta.dart';
 
 class LocationService {
   // Singleton pattern for location service
@@ -73,5 +74,11 @@ class LocationService {
           endLongitude,
         ) /
         1000; // Convert to kilometers
+  }
+
+  @visibleForTesting
+  void clearCache() {
+    _cachedPosition = null;
+    _lastLocationFetchTime = null;
   }
 }
