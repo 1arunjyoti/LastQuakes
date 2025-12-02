@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:lastquake/utils/formatting.dart';
 
+/// Pre-computed source badge styles to avoid rebuilding on every frame
+class _SourceBadgeStyles {
+  static const usgsBackground = Color(0xFFBBDEFB); // Colors.blue.shade100
+  static const usgsTextColor = Color(0xFF1976D2); // Colors.blue.shade700
+  static const usgsBorderColor = Color(0xFF64B5F6); // Colors.blue.shade300
+  static const emscBackground = Color(0xFFC8E6C9); // Colors.green.shade100
+  static const emscTextColor = Color(0xFF388E3C); // Colors.green.shade700
+  static const emscBorderColor = Color(0xFF81C784); // Colors.green.shade300
+}
+
 class EarthquakeListItem extends StatelessWidget {
   final String location;
   final double magnitude;
@@ -8,7 +18,12 @@ class EarthquakeListItem extends StatelessWidget {
   final VoidCallback onTap;
   final DateTime timestamp;
   final double? distanceKm;
-  final String? source; // Add source parameter
+  final String? source;
+
+  // Pre-computed formatted strings (passed from parent)
+  final String? formattedDistance;
+  final String? formattedTime;
+  final String? formattedLocation;
 
   const EarthquakeListItem({
     super.key,
@@ -19,50 +34,44 @@ class EarthquakeListItem extends StatelessWidget {
     required this.timestamp,
     required this.distanceKm,
     this.source,
+    this.formattedDistance,
+    this.formattedTime,
+    this.formattedLocation,
   });
+
+  // Static constants moved outside build() for better performance
+  static const _cardMargin = EdgeInsets.symmetric(horizontal: 12, vertical: 6);
+  static const _contentPadding = EdgeInsets.all(16.0);
+  static const _magnitudeBoxPadding = EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 8,
+  );
+  static const _magnitudeTextStyle = TextStyle(
+    color: Colors.white,
+    fontWeight: FontWeight.bold,
+    fontSize: 26,
+  );
+  static const _locationTextStyle = TextStyle(
+    fontWeight: FontWeight.bold,
+    fontSize: 17,
+  );
+  static const _timeTextStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w500);
+  static const _distanceTextStyle = TextStyle(color: Colors.blue, fontSize: 14);
+  static const _indicatorBarWidth = 4.0;
+  static const _sourceBadgePadding = EdgeInsets.symmetric(horizontal: 6, vertical: 2);
+  static const _sourceTextStyle = TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
 
   @override
   Widget build(BuildContext context) {
-    // Format distance and time using utils inside build method
-    String displayDistance;
-    if (distanceKm != null) {
-      displayDistance = FormattingUtils.formatDistance(context, distanceKm!);
-      displayDistance = "$displayDistance from your location";
-    } else {
-      displayDistance = "Enable location for distance";
-    }
-    final String displayTime = FormattingUtils.formatDateTime(
-      context,
-      timestamp,
-    );
-    final String displayLocation = FormattingUtils.formatPlaceString(
-      context,
-      location,
-    );
-
-    const cardMargin = EdgeInsets.symmetric(horizontal: 12, vertical: 6);
-    const contentPadding = EdgeInsets.all(16.0);
-    const magnitudeBoxPadding = EdgeInsets.symmetric(
-      horizontal: 12,
-      vertical: 8,
-    );
-    const magnitudeTextStyle = TextStyle(
-      color: Colors.white,
-      fontWeight: FontWeight.bold,
-      fontSize: 26,
-    );
-    const locationTextStyle = TextStyle(
-      fontWeight: FontWeight.bold,
-      fontSize: 17,
-    );
-    const timeTextStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w500);
-    const distanceTextStyle = TextStyle(color: Colors.blue, fontSize: 14);
-    const indicatorBarWidth = 4.0;
+    // Use pre-computed values if available, otherwise compute on-demand
+    final String displayDistance = formattedDistance ?? _computeDistance(context);
+    final String displayTime = formattedTime ?? FormattingUtils.formatDateTime(context, timestamp);
+    final String displayLocation = formattedLocation ?? FormattingUtils.formatPlaceString(context, location);
 
     return GestureDetector(
       onTap: onTap,
       child: Card(
-        margin: cardMargin,
+        margin: _cardMargin,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         elevation: 4,
         child: ClipRRect(
@@ -72,12 +81,12 @@ class EarthquakeListItem extends StatelessWidget {
               border: Border(
                 left: BorderSide(
                   color: magnitudeColor,
-                  width: indicatorBarWidth,
+                  width: _indicatorBarWidth,
                 ),
               ),
             ),
             child: Padding(
-              padding: contentPadding,
+              padding: _contentPadding,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -90,7 +99,7 @@ class EarthquakeListItem extends StatelessWidget {
                       children: [
                         Text(
                           displayDistance,
-                          style: distanceTextStyle,
+                          style: _distanceTextStyle,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
@@ -98,12 +107,12 @@ class EarthquakeListItem extends StatelessWidget {
                           displayLocation,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 2,
-                          style: locationTextStyle,
+                          style: _locationTextStyle,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           displayTime,
-                          style: timeTextStyle,
+                          style: _timeTextStyle,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -116,55 +125,61 @@ class EarthquakeListItem extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: magnitudeBoxPadding,
+                        padding: _magnitudeBoxPadding,
                         decoration: BoxDecoration(
                           color: magnitudeColor,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           magnitude.toStringAsFixed(1),
-                          style: magnitudeTextStyle,
+                          style: _magnitudeTextStyle,
                         ),
                       ),
-                      if (source != null) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                source == 'USGS'
-                                    ? Colors.blue.shade100
-                                    : Colors.green.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color:
-                                  source == 'USGS'
-                                      ? Colors.blue.shade300
-                                      : Colors.green.shade300,
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            source!,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color:
-                                  source == 'USGS'
-                                      ? Colors.blue.shade700
-                                      : Colors.green.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
+                      if (source != null) _buildSourceBadge(),
                     ],
                   ),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Compute distance string on-demand (fallback when not pre-computed)
+  String _computeDistance(BuildContext context) {
+    if (distanceKm != null) {
+      return "${FormattingUtils.formatDistance(context, distanceKm!)} from your location";
+    }
+    return "Enable location for distance";
+  }
+
+  /// Build source badge with cached colors to avoid repeated color lookups
+  Widget _buildSourceBadge() {
+    final isUsgs = source == 'USGS';
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Container(
+        padding: _sourceBadgePadding,
+        decoration: BoxDecoration(
+          color: isUsgs
+              ? _SourceBadgeStyles.usgsBackground
+              : _SourceBadgeStyles.emscBackground,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isUsgs
+                ? _SourceBadgeStyles.usgsBorderColor
+                : _SourceBadgeStyles.emscBorderColor,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          source!,
+          style: _sourceTextStyle.copyWith(
+            color: isUsgs
+                ? _SourceBadgeStyles.usgsTextColor
+                : _SourceBadgeStyles.emscTextColor,
           ),
         ),
       ),

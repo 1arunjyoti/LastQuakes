@@ -68,12 +68,12 @@ class _LineChartPainter extends CustomPainter {
 
     final fillPaint =
         Paint()
-          ..color = (fillColor ?? lineColor).withOpacity(0.1)
+          ..color = (fillColor ?? lineColor).withValues(alpha: 0.1)
           ..style = PaintingStyle.fill;
 
     final gridPaint =
         Paint()
-          ..color = theme.colorScheme.onSurface.withOpacity(0.1)
+          ..color = theme.colorScheme.onSurface.withValues(alpha: 0.1)
           ..strokeWidth = 1.0;
 
     final maxCount = data.map((p) => p.count).reduce(math.max).toDouble();
@@ -157,7 +157,7 @@ class _LineChartPainter extends CustomPainter {
       if (movingAvg.isNotEmpty) {
         final avgPaint =
             Paint()
-              ..color = lineColor.withOpacity(0.5)
+              ..color = lineColor.withValues(alpha: 0.5)
               ..strokeWidth = 1.5
               ..style = PaintingStyle.stroke
               ..strokeCap = StrokeCap.round;
@@ -184,7 +184,7 @@ class _LineChartPainter extends CustomPainter {
 
     // Draw Y-axis labels
     final textStyle = TextStyle(
-      color: theme.colorScheme.onSurface.withOpacity(0.6),
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
       fontSize: 10,
     );
 

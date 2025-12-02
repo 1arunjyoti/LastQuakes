@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lastquake/presentation/providers/earthquake_provider.dart';
 import 'package:lastquake/screens/earthquake_list.dart';
 import 'package:lastquake/screens/earthquake_map_screen.dart';
+import 'package:provider/provider.dart';
 
 class NavigationHandler extends StatefulWidget {
   const NavigationHandler({super.key});
@@ -28,6 +30,18 @@ class _NavigationHandlerState extends State<NavigationHandler> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Trigger data loading when home screen is displayed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<EarthquakeProvider>(
+        context,
+        listen: false,
+      ).ensureDataLoaded();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Calculate responsive height, e.g., 8% of screen height, clamped between 60 and 80
     final screenHeight = MediaQuery.of(context).size.height;
@@ -38,7 +52,7 @@ class _NavigationHandlerState extends State<NavigationHandler> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _onBottomNavTap,
-        height: responsiveNavBarHeight, 
+        height: responsiveNavBarHeight,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.explore_outlined),

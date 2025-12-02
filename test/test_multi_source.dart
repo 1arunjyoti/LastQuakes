@@ -1,7 +1,8 @@
 // Simple test file to verify multi-source functionality
 // This is not a unit test, just a verification script
 
-import 'package:flutter/foundation.dart';
+// ignore_for_file: avoid_print
+
 import 'package:flutter/widgets.dart';
 import 'package:lastquake/services/multi_source_api_service.dart';
 import 'package:lastquake/utils/enums.dart';
@@ -16,9 +17,8 @@ void main() async {
   print('\n--- Test 1: USGS Only ---');
   await service.setSelectedSources({DataSource.usgs});
   var sources = service.getSelectedSources();
-  if (kDebugMode) {
-    print('Selected sources: ${sources.map((s) => s.name).join(', ')}');
-  }
+  print('Selected sources: ${sources.map((s) => s.name).join(', ')}');
+  
 
   try {
     var earthquakes = await service.fetchEarthquakes(

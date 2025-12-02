@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lastquake/models/earthquake.dart';
 import 'package:lastquake/presentation/providers/earthquake_provider.dart';
 import 'package:lastquake/services/earthquake_statistics.dart';
 import 'package:lastquake/widgets/appbar.dart';
@@ -6,8 +7,17 @@ import 'package:lastquake/widgets/statistics/simple_line_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-class StatisticsScreen extends StatelessWidget {
+class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
+
+  @override
+  State<StatisticsScreen> createState() => _StatisticsScreenState();
+}
+
+class _StatisticsScreenState extends State<StatisticsScreen> {
+  // Cache statistics to avoid recalculating on every rebuild
+  EarthquakeStats? _cachedStats;
+  List<Earthquake>? _lastDataSnapshot;
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +51,15 @@ class StatisticsScreen extends StatelessWidget {
             );
           }
 
-          // Calculate statistics
-          final stats = EarthquakeStatistics.calculate(
-            provider.listEarthquakes,
-          );
+          // Only recalculate if data changed
+          if (_lastDataSnapshot != provider.listEarthquakes) {
+            _cachedStats = EarthquakeStatistics.calculate(
+              provider.listEarthquakes,
+            );
+            _lastDataSnapshot = provider.listEarthquakes;
+          }
+
+          final stats = _cachedStats!;
 
           return RefreshIndicator(
             onRefresh: () => provider.loadData(forceRefresh: true),
@@ -542,7 +557,7 @@ class StatisticsScreen extends StatelessWidget {
               data: stats.dailyTrend,
               showMovingAverage: true,
               lineColor: Theme.of(context).colorScheme.primary,
-              fillColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              fillColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
             ),
             const SizedBox(height: 12),
             Center(
@@ -616,8 +631,8 @@ class StatisticsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: (isIncrease ? Colors.orange : Colors.green).withOpacity(
-                  0.1,
+                color: (isIncrease ? Colors.orange : Colors.green).withValues(
+                  alpha: 0.1,
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -662,9 +677,9 @@ class StatisticsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [

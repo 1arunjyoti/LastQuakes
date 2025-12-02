@@ -379,7 +379,15 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
         children: [
           ElevatedButton.icon(
             icon: const Icon(Icons.public),
-            label: const Text("View on USGS"),
+            label: Text(
+              (() {
+              final url = widget.earthquake.url ?? '';
+              final host = Uri.tryParse(url)?.host ?? '';
+              if (host.contains('emsc')) return 'View on EMSC';
+              if (host.contains('usgs')) return 'View on USGS';
+              return 'View on Web';
+              })(),
+            ),
             style: ElevatedButton.styleFrom(elevation: 1),
             onPressed:
                 hasValidUsgsUrl

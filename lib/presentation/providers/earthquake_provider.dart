@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:lastquake/domain/usecases/get_earthquakes_usecase.dart';
 import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquake/services/earthquake_cache_service.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
@@ -210,6 +211,7 @@ class EarthquakeProvider extends ChangeNotifier {
   Position? _userPosition;
   bool _isLoadingLocation = false;
   final Map<String, double> _distanceCache = {};
+  static const int _maxCacheSize = 500; // Prevent unbounded memory growth
 
   // --- Map View State ---
   List<Earthquake> _mapFilteredEarthquakes = [];
@@ -270,7 +272,15 @@ class EarthquakeProvider extends ChangeNotifier {
 
   Future<void> init() async {
     await _loadPreferences();
-    await loadData();
+    // DON'T load data here - let screens trigger it when needed
+    // This significantly improves app startup time
+  }
+
+  /// Ensure data is loaded - call this from screens
+  Future<void> ensureDataLoaded() async {
+    if (_allEarthquakes.isEmpty && !_isLoading) {
+      await loadData();
+    }
   }
 
   Future<void> _loadPreferences() async {
@@ -302,11 +312,34 @@ class EarthquakeProvider extends ChangeNotifier {
     _error = null;
 
     try {
+      // Try to load from cache first for instant display
+      if (!forceRefresh && _allEarthquakes.isEmpty) {
+        final cachedData = await EarthquakeCacheService.getCachedData();
+        if (cachedData != null && cachedData.isNotEmpty) {
+          _allEarthquakes = cachedData;
+          await Future.wait([_applyListFilters(), _applyMapFilters()]);
+          _distanceCache.clear();
+          if (_userPosition != null) {
+            await _preCalculateDistances();
+          }
+          _isLoading = false;
+          notifyListeners();
+
+          // Fetch fresh data in background
+          _fetchFreshDataInBackground();
+          return;
+        }
+      }
+
+      // Fetch from network
       _allEarthquakes = await getEarthquakesUseCase(
         minMagnitude: 3.0,
         days: 45,
         forceRefresh: forceRefresh,
       ).timeout(const Duration(seconds: 30));
+
+      // Cache the data for next time
+      EarthquakeCacheService.cacheData(_allEarthquakes);
 
       // Apply filters for both views
       await Future.wait([_applyListFilters(), _applyMapFilters()]);
@@ -320,6 +353,30 @@ class EarthquakeProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Fetch fresh data in background after loading from cache
+  Future<void> _fetchFreshDataInBackground() async {
+    try {
+      final freshData = await getEarthquakesUseCase(
+        minMagnitude: 3.0,
+        days: 45,
+        forceRefresh: true,
+      ).timeout(const Duration(seconds: 30));
+
+      // Update cache and data
+      _allEarthquakes = freshData;
+      EarthquakeCacheService.cacheData(_allEarthquakes);
+
+      await Future.wait([_applyListFilters(), _applyMapFilters()]);
+      _distanceCache.clear();
+      if (_userPosition != null) {
+        await _preCalculateDistances();
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Background refresh failed: $e');
     }
   }
 
@@ -416,6 +473,15 @@ class EarthquakeProvider extends ChangeNotifier {
       );
 
       _distanceCache[quake.id] = computedDistance;
+
+      // Implement cache size limit to prevent memory bloat
+      if (_distanceCache.length > _maxCacheSize) {
+        // Remove oldest entries (FIFO)
+        final keysToRemove = _distanceCache.keys.take(100).toList();
+        for (final key in keysToRemove) {
+          _distanceCache.remove(key);
+        }
+      }
     }
   }
 

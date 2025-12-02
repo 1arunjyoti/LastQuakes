@@ -36,6 +36,10 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   static final Map<String, Marker> _markerCache = {};
   static final Map<double, Color> _markerColorCache = {};
 
+  // Performance: Track last processed earthquakes to avoid unnecessary updates
+  List<Earthquake>? _lastProcessedEarthquakes;
+  bool _isUpdatingMarkers = false;
+
   // Performance
   Timer? _memoryCleanupTimer;
   bool _isDisposed = false;
@@ -251,13 +255,14 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   }
 
   Widget _buildMap(EarthquakeProvider provider) {
-    // We need to update markers when provider.filteredEarthquakes changes.
-    // We can use a Selector to isolate this update.
+    // Use Selector to only rebuild when mapEarthquakes changes
     return Selector<EarthquakeProvider, List<Earthquake>>(
       selector: (_, p) => p.mapEarthquakes,
+      // Use shouldRebuild to check if we actually need to update
+      shouldRebuild: (previous, next) => !identical(previous, next),
       builder: (context, earthquakes, child) {
-        // Trigger marker update
-        _updateMarkersOptimized(earthquakes);
+        // Schedule marker update after build completes (not during build)
+        _scheduleMarkerUpdate(earthquakes);
 
         return FlutterMap(
           mapController: _mapController,
@@ -350,47 +355,88 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
     );
   }
 
-  Future<void> _updateMarkersOptimized(List<Earthquake> earthquakes) async {
-    if (!mounted || _isDisposed) return;
+  /// Schedule marker update to run after build completes
+  /// This avoids calling setState during build
+  void _scheduleMarkerUpdate(List<Earthquake> earthquakes) {
+    // Skip if already processing or if data hasn't changed
+    if (_isUpdatingMarkers) return;
+    if (identical(_lastProcessedEarthquakes, earthquakes)) return;
 
-    final List<Marker> newMarkers = [];
-    if (earthquakes.isEmpty) {
-      if (mounted && _currentMarkers.isNotEmpty) {
-        setState(() => _currentMarkers = []);
-      }
+    // Check if content actually changed (quick check using length + first/last ids)
+    if (_lastProcessedEarthquakes != null &&
+        _lastProcessedEarthquakes!.length == earthquakes.length &&
+        earthquakes.isNotEmpty &&
+        _lastProcessedEarthquakes!.isNotEmpty &&
+        _lastProcessedEarthquakes!.first.id == earthquakes.first.id &&
+        _lastProcessedEarthquakes!.last.id == earthquakes.last.id) {
       return;
     }
 
-    final earthquakesToProcess =
-        earthquakes.length > _maxMarkersToRender
-            ? earthquakes.take(_maxMarkersToRender).toList()
-            : earthquakes;
+    // Schedule update after current frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_isDisposed) {
+        _updateMarkersOptimized(earthquakes);
+      }
+    });
+  }
 
-    for (int i = 0; i < earthquakesToProcess.length; i += _markerBatchSize) {
-      if (!mounted || _isDisposed) return;
+  /// Update markers with optimization - only creates new markers when needed
+  Future<void> _updateMarkersOptimized(List<Earthquake> earthquakes) async {
+    if (!mounted || _isDisposed || _isUpdatingMarkers) return;
 
-      final end = math.min(i + _markerBatchSize, earthquakesToProcess.length);
-      final batch = earthquakesToProcess.sublist(i, end);
+    _isUpdatingMarkers = true;
+    _lastProcessedEarthquakes = earthquakes;
 
-      for (final quake in batch) {
-        final marker = await _createMarkerOptimized(quake);
-        if (marker != null) newMarkers.add(marker);
+    try {
+      if (earthquakes.isEmpty) {
+        if (_currentMarkers.isNotEmpty) {
+          setState(() => _currentMarkers = []);
+        }
+        return;
       }
 
-      if (i + _markerBatchSize < earthquakesToProcess.length) {
-        await Future.delayed(const Duration(microseconds: 1));
-      }
-    }
+      final earthquakesToProcess =
+          earthquakes.length > _maxMarkersToRender
+              ? earthquakes.take(_maxMarkersToRender).toList()
+              : earthquakes;
 
-    if (mounted && !_isDisposed) {
-      setState(() => _currentMarkers = newMarkers);
+      // Build markers using cache where possible
+      final List<Marker> newMarkers = [];
+      
+      for (int i = 0; i < earthquakesToProcess.length; i += _markerBatchSize) {
+        if (!mounted || _isDisposed) return;
+
+        final end = math.min(i + _markerBatchSize, earthquakesToProcess.length);
+        final batch = earthquakesToProcess.sublist(i, end);
+
+        for (final quake in batch) {
+          final marker = _getOrCreateMarker(quake);
+          if (marker != null) newMarkers.add(marker);
+        }
+
+        // Yield to UI thread periodically for large datasets
+        if (i + _markerBatchSize < earthquakesToProcess.length) {
+          await Future.delayed(Duration.zero);
+        }
+      }
+
+      if (mounted && !_isDisposed) {
+        setState(() => _currentMarkers = newMarkers);
+      }
+    } finally {
+      _isUpdatingMarkers = false;
     }
   }
 
-  Future<Marker?> _createMarkerOptimized(Earthquake quake) async {
+  /// Get marker from cache or create new one (synchronous for better performance)
+  Marker? _getOrCreateMarker(Earthquake quake) {
     try {
       final String id = quake.id;
-      if (_markerCache.containsKey(id)) return _markerCache[id];
+      
+      // Return cached marker if available
+      if (_markerCache.containsKey(id)) {
+        return _markerCache[id];
+      }
 
       final double markerSize = (2 + (quake.magnitude * 4.0)).clamp(4.0, 30.0);
       final Color markerColor = _getMarkerColorOptimized(quake.magnitude);
@@ -400,7 +446,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         width: markerSize,
         height: markerSize,
         child: GestureDetector(
-          onTap: () => _showEarthquakeDetails(quake),
+          onTap: () => _showEarthquakePopup(quake),
           child: Tooltip(
             message: 'M ${quake.magnitude.toStringAsFixed(1)}\n${quake.place}',
             preferBelow: false,
@@ -454,6 +500,210 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         page: EarthquakeDetailsScreen(earthquake: quake),
       ),
     );
+  }
+
+  void _showEarthquakePopup(Earthquake quake) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                // Header with magnitude and close button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Magnitude badge
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _getMarkerColorOptimized(quake.magnitude),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'M ${quake.magnitude.toStringAsFixed(1)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Location
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        quake.place,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Time
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _formatDateTime(quake.time),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Coordinates
+                Row(
+                  children: [
+                    Icon(
+                      Icons.map,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${quake.latitude.toStringAsFixed(2)}°, ${quake.longitude.toStringAsFixed(2)}°',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Depth if available
+                if (quake.depth != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.arrow_downward,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Depth: ${quake.depth!.toStringAsFixed(1)} km',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Source
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.source,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Source: ${quake.source}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // View More button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showEarthquakeDetails(quake);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primary,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    child: const Text(
+                      'View More Details',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+    } else {
+      return '${dateTime.month}/${dateTime.day}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    }
   }
 
   void _showFilterBottomSheet() {

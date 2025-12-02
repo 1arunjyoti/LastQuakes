@@ -3,6 +3,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:lastquake/models/earthquake_adapter.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/home_screen.dart';
 import 'package:lastquake/screens/onboarding_screen.dart';
@@ -38,34 +40,76 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
-  // Initialize Firebase first
-  await Firebase.initializeApp();
-
-  // Set up background message handler right after Firebase init
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Set preferred orientations
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+  // Parallelize independent Phase 1 initializations
+  final phase1Results = await Future.wait<dynamic>([
+    dotenv.load(fileName: ".env"),
+    Hive.initFlutter(),
+    Firebase.initializeApp(),
+    SharedPreferences.getInstance(),
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
   ]);
 
-  // Preload SharedPreferences for synchronous access (e.g., for ThemeProvider)
-  final prefs = await SharedPreferences.getInstance();
+  // Extract results from parallel operations
+  final prefs = phase1Results[3] as SharedPreferences;
 
-  // Initialize secure storage service for personal data encryption
-  await SecureStorageService.initialize();
+  // Register Hive adapters (must happen after Hive init)
+  Hive.registerAdapter(EarthquakeAdapter());
+  SecureLogger.success("Hive initialized with Earthquake adapter");
+
+  // Set up Firebase background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Parallelize Phase 2: Secure storage and local notifications initialization
+  await Future.wait([
+    SecureStorageService.initialize(),
+    NotificationService.instance.initNotifications(),
+  ]);
   SecureLogger.success("Secure storage service initialized");
 
-  // Migrate existing tokens from SharedPreferences to secure storage
+  // Migrate tokens (depends on secure storage being initialized)
   await TokenMigrationService.migrateTokenIfNeeded();
 
-  // Initialize local notifications
-  await NotificationService.instance.initNotifications();
+  // Start background initializations (non-blocking)
+  _runBackgroundInitializations();
 
+  final bool seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
+
+  // Initialize MultiSourceApiService
+  final apiService = await MultiSourceApiService.create();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => ThemeProvider(prefs: prefs)..loadPreferences(),
+        ),
+        ChangeNotifierProvider(
+          create:
+              (context) => EarthquakeProvider(
+                getEarthquakesUseCase: GetEarthquakesUseCase(
+                  EarthquakeRepositoryImpl(apiService),
+                ),
+              )..init(), // Only loads preferences, not data
+        ),
+        ChangeNotifierProvider(
+          create:
+              (context) => SettingsProvider(
+                settingsRepository: SettingsRepositoryImpl(apiService),
+                deviceRepository: DeviceRepositoryImpl(),
+              )..loadSettings(),
+        ),
+        ChangeNotifierProvider(create: (_) => MapPickerProvider()),
+      ],
+      child: MyApp(seenOnboarding: seenOnboarding),
+    ),
+  );
+}
+
+/// Run background initializations that don't block app startup
+Future<void> _runBackgroundInitializations() async {
   // Store initial FCM token securely
   String? fcmToken = await FirebaseMessaging.instance.getToken();
   if (fcmToken != null) {
@@ -113,39 +157,6 @@ void main() async {
       SecureLogger.error("Error handling token refresh", e);
     }
   });
-  // End of Firebase Messaging setup
-
-  final bool seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
-
-  // Initialize MultiSourceApiService
-  final apiService = await MultiSourceApiService.create();
-
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (context) => ThemeProvider(prefs: prefs)..loadPreferences(),
-        ),
-        ChangeNotifierProvider(
-          create:
-              (context) => EarthquakeProvider(
-                getEarthquakesUseCase: GetEarthquakesUseCase(
-                  EarthquakeRepositoryImpl(apiService),
-                ),
-              )..init(),
-        ),
-        ChangeNotifierProvider(
-          create:
-              (context) => SettingsProvider(
-                settingsRepository: SettingsRepositoryImpl(apiService),
-                deviceRepository: DeviceRepositoryImpl(),
-              )..loadSettings(),
-        ),
-        ChangeNotifierProvider(create: (_) => MapPickerProvider()),
-      ],
-      child: MyApp(seenOnboarding: seenOnboarding),
-    ),
-  );
 }
 
 class MyApp extends StatelessWidget {

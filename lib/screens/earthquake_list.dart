@@ -155,6 +155,10 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                               () => provider.loadData(forceRefresh: true),
                           child: ListView.builder(
                             controller: _scrollController,
+                            // Performance optimizations
+                            cacheExtent: 500, // Pre-render items outside viewport
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
                             itemCount:
                                 provider.listVisibleEarthquakes.length +
                                 (provider.listIsLoadingMore ? 1 : 0),
@@ -314,89 +318,151 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   }
 
   void _showCountryPickerBottomSheet(EarthquakeProvider provider) {
+    final countryList = provider.countryList;
+    final List<String> initialCountries = [
+      ...countryList.where((c) => c != 'All'),
+    ]..sort();
+    List<String> filtered = ['All', ...initialCountries];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        // ... (Keep existing bottom sheet logic but call provider.setCountryFilter)
-        // For brevity re-implementing simplified version or reusing existing logic adapted
-        final countryList = provider.countryList;
-        final List<String> initialCountries = [
-          ...countryList.where((c) => c != 'All'),
-        ]..sort();
-        List<String> filtered = ['All', ...initialCountries];
-
+        final theme = Theme.of(context);
         return StatefulBuilder(
           builder: (context, setModalState) {
             return DraggableScrollableSheet(
-              initialChildSize: 0.9,
-              minChildSize: 0.5,
+              initialChildSize: 0.8,
+              minChildSize: 0.45,
               maxChildSize: 0.95,
               expand: false,
               builder: (context, scrollController) {
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          labelText: "Search Country",
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
+                return Container(
+                  clipBehavior: Clip.hardEdge,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 18,
+                        offset: const Offset(0, -10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 48,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.dividerColor,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        onChanged: (query) {
-                          final q = query.trim().toLowerCase();
-                          setModalState(() {
-                            if (q.isEmpty) {
-                              final rest =
-                                  countryList.where((c) => c != 'All').toList()
-                                    ..sort();
-                              filtered = ['All', ...rest];
-                            } else {
-                              final rest =
-                                  countryList
-                                      .where(
-                                        (c) =>
-                                            c != 'All' &&
-                                            c.toLowerCase().contains(q),
-                                      )
-                                      .toList()
-                                    ..sort();
-                              filtered = ['All', ...rest];
-                            }
-                          });
-                        },
                       ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final country = filtered[index];
-                          final isSelected =
-                              country == provider.listSelectedCountry;
-                          return ListTile(
-                            title: Text(country),
-                            trailing:
-                                isSelected
-                                    ? const Icon(
-                                      Icons.check,
-                                      color: Colors.blue,
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: 16,
+                          left: 20,
+                          right: 20,
+                          bottom: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.public, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "Choose Region",
+                                style: theme.textTheme.titleMedium,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                provider.setListCountryFilter('All');
+                                _scrollToTop();
+                                Navigator.pop(context);
+                              },
+                              child: const Text("Reset"),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: "Search region",
+                            hintText: "Search country or area",
+                            prefixIcon: const Icon(Icons.search),
+                            filled: true,
+                            fillColor: theme.colorScheme.primary.withValues(alpha: 0.06),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          onChanged: (query) {
+                            final q = query.trim().toLowerCase();
+                            setModalState(() {
+                              if (q.isEmpty) {
+                                final rest = countryList
+                                    .where((c) => c != 'All')
+                                    .toList()
+                                      ..sort();
+                                filtered = ['All', ...rest];
+                              } else {
+                                final rest = countryList
+                                    .where(
+                                      (c) =>
+                                          c != 'All' &&
+                                          c.toLowerCase().contains(q),
                                     )
-                                    : null,
-                            onTap: () {
-                              provider.setListCountryFilter(country);
-                              Navigator.pop(context);
-                              _scrollToTop();
-                            },
-                          );
-                        },
+                                    .toList()
+                                      ..sort();
+                                filtered = ['All', ...rest];
+                              }
+                            });
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: ListView.separated(
+                          controller: scrollController,
+                          padding: const EdgeInsets.only(
+                            top: 4,
+                            bottom: 8,
+                          ),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const Divider(height: 0),
+                          itemBuilder: (context, index) {
+                            final country = filtered[index];
+                            final isSelected =
+                                country == provider.listSelectedCountry;
+                            return ListTile(
+                              title: Text(country),
+                              trailing: isSelected
+                                  ? Icon(Icons.check,
+                                      color: theme.colorScheme.primary)
+                                  : null,
+                              onTap: () {
+                                provider.setListCountryFilter(country);
+                                Navigator.pop(context);
+                                _scrollToTop();
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               },
             );
@@ -410,28 +476,91 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     final List<double> magnitudeOptions = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
     showModalBottomSheet(
       context: context,
-      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return ListView.builder(
-          shrinkWrap: true,
-          itemCount: magnitudeOptions.length,
-          itemBuilder: (context, index) {
-            final mag = magnitudeOptions[index];
-            final isSelected = mag == provider.listSelectedMagnitude;
-            return ListTile(
-              leading: const Icon(Icons.speed),
-              title: Text("Magnitude ≥ ${mag.toStringAsFixed(1)}"),
-              trailing:
-                  isSelected
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-              onTap: () {
-                provider.setListMagnitudeFilter(mag);
-                Navigator.pop(context);
-                _scrollToTop();
-              },
-            );
-          },
+        final theme = Theme.of(context);
+        return Container(
+          padding: const EdgeInsets.only(
+            top: 18,
+            left: 20,
+            right: 20,
+            bottom: 24,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 20,
+                offset: const Offset(0, -8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.speed, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "Minimum Magnitude",
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      provider.setListMagnitudeFilter(3.0);
+                      Navigator.pop(context);
+                      _scrollToTop();
+                    },
+                    child: const Text("Reset"),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                fit: FlexFit.loose,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: magnitudeOptions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 0),
+                  itemBuilder: (context, index) {
+                    final mag = magnitudeOptions[index];
+                    final isSelected = mag == provider.listSelectedMagnitude;
+                    return ListTile(
+                      leading: const Icon(Icons.show_chart),
+                      title: Text("Magnitude ≥ ${mag.toStringAsFixed(1)}"),
+                      trailing: isSelected
+                          ? Icon(Icons.check,
+                              color: theme.colorScheme.primary)
+                          : null,
+                      onTap: () {
+                        provider.setListMagnitudeFilter(mag);
+                        Navigator.pop(context);
+                        _scrollToTop();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
