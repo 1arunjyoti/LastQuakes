@@ -1,15 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
-import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:lastquake/models/earthquake.dart';
 import 'package:lastquake/services/secure_http_client.dart';
+import 'package:lastquake/services/sources/earthquake_data_source.dart';
+import 'package:lastquake/services/sources/emsc_data_source.dart';
+import 'package:lastquake/services/sources/usgs_data_source.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/utils/secure_logger.dart';
-import 'package:meta/meta.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Optimized multi-source API service with performance and memory optimizations
 class MultiSourceApiService {
@@ -18,53 +20,49 @@ class MultiSourceApiService {
   static const String _selectedSourcesKey = 'selected_data_sources';
 
   // Performance constants
+  // Performance and Configuration constants
   static const int _maxCacheSize = 50 * 1024 * 1024; // 50MB max cache size
   static const int _cacheValidityHours = 1;
-  static const int _maxEarthquakesPerSource = 10000; // Prevent memory issues
-  static const double _duplicateDistanceThreshold = 50.0; // km
-  static const int _duplicateTimeThreshold = 600000; // 10 minutes in ms
-  static const int _chunkSize = 1000; // Process data in chunks
+  static const int _staleCacheValidityHours =
+      24; // Allow up to 24h old data if network fails
+
+  final SharedPreferences _prefs;
+  final Directory _cacheDir;
+  final Map<DataSource, EarthquakeDataSource> _sources;
 
   // Cache for expensive operations
-  static final Map<String, Set<DataSource>> _sourceCache = {};
-  static SharedPreferences? _prefsCache;
-  static final Map<String, List<Earthquake>> _memoryCache = {};
+  final Map<String, List<Earthquake>> _memoryCache = {};
 
-  /// Get cached SharedPreferences instance
-  static Future<SharedPreferences> Function()? _prefsProvider;
-  static Future<Directory> Function()? _directoryProvider;
-  static SecureHttpClient? _httpClientOverride;
+  MultiSourceApiService({
+    required SharedPreferences prefs,
+    required SecureHttpClient client,
+    required Directory cacheDir,
+    Map<DataSource, EarthquakeDataSource>? sources,
+  }) : _prefs = prefs,
+       _cacheDir = cacheDir,
+       _sources =
+           sources ??
+           {
+             DataSource.usgs: UsgsDataSource(client, prefs),
+             DataSource.emsc: EmscDataSource(client, prefs),
+           };
 
-  static Future<SharedPreferences> _getPrefs() async {
-    if (_prefsProvider != null) {
-      return _prefsCache ??= await _prefsProvider!.call();
-    }
-    return _prefsCache ??= await SharedPreferences.getInstance();
+  /// Factory to create instance with default dependencies
+  static Future<MultiSourceApiService> create() async {
+    final prefs = await SharedPreferences.getInstance();
+    final client = SecureHttpClient.instance;
+    final cacheDir = await getApplicationDocumentsDirectory();
+    return MultiSourceApiService(
+      prefs: prefs,
+      client: client,
+      cacheDir: cacheDir,
+    );
   }
 
-  static Future<List<Earthquake>> _fetchSource(
-    DataSource source, {
-    required double minMagnitude,
-    required int days,
-  }) {
-    switch (source) {
-      case DataSource.usgs:
-        return _fetchFromUsgs(minMagnitude: minMagnitude, days: days);
-      case DataSource.emsc:
-        return _fetchFromEmsc(minMagnitude: minMagnitude, days: days);
-    }
-  }
-
-  /// Get selected data sources from preferences with caching
-  static Future<Set<DataSource>> getSelectedSources() async {
-    const cacheKey = 'selected_sources';
-    if (_sourceCache.containsKey(cacheKey)) {
-      return _sourceCache[cacheKey]!;
-    }
-
+  /// Get selected data sources from preferences
+  Set<DataSource> getSelectedSources() {
     try {
-      final prefs = await _getPrefs();
-      final sourceNames = prefs.getStringList(_selectedSourcesKey) ?? ['usgs'];
+      final sourceNames = _prefs.getStringList(_selectedSourcesKey) ?? ['usgs'];
 
       final sources =
           sourceNames
@@ -78,8 +76,6 @@ class MultiSourceApiService {
               .toSet();
 
       if (sources.isEmpty) sources.add(DataSource.usgs);
-
-      _sourceCache[cacheKey] = sources;
       return sources;
     } catch (e) {
       SecureLogger.error("Error loading selected sources", e);
@@ -88,16 +84,13 @@ class MultiSourceApiService {
   }
 
   /// Save selected data sources to preferences
-  static Future<void> setSelectedSources(Set<DataSource> sources) async {
+  Future<void> setSelectedSources(Set<DataSource> sources) async {
     try {
-      final prefs = await _getPrefs();
       final sourcesToSave = sources.isEmpty ? {DataSource.usgs} : sources;
-      await prefs.setStringList(
+      await _prefs.setStringList(
         _selectedSourcesKey,
         sourcesToSave.map((e) => e.name).toList(),
       );
-
-      _sourceCache.clear();
       _memoryCache.clear(); // Clear memory cache when sources change
     } catch (e) {
       SecureLogger.error("Error saving selected sources", e);
@@ -106,14 +99,14 @@ class MultiSourceApiService {
   }
 
   /// Get all available data sources
-  static Set<DataSource> getAvailableSources() {
+  Set<DataSource> getAvailableSources() {
     return DataSource.values.toSet();
   }
 
   /// Check if multiple sources are selected
-  static Future<bool> hasMultipleSources() async {
+  bool hasMultipleSources() {
     try {
-      final sources = await getSelectedSources();
+      final sources = getSelectedSources();
       return sources.length > 1;
     } catch (e) {
       SecureLogger.error("Error checking multiple sources", e);
@@ -122,14 +115,11 @@ class MultiSourceApiService {
   }
 
   /// Get cache file path for specific sources
-  static Future<File> _getCacheFile(Set<DataSource> sources) async {
+  File _getCacheFile(Set<DataSource> sources) {
     try {
-      final directory =
-          await (_directoryProvider?.call() ??
-              getApplicationDocumentsDirectory());
       final sourceKey = sources.map((s) => s.name).toList()..sort();
       final filename = 'multi_source_cache_${sourceKey.join('_')}.json';
-      return File('${directory.path}/$filename');
+      return File('${_cacheDir.path}/$filename');
     } catch (e) {
       SecureLogger.error("Error getting cache file path", e);
       rethrow;
@@ -137,20 +127,27 @@ class MultiSourceApiService {
   }
 
   /// Get cache timestamp key for specific sources
-  static String _getCacheTimestampKey(Set<DataSource> sources) {
+  String _getCacheTimestampKey(Set<DataSource> sources) {
     final sourceKey = sources.map((s) => s.name).toList()..sort();
     return 'multi_source_cache_timestamp_${sourceKey.join('_')}';
   }
 
   /// Check if cache is valid and within size limits
-  static Future<bool> _isCacheValid(File cacheFile, int timestamp) async {
+  Future<bool> _isCacheValid(
+    File cacheFile,
+    int timestamp, {
+    bool allowStale = false,
+  }) async {
     try {
       if (!await cacheFile.exists()) return false;
 
       final currentTime = DateTime.now().millisecondsSinceEpoch;
       final cacheAge = currentTime - timestamp;
+      final validityWindow =
+          (allowStale ? _staleCacheValidityHours : _cacheValidityHours) *
+          3600000;
 
-      if (cacheAge > _cacheValidityHours * 3600000) return false;
+      if (cacheAge > validityWindow) return false;
 
       final fileSize = await cacheFile.length();
       if (fileSize > _maxCacheSize) {
@@ -165,308 +162,15 @@ class MultiSourceApiService {
     }
   }
 
-  /// Fetch earthquakes from USGS with optimizations
-  static Future<List<Earthquake>> _fetchFromUsgs({
-    double minMagnitude = 3.0,
-    int days = 45,
-  }) async {
-    try {
-      final DateTime now = DateTime.now();
-      final DateTime startDate = now.subtract(Duration(days: days));
-
-      final Uri url =
-          Uri.https("earthquake.usgs.gov", "/fdsnws/event/1/query", {
-            "format": "geojson",
-            "orderby": "time",
-            "starttime": startDate.toIso8601String(),
-            "endtime": now.toIso8601String(),
-            "minmagnitude": minMagnitude.toString(),
-            "limit": _maxEarthquakesPerSource.toString(),
-          });
-
-      final response = await (_httpClientOverride ?? SecureHttpClient.instance)
-          .get(url, timeout: const Duration(seconds: 30));
-
-      SecureLogger.api(
-        "earthquake.usgs.gov/fdsnws/event/1/query",
-        statusCode: response.statusCode,
-        method: "GET",
-      );
-
-      if (response.statusCode == 200) {
-        return await _parseUsgsResponse(response.body, minMagnitude);
-      } else if (response.statusCode == 204) {
-        return [];
-      } else {
-        throw HttpException("USGS API Error: ${response.statusCode}");
-      }
-    } catch (e) {
-      SecureLogger.error("Error fetching USGS data", e);
-      rethrow;
-    }
-  }
-
-  /// Parse USGS response efficiently
-  static Future<List<Earthquake>> _parseUsgsResponse(
-    String responseBody,
-    double minMagnitude,
-  ) async {
-    try {
-      final data = json.decode(responseBody);
-      if (data["features"] == null) return [];
-
-      final features = data["features"] as List;
-      if (features.isEmpty) return [];
-
-      final List<Earthquake> allEarthquakes = [];
-
-      for (int i = 0; i < features.length; i += _chunkSize) {
-        final end =
-            (i + _chunkSize < features.length)
-                ? i + _chunkSize
-                : features.length;
-        final chunk = features.sublist(i, end);
-
-        final earthquakes =
-            chunk
-                .whereType<Map<String, dynamic>>()
-                .map((quake) {
-                  try {
-                    final earthquake = Earthquake.fromUsgs(quake);
-                    return earthquake.magnitude >= minMagnitude
-                        ? earthquake
-                        : null;
-                  } catch (e) {
-                    if (allEarthquakes.length < 5) {
-                      SecureLogger.error(
-                        "Error parsing USGS earthquake data",
-                        e,
-                      );
-                    }
-                    return null;
-                  }
-                })
-                .whereType<Earthquake>()
-                .toList();
-
-        allEarthquakes.addAll(earthquakes);
-      }
-
-      return allEarthquakes;
-    } catch (e) {
-      SecureLogger.error("Error parsing USGS response", e);
-      return [];
-    }
-  }
-
-  /// Fetch earthquakes from EMSC with optimizations
-  static Future<List<Earthquake>> _fetchFromEmsc({
-    double minMagnitude = 3.0,
-    int days = 45,
-  }) async {
-    try {
-      final DateTime now = DateTime.now();
-      final DateTime startDate = now.subtract(Duration(days: days));
-
-      final Uri url =
-          Uri.https("www.seismicportal.eu", "/fdsnws/event/1/query", {
-            "format": "json",
-            "orderby": "time-desc",
-            "starttime": startDate.toIso8601String().split('T')[0],
-            "endtime": now.toIso8601String().split('T')[0],
-            "minmagnitude": minMagnitude.toString(),
-            "limit": _maxEarthquakesPerSource.toString(),
-          });
-
-      final response = await SecureHttpClient.instance.get(
-        url,
-        timeout: const Duration(seconds: 30),
-      );
-
-      SecureLogger.api(
-        "www.seismicportal.eu/fdsnws/event/1/query",
-        statusCode: response.statusCode,
-        method: "GET",
-      );
-
-      if (response.statusCode == 200) {
-        return await _parseEmscResponse(response.body, minMagnitude);
-      } else if (response.statusCode == 204) {
-        return [];
-      } else {
-        throw HttpException("EMSC API Error: ${response.statusCode}");
-      }
-    } catch (e) {
-      SecureLogger.error("Error fetching EMSC data", e);
-      rethrow;
-    }
-  }
-
-  /// Parse EMSC response efficiently
-  static Future<List<Earthquake>> _parseEmscResponse(
-    String responseBody,
-    double minMagnitude,
-  ) async {
-    try {
-      final data = json.decode(responseBody);
-
-      if (data is! Map || data["features"] == null) {
-        SecureLogger.error(
-          "Unexpected EMSC response format",
-          "Keys: ${data is Map ? data.keys.toList() : 'Not a map'}",
-        );
-        return [];
-      }
-
-      final earthquakeList = data["features"] as List;
-      if (earthquakeList.isEmpty) return [];
-
-      final List<Earthquake> allEarthquakes = [];
-      int parseErrorCount = 0;
-
-      for (int i = 0; i < earthquakeList.length; i += _chunkSize) {
-        final end =
-            (i + _chunkSize < earthquakeList.length)
-                ? i + _chunkSize
-                : earthquakeList.length;
-        final chunk = earthquakeList.sublist(i, end);
-
-        final earthquakes =
-            chunk
-                .whereType<Map<String, dynamic>>()
-                .map((quake) {
-                  try {
-                    final earthquakeData =
-                        quake['properties'] as Map<String, dynamic>?;
-                    if (earthquakeData == null) return null;
-
-                    final earthquake = Earthquake.fromEmsc(earthquakeData);
-                    return earthquake.magnitude >= minMagnitude
-                        ? earthquake
-                        : null;
-                  } catch (e) {
-                    parseErrorCount++;
-                    if (parseErrorCount <= 5) {
-                      SecureLogger.error(
-                        "Error parsing EMSC earthquake data",
-                        e,
-                      );
-                    }
-                    return null;
-                  }
-                })
-                .whereType<Earthquake>()
-                .toList();
-
-        allEarthquakes.addAll(earthquakes);
-      }
-
-      if (parseErrorCount > 0) {
-        SecureLogger.info(
-          "EMSC parsing: ${allEarthquakes.length} earthquakes ($parseErrorCount errors)",
-        );
-      }
-
-      return allEarthquakes;
-    } catch (e) {
-      SecureLogger.error("Error parsing EMSC response", e);
-      return [];
-    }
-  }
-
-  /// Optimized duplicate removal using spatial indexing
-  static List<Earthquake> _removeDuplicatesOptimized(
-    List<Earthquake> earthquakes,
-  ) {
-    if (earthquakes.length <= 1) return earthquakes;
-
-    // Sort by time for better performance
-    earthquakes.sort((a, b) => b.time.compareTo(a.time));
-
-    final List<Earthquake> unique = [];
-
-    for (final earthquake in earthquakes) {
-      bool isDuplicate = false;
-
-      // Only check recent earthquakes for duplicates (optimization)
-      final recentUnique =
-          unique
-              .where(
-                (e) =>
-                    (earthquake.time.millisecondsSinceEpoch -
-                            e.time.millisecondsSinceEpoch)
-                        .abs() <
-                    _duplicateTimeThreshold * 2,
-              )
-              .toList();
-
-      for (final existing in recentUnique) {
-        final distance = _calculateDistanceFast(
-          earthquake.latitude,
-          earthquake.longitude,
-          existing.latitude,
-          existing.longitude,
-        );
-
-        final timeDiff =
-            (earthquake.time.millisecondsSinceEpoch -
-                    existing.time.millisecondsSinceEpoch)
-                .abs();
-
-        if (distance < _duplicateDistanceThreshold &&
-            timeDiff < _duplicateTimeThreshold) {
-          isDuplicate = true;
-
-          // Replace if current is better
-          if (earthquake.magnitude > existing.magnitude ||
-              (earthquake.magnitude == existing.magnitude &&
-                  earthquake.time.isAfter(existing.time)) ||
-              (earthquake.magnitude == existing.magnitude &&
-                  earthquake.time == existing.time &&
-                  earthquake.source == 'USGS' &&
-                  existing.source == 'EMSC')) {
-            final index = unique.indexOf(existing);
-            if (index >= 0) unique[index] = earthquake;
-          }
-          break;
-        }
-      }
-
-      if (!isDuplicate) {
-        unique.add(earthquake);
-      }
-    }
-
-    return unique;
-  }
-
-  /// Fast distance calculation using approximation for better performance
-  static double _calculateDistanceFast(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    // Use approximation for better performance in duplicate detection
-    const double earthRadius = 6371.0;
-    final double dLat = (lat2 - lat1) * (pi / 180);
-    final double dLon = (lon2 - lon1) * (pi / 180);
-
-    // Simplified calculation for performance
-    final double a =
-        dLat * dLat + cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * dLon * dLon;
-    return earthRadius * sqrt(a);
-  }
-
   /// Main fetch method with comprehensive optimizations
-  static Future<List<Earthquake>> fetchEarthquakes({
+  Future<List<Earthquake>> fetchEarthquakes({
     double minMagnitude = 3.0,
     int days = 45,
     bool forceRefresh = false,
     Set<DataSource>? sources,
   }) async {
     try {
-      final selectedSources = sources ?? await getSelectedSources();
+      final selectedSources = sources ?? getSelectedSources();
 
       if (selectedSources.isEmpty) {
         selectedSources.add(DataSource.usgs);
@@ -488,20 +192,21 @@ class MultiSourceApiService {
         }
       }
 
-      final prefs = await _getPrefs();
-      final cacheFile = await _getCacheFile(selectedSources);
+      final cacheFile = _getCacheFile(selectedSources);
       final cacheTimestampKey = _getCacheTimestampKey(selectedSources);
 
       // Check disk cache
       if (!forceRefresh) {
-        final cachedTimestamp = prefs.getInt(cacheTimestampKey);
+        final cachedTimestamp = _prefs.getInt(cacheTimestampKey);
         if (cachedTimestamp != null &&
             await _isCacheValid(cacheFile, cachedTimestamp)) {
           try {
             final String cachedData = await cacheFile.readAsString();
-            final List<dynamic> decoded = json.decode(cachedData);
-            final earthquakes =
-                decoded.map((e) => Earthquake.fromJson(e)).toList();
+            // Use compute for JSON parsing
+            final earthquakes = await compute(
+              _parseEarthquakesJson,
+              cachedData,
+            );
 
             // Store in memory cache
             _memoryCache[cacheKey] = earthquakes;
@@ -526,8 +231,14 @@ class MultiSourceApiService {
       final results = await Future.wait(
         sourcesList.map((source) async {
           try {
-            final data = await _fetchSource(
-              source,
+            final dataSource = _sources[source];
+            if (dataSource == null) {
+              throw Exception(
+                "Data source implementation not found for $source",
+              );
+            }
+
+            final data = await dataSource.fetchEarthquakes(
               minMagnitude: minMagnitude,
               days: days,
             );
@@ -558,7 +269,11 @@ class MultiSourceApiService {
       // Remove duplicates only if multiple sources
       if (sourcesList.length > 1 && allEarthquakes.isNotEmpty) {
         final beforeCount = allEarthquakes.length;
-        allEarthquakes = _removeDuplicatesOptimized(allEarthquakes);
+        // Use compute for duplicate removal
+        allEarthquakes = await compute(
+          _removeDuplicatesOptimized,
+          allEarthquakes,
+        );
         SecureLogger.info(
           "Removed ${beforeCount - allEarthquakes.length} duplicates",
         );
@@ -576,11 +291,13 @@ class MultiSourceApiService {
           _memoryCache[cacheKey] = allEarthquakes;
 
           // Disk cache
-          final encodedData = json.encode(
-            allEarthquakes.map((e) => e.toJson()).toList(),
+          // Use compute for JSON encoding
+          final encodedData = await compute(
+            _encodeEarthquakesJson,
+            allEarthquakes,
           );
           await cacheFile.writeAsString(encodedData);
-          await prefs.setInt(
+          await _prefs.setInt(
             cacheTimestampKey,
             DateTime.now().millisecondsSinceEpoch,
           );
@@ -592,6 +309,35 @@ class MultiSourceApiService {
       // Handle errors
       if (errors.isNotEmpty) {
         if (allEarthquakes.isEmpty) {
+          SecureLogger.warning(
+            "All sources failed, attempting to load stale cache",
+          );
+
+          // Attempt to load stale cache
+          final cachedTimestamp = _prefs.getInt(cacheTimestampKey);
+          if (cachedTimestamp != null &&
+              await _isCacheValid(
+                cacheFile,
+                cachedTimestamp,
+                allowStale: true,
+              )) {
+            try {
+              final String cachedData = await cacheFile.readAsString();
+              // Use compute for JSON parsing
+              final staleEarthquakes = await compute(
+                _parseEarthquakesJson,
+                cachedData,
+              );
+
+              SecureLogger.info(
+                "Returning ${staleEarthquakes.length} earthquakes from STALE disk cache",
+              );
+              return staleEarthquakes;
+            } catch (e) {
+              SecureLogger.error("Error reading stale cache", e);
+            }
+          }
+
           throw Exception("All sources failed: ${errors.join(', ')}");
         } else {
           SecureLogger.error(
@@ -609,36 +355,30 @@ class MultiSourceApiService {
   }
 
   /// Clear all caches
-  static Future<void> clearCache() async {
+  Future<void> clearCache() async {
     try {
       _memoryCache.clear();
-      _sourceCache.clear();
-
-      final prefs = await _getPrefs();
-      final directory =
-          await (_directoryProvider?.call() ??
-              getApplicationDocumentsDirectory());
 
       // Clear all cache timestamps
       final allKeys =
-          prefs
+          _prefs
               .getKeys()
               .where((key) => key.startsWith('multi_source_cache_timestamp_'))
               .toList();
 
       for (final key in allKeys) {
-        await prefs.remove(key);
+        await _prefs.remove(key);
       }
 
       // Remove old cache file
-      final oldCacheFile = File('${directory.path}/$_cacheFilename');
+      final oldCacheFile = File('${_cacheDir.path}/$_cacheFilename');
       if (await oldCacheFile.exists()) {
         await oldCacheFile.delete();
       }
-      await prefs.remove(_cacheTimestampKey);
+      await _prefs.remove(_cacheTimestampKey);
 
       // Remove all source-specific cache files
-      final files = directory.listSync().where(
+      final files = _cacheDir.listSync().where(
         (file) =>
             file.path.contains('multi_source_cache_') &&
             file.path.endsWith('.json'),
@@ -657,27 +397,120 @@ class MultiSourceApiService {
       SecureLogger.error("Error clearing cache", e);
     }
   }
+}
 
-  @visibleForTesting
-  static void setPrefsProvider(Future<SharedPreferences> Function()? provider) {
-    _prefsProvider = provider;
-    _prefsCache = null;
+/// Top-level function for JSON decoding
+List<Earthquake> _parseEarthquakesJson(String jsonStr) {
+  final List<dynamic> decoded = json.decode(jsonStr);
+  return decoded.map((e) => Earthquake.fromJson(e)).toList();
+}
+
+/// Top-level function for JSON encoding
+String _encodeEarthquakesJson(List<Earthquake> earthquakes) {
+  return json.encode(earthquakes.map((e) => e.toJson()).toList());
+}
+
+/// Top-level function for duplicate removal
+List<Earthquake> _removeDuplicatesOptimized(List<Earthquake> earthquakes) {
+  if (earthquakes.length <= 1) return earthquakes;
+
+  // Constants needed for top-level function
+  const double duplicateDistanceThreshold = 50.0; // km
+  const int duplicateTimeThreshold = 600000; // 10 minutes in ms
+  // Approx degrees for 50km (1 deg lat ~= 111km)
+  const double latDegreeThreshold = 0.5;
+  const double lonDegreeThreshold = 0.5;
+
+  // Sort by time for better performance
+  earthquakes.sort((a, b) => b.time.compareTo(a.time));
+
+  final List<Earthquake> unique = [];
+
+  for (final earthquake in earthquakes) {
+    bool isDuplicate = false;
+
+    // Iterate backwards through unique list (sliding window)
+    // Since both lists are sorted by time (descending), recent items are at the end
+    for (int i = unique.length - 1; i >= 0; i--) {
+      final existing = unique[i];
+
+      final timeDiff =
+          (earthquake.time.millisecondsSinceEpoch -
+                  existing.time.millisecondsSinceEpoch)
+              .abs();
+
+      // If time difference exceeds threshold, we can stop checking this branch
+      // because all subsequent items in 'unique' will be even older
+      if (timeDiff >= duplicateTimeThreshold) {
+        break;
+      }
+
+      // Bounding box check (optimization)
+      if ((earthquake.latitude - existing.latitude).abs() >
+              latDegreeThreshold ||
+          (earthquake.longitude - existing.longitude).abs() >
+              lonDegreeThreshold) {
+        continue;
+      }
+
+      final distance = _calculateDistanceHaversine(
+        earthquake.latitude,
+        earthquake.longitude,
+        existing.latitude,
+        existing.longitude,
+      );
+
+      if (distance < duplicateDistanceThreshold) {
+        isDuplicate = true;
+
+        // Replace if current is better
+        // Prioritize USGS over EMSC
+        bool shouldReplace = false;
+
+        if (earthquake.source == 'USGS' && existing.source != 'USGS') {
+          shouldReplace = true;
+        } else if (earthquake.source != 'USGS' && existing.source == 'USGS') {
+          shouldReplace = false;
+        } else {
+          // Same source or neither is USGS, use standard criteria
+          if (earthquake.magnitude > existing.magnitude ||
+              (earthquake.magnitude == existing.magnitude &&
+                  earthquake.time.isAfter(existing.time))) {
+            shouldReplace = true;
+          }
+        }
+
+        if (shouldReplace) {
+          unique[i] = earthquake;
+        }
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      unique.add(earthquake);
+    }
   }
 
-  @visibleForTesting
-  static void setDirectoryProvider(Future<Directory> Function()? provider) {
-    _directoryProvider = provider;
-  }
+  return unique;
+}
 
-  @visibleForTesting
-  static void setHttpClientOverride(SecureHttpClient? client) {
-    _httpClientOverride = client;
-  }
-
-  @visibleForTesting
-  static void resetCaches() {
-    _sourceCache.clear();
-    _memoryCache.clear();
-    _prefsCache = null;
-  }
+/// Top-level function for Haversine distance calculation
+double _calculateDistanceHaversine(
+  double lat1,
+  double lon1,
+  double lat2,
+  double lon2,
+) {
+  const double earthRadius = 6371.0; // km
+  final double dLat = (lat2 - lat1) * (pi / 180);
+  final double dLon = (lon2 - lon1) * (pi / 180);
+  final double a =
+      sin(dLat / 2) * sin(dLat / 2) +
+      cos(lat1 * (pi / 180)) *
+          cos(lat2 * (pi / 180)) *
+          sin(dLon / 2) *
+          sin(dLon / 2);
+  final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+  return earthRadius * c;
 }

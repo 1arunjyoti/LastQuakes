@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -10,12 +11,17 @@ class _FakeGeolocator extends GeolocatorPlatform {
   LocationPermission permission;
   Position? currentPosition;
   bool shouldThrow = false;
+  bool shouldTimeout = false;
+  int callCount = 0;
 
   _FakeGeolocator({
     required this.serviceEnabled,
     required this.permission,
     this.currentPosition,
+    this.lastKnownPosition,
   });
+
+  Position? lastKnownPosition;
 
   @override
   Future<bool> isLocationServiceEnabled() async => serviceEnabled;
@@ -30,10 +36,21 @@ class _FakeGeolocator extends GeolocatorPlatform {
   Future<Position> getCurrentPosition({
     LocationSettings? locationSettings,
   }) async {
+    callCount++;
+    if (shouldTimeout && callCount == 1) {
+      throw TimeoutException('Mock timeout');
+    }
     if (shouldThrow || currentPosition == null) {
       throw Exception('Location unavailable');
     }
     return currentPosition!;
+  }
+
+  @override
+  Future<Position?> getLastKnownPosition({
+    bool forceLocationManager = false,
+  }) async {
+    return lastKnownPosition;
   }
 
   @override
@@ -48,7 +65,10 @@ class _FakeGeolocator extends GeolocatorPlatform {
     final dLon = _degToRad(endLongitude - startLongitude);
 
     final a =
-        (math.sin(dLat / 2) * math.sin(dLat / 2)) + math.cos(_degToRad(startLatitude)) * math.cos(_degToRad(endLatitude)) * (math.sin(dLon / 2) * math.sin(dLon / 2));
+        (math.sin(dLat / 2) * math.sin(dLat / 2)) +
+        math.cos(_degToRad(startLatitude)) *
+            math.cos(_degToRad(endLatitude)) *
+            (math.sin(dLon / 2) * math.sin(dLon / 2));
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadiusKm * c * 1000;
   }
@@ -150,13 +170,52 @@ void main() {
       expect(result, isNull);
     });
 
-    test('returns null when fetching throws', () async {
+    test(
+      'returns null when fetching throws and no last known position',
+      () async {
+        fakeGeolocator.shouldThrow = true;
+
+        final result = await service.getCurrentLocation(forceRefresh: true);
+
+        expect(result, isNull);
+      },
+    );
+
+    test('returns last known position when fetching throws', () async {
       fakeGeolocator.shouldThrow = true;
+      final lastKnown = Position(
+        latitude: 20,
+        longitude: 30,
+        accuracy: 5,
+        altitude: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+        altitudeAccuracy: 0,
+        timestamp: DateTime(2024, 1, 1),
+        isMocked: false,
+      );
+      fakeGeolocator.lastKnownPosition = lastKnown;
 
       final result = await service.getCurrentLocation(forceRefresh: true);
 
-      expect(result, isNull);
+      expect(result, isNotNull);
+      expect(result!.latitude, 20);
+      expect(result.longitude, 30);
     });
+
+    test(
+      'retries with low accuracy on timeout if no last known position',
+      () async {
+        fakeGeolocator.shouldTimeout = true;
+
+        final result = await service.getCurrentLocation(forceRefresh: true);
+
+        expect(result, isNotNull);
+        expect(fakeGeolocator.callCount, 2); // Should be called twice
+      },
+    );
 
     test('calculateDistance returns value in kilometers', () {
       final result = service.calculateDistance(0, 0, 0, 1);

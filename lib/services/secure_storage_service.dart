@@ -11,7 +11,7 @@ class SecureStorageService {
   static const String _emergencyContactsKey = 'secure_emergency_contacts';
   static const String _selectedCountryKey = 'secure_selected_country';
   static const String _notificationSettingsKey = 'secure_notification_settings';
-  
+
   // Contexts for encryption (different contexts use different derived keys)
   static const String _locationContext = 'location_data';
   static const String _contactsContext = 'emergency_contacts';
@@ -20,22 +20,73 @@ class SecureStorageService {
   /// Initialize the secure storage service
   static Future<void> initialize() async {
     await EncryptionService.initialize();
+    await _migrateIfNeeded();
+  }
+
+  /// Migrate data from legacy custom encryption to native secure storage
+  static Future<void> _migrateIfNeeded() async {
+    if (await EncryptionService.isLegacyMode()) {
+      if (kDebugMode) {
+        print('Legacy encryption detected. Starting migration...');
+      }
+
+      try {
+        // Helper to migrate a single key
+        Future<void> migrateKey(String key, String context) async {
+          final encrypted = await EncryptionService.retrieveDecryptedData(
+            key,
+            context,
+          );
+          if (encrypted != null) {
+            try {
+              final decrypted = await EncryptionService.decryptLegacy(
+                encrypted,
+                context,
+              );
+              await EncryptionService.storeEncryptedData(
+                key,
+                decrypted,
+                context,
+              );
+              if (kDebugMode) print('Migrated $key');
+            } catch (e) {
+              if (kDebugMode) print('Error migrating $key: $e');
+            }
+          }
+        }
+
+        await migrateKey(_safeZonesKey, _locationContext);
+        await migrateKey(_emergencyContactsKey, _contactsContext);
+        await migrateKey(_selectedCountryKey, _settingsContext);
+        await migrateKey(_notificationSettingsKey, _settingsContext);
+
+        // Clear legacy keys to mark migration as complete
+        await EncryptionService.clearLegacyKeys();
+        if (kDebugMode) {
+          print('Migration completed successfully.');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error during migration: $e');
+        }
+      }
+    }
   }
 
   // --- Safe Zones Management ---
-  
+
   /// Store safe zones securely
   static Future<void> storeSafeZones(List<SafeZone> safeZones) async {
     try {
       final jsonList = safeZones.map((zone) => zone.toJson()).toList();
       final jsonString = jsonEncode(jsonList);
-      
+
       await EncryptionService.storeEncryptedData(
         _safeZonesKey,
         jsonString,
         _locationContext,
       );
-      
+
       if (kDebugMode) {
         print('Successfully stored ${safeZones.length} safe zones securely');
       }
@@ -54,18 +105,19 @@ class SecureStorageService {
         _safeZonesKey,
         _locationContext,
       );
-      
+
       if (jsonString == null) return [];
-      
+
       final jsonList = jsonDecode(jsonString) as List<dynamic>;
-      final safeZones = jsonList
-          .map((json) => SafeZone.fromJson(json as Map<String, dynamic>))
-          .toList();
-      
+      final safeZones =
+          jsonList
+              .map((json) => SafeZone.fromJson(json as Map<String, dynamic>))
+              .toList();
+
       if (kDebugMode) {
         print('Successfully retrieved ${safeZones.length} safe zones');
       }
-      
+
       return safeZones;
     } catch (e) {
       if (kDebugMode) {
@@ -76,20 +128,24 @@ class SecureStorageService {
   }
 
   // --- Emergency Contacts Management ---
-  
+
   /// Store emergency contacts securely
-  static Future<void> storeEmergencyContacts(List<Map<String, String>> contacts) async {
+  static Future<void> storeEmergencyContacts(
+    List<Map<String, String>> contacts,
+  ) async {
     try {
       final jsonString = jsonEncode(contacts);
-      
+
       await EncryptionService.storeEncryptedData(
         _emergencyContactsKey,
         jsonString,
         _contactsContext,
       );
-      
+
       if (kDebugMode) {
-        print('Successfully stored ${contacts.length} emergency contacts securely');
+        print(
+          'Successfully stored ${contacts.length} emergency contacts securely',
+        );
       }
     } catch (e) {
       if (kDebugMode) {
@@ -106,18 +162,19 @@ class SecureStorageService {
         _emergencyContactsKey,
         _contactsContext,
       );
-      
+
       if (jsonString == null) return [];
-      
+
       final jsonList = jsonDecode(jsonString) as List<dynamic>;
-      final contacts = jsonList
-          .map((json) => Map<String, String>.from(json as Map))
-          .toList();
-      
+      final contacts =
+          jsonList
+              .map((json) => Map<String, String>.from(json as Map))
+              .toList();
+
       if (kDebugMode) {
         print('Successfully retrieved ${contacts.length} emergency contacts');
       }
-      
+
       return contacts;
     } catch (e) {
       if (kDebugMode) {
@@ -128,7 +185,7 @@ class SecureStorageService {
   }
 
   // --- Country Selection Management ---
-  
+
   /// Store selected country securely
   static Future<void> storeSelectedCountry(String country) async {
     try {
@@ -137,7 +194,7 @@ class SecureStorageService {
         country,
         _settingsContext,
       );
-      
+
       if (kDebugMode) {
         print('Successfully stored selected country: $country');
       }
@@ -156,13 +213,13 @@ class SecureStorageService {
         _selectedCountryKey,
         _settingsContext,
       );
-      
+
       if (kDebugMode && country != null) {
         if (kDebugMode) {
           print('Successfully retrieved selected country: $country');
         }
       }
-      
+
       return country;
     } catch (e) {
       if (kDebugMode) {
@@ -173,18 +230,20 @@ class SecureStorageService {
   }
 
   // --- Notification Settings Management ---
-  
+
   /// Store notification settings securely
-  static Future<void> storeNotificationSettings(Map<String, dynamic> settings) async {
+  static Future<void> storeNotificationSettings(
+    Map<String, dynamic> settings,
+  ) async {
     try {
       final jsonString = jsonEncode(settings);
-      
+
       await EncryptionService.storeEncryptedData(
         _notificationSettingsKey,
         jsonString,
         _settingsContext,
       );
-      
+
       if (kDebugMode) {
         print('Successfully stored notification settings securely');
       }
@@ -203,15 +262,15 @@ class SecureStorageService {
         _notificationSettingsKey,
         _settingsContext,
       );
-      
+
       if (jsonString == null) return null;
-      
+
       final settings = jsonDecode(jsonString) as Map<String, dynamic>;
-      
+
       if (kDebugMode) {
         print('Successfully retrieved notification settings');
       }
-      
+
       return settings;
     } catch (e) {
       if (kDebugMode) {
@@ -222,7 +281,7 @@ class SecureStorageService {
   }
 
   // --- Data Migration and Cleanup ---
-  
+
   /// Migrate data from SharedPreferences to secure storage
   static Future<void> migrateFromSharedPreferences() async {
     // This method would be called during app initialization

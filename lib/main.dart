@@ -5,12 +5,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/home_screen.dart';
+import 'package:lastquake/screens/onboarding_screen.dart';
+import 'package:lastquake/services/multi_source_api_service.dart';
 import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/services/secure_token_service.dart';
 import 'package:lastquake/services/token_migration_service.dart';
 import 'package:lastquake/theme/app_theme.dart';
 import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquake/data/repositories/earthquake_repository_impl.dart';
+import 'package:lastquake/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:lastquake/presentation/providers/earthquake_provider.dart';
+import 'package:lastquake/presentation/providers/settings_provider.dart';
+import 'package:lastquake/presentation/providers/map_picker_provider.dart';
+import 'package:lastquake/data/repositories/settings_repository_impl.dart';
+import 'package:lastquake/data/repositories/device_repository_impl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -47,6 +56,47 @@ void main() async {
   // Preload SharedPreferences for synchronous access (e.g., for ThemeProvider)
   final prefs = await SharedPreferences.getInstance();
 
+  // Initialize secure storage service for personal data encryption
+  await SecureStorageService.initialize();
+  SecureLogger.success("Secure storage service initialized");
+
+  // Migrate existing tokens from SharedPreferences to secure storage
+  await TokenMigrationService.migrateTokenIfNeeded();
+
+  // Initialize local notifications
+  await NotificationService.instance.initNotifications();
+
+  // Store initial FCM token securely
+  String? fcmToken = await FirebaseMessaging.instance.getToken();
+  if (fcmToken != null) {
+    SecureLogger.token("Initial FCM Token obtained", token: fcmToken);
+    await SecureTokenService.instance.storeFCMToken(fcmToken);
+  }
+
+  // Request permissions and perform initial backend registration
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+    provisional: false,
+  );
+  SecureLogger.permission(
+    "FCM Notification",
+    settings.authorizationStatus.toString(),
+  );
+
+  if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+      settings.authorizationStatus == AuthorizationStatus.provisional) {
+    SecureLogger.init("Triggering initial backend registration");
+    await NotificationService.instance.initialRegisterOrUpdate();
+  } else {
+    SecureLogger.warning(
+      "FCM permission denied. Registration will be attempted, but notifications may not be received",
+    );
+    await NotificationService.instance.initialRegisterOrUpdate();
+  }
+
   // Set up foreground message listener
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     SecureLogger.firebase("Foreground message received");
@@ -64,98 +114,61 @@ void main() async {
     }
   });
   // End of Firebase Messaging setup
+
+  final bool seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
+
+  // Initialize MultiSourceApiService
+  final apiService = await MultiSourceApiService.create();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(prefs: prefs)..loadPreferences(),
-      child: const MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => ThemeProvider(prefs: prefs)..loadPreferences(),
+        ),
+        ChangeNotifierProvider(
+          create:
+              (context) => EarthquakeProvider(
+                getEarthquakesUseCase: GetEarthquakesUseCase(
+                  EarthquakeRepositoryImpl(apiService),
+                ),
+              )..init(),
+        ),
+        ChangeNotifierProvider(
+          create:
+              (context) => SettingsProvider(
+                settingsRepository: SettingsRepositoryImpl(apiService),
+                deviceRepository: DeviceRepositoryImpl(),
+              )..loadSettings(),
+        ),
+        ChangeNotifierProvider(create: (_) => MapPickerProvider()),
+      ],
+      child: MyApp(seenOnboarding: seenOnboarding),
     ),
   );
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class MyApp extends StatelessWidget {
+  final bool seenOnboarding;
 
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
+  const MyApp({super.key, required this.seenOnboarding});
 
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    // Defer non-critical initializations until after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeServices();
-    });
-  }
-
-  // Consolidated initialization logic
-  Future<void> _initializeServices() async {
-    SecureLogger.init("Starting post-frame initializations");
-    try {
-      // Initialize secure storage service for personal data encryption
-      await SecureStorageService.initialize();
-      SecureLogger.success("Secure storage service initialized");
-
-      // Migrate existing tokens from SharedPreferences to secure storage
-      await TokenMigrationService.migrateTokenIfNeeded();
-
-      // Initialize local notifications
-      await NotificationService.instance.initNotifications();
-
-      // Store initial FCM token securely
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken != null) {
-        SecureLogger.token("Initial FCM Token obtained", token: fcmToken);
-        await SecureTokenService.instance.storeFCMToken(fcmToken);
-      }
-
-      // Request permissions and perform initial backend registration
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
-      NotificationSettings settings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-      SecureLogger.permission(
-        "FCM Notification",
-        settings.authorizationStatus.toString(),
-      );
-
-      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
-          settings.authorizationStatus == AuthorizationStatus.provisional) {
-        SecureLogger.init("Triggering initial backend registration");
-        await NotificationService.instance.initialRegisterOrUpdate();
-      } else {
-        SecureLogger.warning(
-          "FCM permission denied. Registration will be attempted, but notifications may not be received",
-        );
-        await NotificationService.instance.initialRegisterOrUpdate();
-      }
-    } catch (e) {
-      SecureLogger.error("Error during post-frame initializations", e);
-    }
-    SecureLogger.success("Post-frame initializations complete");
-  }
-
-  // Build method with theme management
   @override
   Widget build(BuildContext context) {
-    return Selector<ThemeProvider, ThemeMode>(
-      selector: (context, provider) => provider.themeMode,
-      builder: (context, themeMode, child) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
         return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'LastQuakes',
+          title: 'LastQuake',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: themeMode,
-          home: child,
+          themeMode: themeProvider.themeMode,
+          home:
+              seenOnboarding
+                  ? const NavigationHandler()
+                  : const OnboardingScreen(),
+          debugShowCheckedModeBanner: false,
         );
       },
-      // Pre-build child widget to avoid unnecessary rebuilds
-      child: const NavigationHandler(),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:lastquake/models/earthquake.dart';
 import 'package:lastquake/utils/formatting.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/components/zoom_controls.dart';
@@ -13,32 +14,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class _EarthquakeData {
-  final double magnitude;
-  final String location;
-  final int timestamp;
-  final bool tsunami;
-  final double depth;
-  final double? lat;
-  final double? lon;
-  final String? url;
-
-  const _EarthquakeData({
-    required this.magnitude,
-    required this.location,
-    required this.timestamp,
-    required this.tsunami,
-    required this.depth,
-    required this.lat,
-    required this.lon,
-    this.url,
-  });
-}
-
 class EarthquakeDetailsScreen extends StatefulWidget {
-  final Map<String, dynamic> quakeData;
+  final Earthquake earthquake;
 
-  const EarthquakeDetailsScreen({super.key, required this.quakeData});
+  const EarthquakeDetailsScreen({super.key, required this.earthquake});
 
   @override
   EarthquakeDetailsScreenState createState() => EarthquakeDetailsScreenState();
@@ -52,41 +31,10 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   static const double _minZoom = 1.0;
   static const double _maxZoom = 8.0;
 
-  // Processed earthquake data (memoized)
-  late final _EarthquakeData _memoizedData = _extractEarthquakeData();
-
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
-  }
-
-  // Extracts and processes earthquake data from the provided map
-  _EarthquakeData _extractEarthquakeData() {
-    final properties = widget.quakeData["properties"] ?? {};
-    final geometry = widget.quakeData["geometry"] ?? {};
-    return _EarthquakeData(
-      magnitude: (properties["mag"] as num?)?.toDouble() ?? 0.0,
-      location: properties["place"] as String? ?? "Unknown Location",
-      timestamp: (properties["time"] as int?) ?? 0,
-      tsunami: properties["tsunami"] == 1,
-      depth:
-          (geometry["coordinates"] is List &&
-                  geometry["coordinates"].length > 2)
-              ? (geometry["coordinates"][2] as num?)?.toDouble() ?? 0.0
-              : 0.0,
-      lat:
-          (geometry["coordinates"] is List &&
-                  geometry["coordinates"].length > 1)
-              ? (geometry["coordinates"][1] as num?)?.toDouble()
-              : null,
-      lon:
-          (geometry["coordinates"] is List &&
-                  geometry["coordinates"].length > 0)
-              ? (geometry["coordinates"][0] as num?)?.toDouble()
-              : null,
-      url: properties["url"] as String?,
-    );
   }
 
   @override
@@ -94,26 +42,27 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
+    final earthquake = widget.earthquake;
 
     // --- Format data using utilities ---
-    final dateTime = DateTime.fromMillisecondsSinceEpoch(
-      _memoizedData.timestamp,
+    final formattedTime = FormattingUtils.formatDateTime(
+      context,
+      earthquake.time,
     );
-    final formattedTime = FormattingUtils.formatDateTime(context, dateTime);
     final formattedDepth = FormattingUtils.formatDistance(
       context,
-      _memoizedData.depth,
+      earthquake.depth ?? 0.0,
     );
     final displayLocationTitle = FormattingUtils.formatPlaceString(
       context,
-      _memoizedData.location,
+      earthquake.place,
     );
 
     // Button states
     final bool hasValidUsgsUrl =
-        _memoizedData.url != null && _memoizedData.url!.isNotEmpty;
-    final bool hasCoordinates =
-        _memoizedData.lat != null && _memoizedData.lon != null;
+        earthquake.url != null && earthquake.url!.isNotEmpty;
+    // Coordinates are always present in the model, but let's be safe if they are 0,0 which might be valid but unlikely for an earthquake
+    final bool hasCoordinates = true;
 
     return Scaffold(
       appBar: LastQuakesAppBar(
@@ -148,8 +97,8 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                         // --- Impact Section Header (Magnitude & Tsunami) ---
                         _buildMagnitudeHeader(
                           context,
-                          magnitude: _memoizedData.magnitude,
-                          tsunami: _memoizedData.tsunami,
+                          magnitude: earthquake.magnitude,
+                          tsunami: earthquake.tsunami == 1,
                         ),
 
                         // --- Details Section ---
@@ -181,8 +130,8 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                               ),
                               _buildCoordinatesRow(
                                 context: context,
-                                lat: _memoizedData.lat,
-                                lon: _memoizedData.lon,
+                                lat: earthquake.latitude,
+                                lon: earthquake.longitude,
                               ),
                               const SizedBox(height: 8),
 
@@ -353,15 +302,14 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   // Specific row for displaying coordinates with a copy button
   Widget _buildCoordinatesRow({
     required BuildContext context,
-    required double? lat,
-    required double? lon,
+    required double lat,
+    required double lon,
   }) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
-    final String latText = lat?.toStringAsFixed(4) ?? "N/A";
-    final String lonText = lon?.toStringAsFixed(4) ?? "N/A";
-    final bool canCopy = lat != null && lon != null;
+    final String latText = lat.toStringAsFixed(4);
+    final String lonText = lon.toStringAsFixed(4);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
@@ -394,19 +342,18 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (canCopy)
-                      InkWell(
-                        onTap: _copyCoordinates,
-                        borderRadius: BorderRadius.circular(4),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2.0),
-                          child: Icon(
-                            Icons.copy_all_outlined,
-                            size: 18,
-                            color: colorScheme.primary,
-                          ),
+                    InkWell(
+                      onTap: _copyCoordinates,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(2.0),
+                        child: Icon(
+                          Icons.copy_all_outlined,
+                          size: 18,
+                          color: colorScheme.primary,
                         ),
                       ),
+                    ),
                   ],
                 ),
               ],
@@ -435,7 +382,9 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
             label: const Text("View on USGS"),
             style: ElevatedButton.styleFrom(elevation: 1),
             onPressed:
-                hasValidUsgsUrl ? () => _launchURL(_memoizedData.url!) : null,
+                hasValidUsgsUrl
+                    ? () => _launchURL(widget.earthquake.url!)
+                    : null,
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.map_outlined),
@@ -450,40 +399,42 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
 
   // --- Copy Coordinates ---
   void _copyCoordinates() {
-    if (_memoizedData.lat != null && _memoizedData.lon != null) {
-      Clipboard.setData(
-        ClipboardData(text: "${_memoizedData.lat}, ${_memoizedData.lon}"),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Coordinates copied!"),
-          duration: Duration(milliseconds: 500),
-        ),
-      );
-    }
+    Clipboard.setData(
+      ClipboardData(
+        text: "${widget.earthquake.latitude}, ${widget.earthquake.longitude}",
+      ),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Coordinates copied!"),
+        duration: Duration(milliseconds: 500),
+      ),
+    );
   }
 
   // --- Share Details ---
   Future<void> _shareEarthquakeDetails() async {
     try {
       RenderRepaintBoundary boundary =
-          _globalKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+          _globalKey.currentContext!.findRenderObject()
+              as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       Uint8List pngBytes = byteData!.buffer.asUint8List();
 
       final directory = await getTemporaryDirectory();
-      final imagePath = await File('${directory.path}/earthquake_details.png').create();
+      final imagePath =
+          await File('${directory.path}/earthquake_details.png').create();
       await imagePath.writeAsBytes(pngBytes);
 
-      final magnitude = _memoizedData.magnitude.toStringAsFixed(1);
-      final location = _memoizedData.location;
+      final magnitude = widget.earthquake.magnitude.toStringAsFixed(1);
+      final location = widget.earthquake.place;
 
-      await Share.shareXFiles(
-        [XFile(imagePath.path)],
-        subject: 'Earthquake Information: M $magnitude near $location',
-      );
+      await Share.shareXFiles([
+        XFile(imagePath.path),
+      ], subject: 'Earthquake Information: M $magnitude near $location');
     } catch (e) {
       debugPrint('Error sharing: $e');
       if (mounted) {
@@ -499,14 +450,9 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
 
   // --- Open External Map ---
   Future<void> _openMap() async {
-    final double? lat = _memoizedData.lat;
-    final double? lon = _memoizedData.lon;
-    final String locationLabel = _memoizedData.location;
-
-    if (lat == null || lon == null) {
-      _showMapErrorSnackbar("Coordinates not available.");
-      return;
-    }
+    final double lat = widget.earthquake.latitude;
+    final double lon = widget.earthquake.longitude;
+    final String locationLabel = widget.earthquake.place;
 
     Uri mapUri;
     final String encodedLabel = Uri.encodeComponent(locationLabel);
@@ -581,7 +527,10 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: LatLng(_memoizedData.lat!, _memoizedData.lon!),
+                  initialCenter: LatLng(
+                    widget.earthquake.latitude,
+                    widget.earthquake.longitude,
+                  ),
                   initialZoom: _zoomLevel,
                   minZoom: _minZoom,
                   maxZoom: _maxZoom,
@@ -598,7 +547,10 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                   MarkerLayer(
                     markers: [
                       Marker(
-                        point: LatLng(_memoizedData.lat!, _memoizedData.lon!),
+                        point: LatLng(
+                          widget.earthquake.latitude,
+                          widget.earthquake.longitude,
+                        ),
                         width: 50,
                         height: 50,
                         child: Icon(

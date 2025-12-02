@@ -7,11 +7,28 @@ import 'package:http/testing.dart';
 import 'package:lastquake/models/earthquake.dart';
 import 'package:lastquake/services/multi_source_api_service.dart';
 import 'package:lastquake/services/secure_http_client.dart';
+import 'package:lastquake/services/sources/earthquake_data_source.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeHttpClient extends SecureHttpClient {
   _FakeHttpClient(super.client) : super.testing();
+}
+
+class MockDataSource implements EarthquakeDataSource {
+  final List<Earthquake> earthquakes;
+  final bool shouldThrow;
+
+  MockDataSource({this.earthquakes = const [], this.shouldThrow = false});
+
+  @override
+  Future<List<Earthquake>> fetchEarthquakes({
+    required double minMagnitude,
+    required int days,
+  }) async {
+    if (shouldThrow) throw Exception('Mock error');
+    return earthquakes;
+  }
 }
 
 void main() {
@@ -20,26 +37,18 @@ void main() {
   late Directory tempDir;
   late File usgsCacheFile;
   late File multiCacheFile;
+  late MultiSourceApiService service;
+  late SharedPreferences prefs;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
     tempDir = await Directory.systemTemp.createTemp('multi_service_test');
     usgsCacheFile = File('${tempDir.path}/multi_source_cache_usgs.json');
     multiCacheFile = File('${tempDir.path}/multi_source_cache_emsc_usgs.json');
-
-    MultiSourceApiService.setPrefsProvider(
-      () async => SharedPreferences.getInstance(),
-    );
-    MultiSourceApiService.setDirectoryProvider(() async => tempDir);
-    MultiSourceApiService.resetCaches();
   });
 
   tearDown(() async {
-    await MultiSourceApiService.clearCache();
-    MultiSourceApiService.setPrefsProvider(null);
-    MultiSourceApiService.setDirectoryProvider(null);
-    MultiSourceApiService.setHttpClientOverride(null);
-    MultiSourceApiService.resetCaches();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -47,15 +56,19 @@ void main() {
 
   group('getSelectedSources / setSelectedSources', () {
     test('defaults to USGS and persists selections', () async {
-      final prefs = await SharedPreferences.getInstance();
-      expect(await MultiSourceApiService.getSelectedSources(), {
-        DataSource.usgs,
-      });
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+      service = MultiSourceApiService(
+        prefs: prefs,
+        client: _FakeHttpClient(mockClient),
+        cacheDir: tempDir,
+      );
 
-      await MultiSourceApiService.setSelectedSources({DataSource.emsc});
-      expect(await MultiSourceApiService.getSelectedSources(), {
-        DataSource.emsc,
-      });
+      expect(service.getSelectedSources(), {DataSource.usgs});
+
+      await service.setSelectedSources({DataSource.emsc});
+      expect(service.getSelectedSources(), {DataSource.emsc});
 
       final stored = prefs.getStringList('selected_data_sources');
       expect(stored, ['emsc']);
@@ -64,7 +77,6 @@ void main() {
 
   group('fetchEarthquakes', () {
     test('returns cached data when disk cache valid', () async {
-      final prefs = await SharedPreferences.getInstance();
       final timestampKey = 'multi_source_cache_timestamp_usgs';
       await prefs.setInt(timestampKey, DateTime.now().millisecondsSinceEpoch);
 
@@ -82,7 +94,16 @@ void main() {
       );
       await usgsCacheFile.writeAsString(jsonEncode([earthquake.toJson()]));
 
-      final result = await MultiSourceApiService.fetchEarthquakes(
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+      service = MultiSourceApiService(
+        prefs: prefs,
+        client: _FakeHttpClient(mockClient),
+        cacheDir: tempDir,
+      );
+
+      final result = await service.fetchEarthquakes(
         forceRefresh: false,
         sources: {DataSource.usgs},
       );
@@ -92,50 +113,47 @@ void main() {
     });
 
     test('fetches from both sources, merges, and removes duplicates', () async {
-      final prefs = await SharedPreferences.getInstance();
-      final mockClient = MockClient((request) async {
-        if (request.url.host == 'earthquake.usgs.gov') {
-          final response = {
-            'features': [
-              {
-                'id': 'us1',
-                'properties': {
-                  'mag': 5.0,
-                  'place': 'USGS Location',
-                  'time': DateTime.utc(2024, 1, 1).millisecondsSinceEpoch,
-                  'url': 'usgs-url',
-                },
-                'geometry': {
-                  'coordinates': [10, 20, 5],
-                },
-              },
-            ],
-          };
-          return http.Response(jsonEncode(response), 200);
-        } else {
-          final response = {
-            'features': [
-              {
-                'properties': {
-                  'unid': 'em1',
-                  'mag': 5.0,
-                  'flynn_region': 'EMSC Location',
-                  'time': '2024-01-01T00:00:30Z',
-                  'lat': 10.1,
-                  'lon': 20.1,
-                  'depth': 6.0,
-                  'source_catalog': 'EMSC',
-                },
-              },
-            ],
-          };
-          return http.Response(jsonEncode(response), 200);
-        }
-      });
+      final usgsQuake = Earthquake(
+        id: 'us1',
+        magnitude: 5.0,
+        place: 'USGS Location',
+        time: DateTime.utc(2024, 1, 1),
+        latitude: 10,
+        longitude: 20,
+        depth: 5,
+        url: 'usgs-url',
+        source: 'USGS',
+        rawData: const {},
+      );
 
-      MultiSourceApiService.setHttpClientOverride(_FakeHttpClient(mockClient));
+      final emscQuake = Earthquake(
+        id: 'em1',
+        magnitude: 5.0,
+        place: 'EMSC Location',
+        time: DateTime.utc(2024, 1, 1).add(const Duration(seconds: 30)),
+        latitude: 10.1,
+        longitude: 20.1,
+        depth: 6,
+        url: 'emsc-url',
+        source: 'EMSC',
+        rawData: const {},
+      );
 
-      final result = await MultiSourceApiService.fetchEarthquakes(
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+
+      service = MultiSourceApiService(
+        prefs: prefs,
+        client: _FakeHttpClient(mockClient),
+        cacheDir: tempDir,
+        sources: {
+          DataSource.usgs: MockDataSource(earthquakes: [usgsQuake]),
+          DataSource.emsc: MockDataSource(earthquakes: [emscQuake]),
+        },
+      );
+
+      final result = await service.fetchEarthquakes(
         forceRefresh: true,
         sources: {DataSource.usgs, DataSource.emsc},
         minMagnitude: 3.0,
@@ -153,14 +171,67 @@ void main() {
       );
     });
 
-    test('throws when all sources fail', () async {
-      final mockClient = MockClient((request) async {
-        return http.Response('Internal error', 500);
-      });
-      MultiSourceApiService.setHttpClientOverride(_FakeHttpClient(mockClient));
+    test(
+      'returns stale cache when all sources fail and stale cache is valid',
+      () async {
+        final timestampKey = 'multi_source_cache_timestamp_usgs';
+        // Set timestamp to 2 hours ago (expired for normal cache, valid for stale)
+        await prefs.setInt(
+          timestampKey,
+          DateTime.now()
+              .subtract(const Duration(hours: 2))
+              .millisecondsSinceEpoch,
+        );
+
+        final earthquake = Earthquake(
+          id: 'usgs1',
+          magnitude: 4.5,
+          place: 'Stale Place',
+          time: DateTime.utc(2024, 1, 1),
+          latitude: 10,
+          longitude: 20,
+          depth: 5,
+          url: 'https://example.com',
+          source: 'USGS',
+          rawData: const {},
+        );
+        await usgsCacheFile.writeAsString(jsonEncode([earthquake.toJson()]));
+
+        final mockClient = MockClient(
+          (request) async => http.Response('[]', 200),
+        );
+
+        service = MultiSourceApiService(
+          prefs: prefs,
+          client: _FakeHttpClient(mockClient),
+          cacheDir: tempDir,
+          sources: {DataSource.usgs: MockDataSource(shouldThrow: true)},
+        );
+
+        final result = await service.fetchEarthquakes(
+          forceRefresh: true, // Force refresh to trigger network
+          sources: {DataSource.usgs},
+        );
+
+        expect(result, hasLength(1));
+        expect(result.first.place, 'Stale Place');
+      },
+    );
+
+    test('throws when all sources fail and no stale cache available', () async {
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+
+      service = MultiSourceApiService(
+        prefs: prefs,
+        client: _FakeHttpClient(mockClient),
+        cacheDir: tempDir,
+        sources: {DataSource.usgs: MockDataSource(shouldThrow: true)},
+      );
 
       expect(
-        () => MultiSourceApiService.fetchEarthquakes(
+        () => service.fetchEarthquakes(
           forceRefresh: true,
           sources: {DataSource.usgs},
         ),
@@ -169,15 +240,77 @@ void main() {
     });
   });
 
+  test('prioritizes USGS over EMSC for duplicates', () async {
+    final usgsQuake = Earthquake(
+      id: 'us1',
+      magnitude: 4.0, // Lower magnitude
+      place: 'USGS Location',
+      time: DateTime.utc(2024, 1, 1),
+      latitude: 10,
+      longitude: 20,
+      depth: 5,
+      url: 'usgs-url',
+      source: 'USGS',
+      rawData: const {},
+    );
+
+    final emscQuake = Earthquake(
+      id: 'em1',
+      magnitude: 5.0, // Higher magnitude
+      place: 'EMSC Location',
+      time: DateTime.utc(2024, 1, 1), // Same time
+      latitude: 10, // Same location
+      longitude: 20,
+      depth: 5,
+      url: 'emsc-url',
+      source: 'EMSC',
+      rawData: const {},
+    );
+
+    final mockClient = MockClient((request) async => http.Response('[]', 200));
+
+    service = MultiSourceApiService(
+      prefs: prefs,
+      client: _FakeHttpClient(mockClient),
+      cacheDir: tempDir,
+      sources: {
+        DataSource.usgs: MockDataSource(earthquakes: [usgsQuake]),
+        DataSource.emsc: MockDataSource(earthquakes: [emscQuake]),
+      },
+    );
+
+    final result = await service.fetchEarthquakes(
+      forceRefresh: true,
+      sources: {DataSource.usgs, DataSource.emsc},
+      minMagnitude: 3.0,
+      days: 1,
+    );
+
+    expect(result, hasLength(1));
+    expect(result.first.source, 'USGS');
+    expect(
+      result.first.magnitude,
+      4.0,
+    ); // Should keep USGS even if lower magnitude
+  });
+
   group('clearCache', () {
     test('removes cache files and timestamps', () async {
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('multi_source_cache_timestamp_usgs', 1);
       await prefs.setInt('multi_source_cache_timestamp_emsc_usgs', 1);
       await usgsCacheFile.writeAsString('usgs');
       await multiCacheFile.writeAsString('multi');
 
-      await MultiSourceApiService.clearCache();
+      final mockClient = MockClient(
+        (request) async => http.Response('[]', 200),
+      );
+      service = MultiSourceApiService(
+        prefs: prefs,
+        client: _FakeHttpClient(mockClient),
+        cacheDir: tempDir,
+      );
+
+      await service.clearCache();
 
       expect(
         prefs.getKeys().where(

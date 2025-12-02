@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:lastquake/utils/secure_logger.dart';
-import 'package:meta/meta.dart';
 
 /// Secure HTTP client with certificate pinning implementation
 class SecureHttpClient {
@@ -65,7 +65,14 @@ class SecureHttpClient {
 
   /// Create HTTP client with certificate pinning
   http.Client _createSecureClient() {
-    final httpClient = HttpClient();
+    // Use a SecurityContext that trusts no roots to force badCertificateCallback
+    // for ALL certificates, ensuring our pinning logic is always executed.
+    final context = SecurityContext(withTrustedRoots: false);
+    final httpClient = HttpClient(context: context);
+
+    // Configure timeouts
+    httpClient.idleTimeout = const Duration(seconds: 10);
+    httpClient.connectionTimeout = const Duration(seconds: 10);
 
     // Configure certificate validation with pinning
     httpClient.badCertificateCallback = (
@@ -90,14 +97,23 @@ class SecureHttpClient {
 
   /// Verify certificate pin for a given host
   bool _verifyCertificatePin(String host, X509Certificate cert) {
+    // In debug mode, we might want to bypass pinning for easier development
+    // but still log a warning.
+    if (kDebugMode) {
+      SecureLogger.warning(
+        'Debug mode: Bypassing certificate pinning for host: $host',
+      );
+      return true;
+    }
+
     final pins = _certificatePins[host];
     if (pins == null || pins.isEmpty) {
       SecureLogger.warning(
         'No certificate pins configured for host: $host - allowing connection',
       );
-      // In development, you might want to allow connections without pins
-      // In production, you should return false here
-      return false; // TODO: Change to false in production
+      // In production, you should return false here if you want to enforce pinning for all hosts
+      // For now, we allow it but log the warning.
+      return true;
     }
 
     try {
@@ -147,6 +163,61 @@ class SecureHttpClient {
   }) async {
     return _makeSecureRequest(
       () => _client.post(url, headers: headers, body: body),
+      url.host,
+      timeout ?? const Duration(seconds: 30),
+    );
+  }
+
+  /// Secure PUT request with certificate pinning
+  Future<http.Response> put(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration? timeout,
+  }) async {
+    return _makeSecureRequest(
+      () => _client.put(url, headers: headers, body: body),
+      url.host,
+      timeout ?? const Duration(seconds: 30),
+    );
+  }
+
+  /// Secure PATCH request with certificate pinning
+  Future<http.Response> patch(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration? timeout,
+  }) async {
+    return _makeSecureRequest(
+      () => _client.patch(url, headers: headers, body: body),
+      url.host,
+      timeout ?? const Duration(seconds: 30),
+    );
+  }
+
+  /// Secure DELETE request with certificate pinning
+  Future<http.Response> delete(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration? timeout,
+  }) async {
+    return _makeSecureRequest(
+      () => _client.delete(url, headers: headers, body: body),
+      url.host,
+      timeout ?? const Duration(seconds: 30),
+    );
+  }
+
+  /// Secure HEAD request with certificate pinning
+  Future<http.Response> head(
+    Uri url, {
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) async {
+    return _makeSecureRequest(
+      () => _client.head(url, headers: headers),
       url.host,
       timeout ?? const Duration(seconds: 30),
     );

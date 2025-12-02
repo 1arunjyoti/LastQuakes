@@ -6,7 +6,7 @@ class EarthquakeListItem extends StatelessWidget {
   final double magnitude;
   final Color magnitudeColor;
   final VoidCallback onTap;
-  final DateTime timestamp; 
+  final DateTime timestamp;
   final double? distanceKm;
   final String? source; // Add source parameter
 
@@ -81,7 +81,6 @@ class EarthquakeListItem extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-
                   // Left Section - Location & Time
                   Expanded(
                     child: Column(
@@ -111,7 +110,7 @@ class EarthquakeListItem extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                   
+
                   // Right Section - Magnitude Box and Source
                   Column(
                     mainAxisSize: MainAxisSize.min,
@@ -135,10 +134,16 @@ class EarthquakeListItem extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: source == 'USGS' ? Colors.blue.shade100 : Colors.green.shade100,
+                            color:
+                                source == 'USGS'
+                                    ? Colors.blue.shade100
+                                    : Colors.green.shade100,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: source == 'USGS' ? Colors.blue.shade300 : Colors.green.shade300,
+                              color:
+                                  source == 'USGS'
+                                      ? Colors.blue.shade300
+                                      : Colors.green.shade300,
                               width: 1,
                             ),
                           ),
@@ -147,7 +152,10 @@ class EarthquakeListItem extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: source == 'USGS' ? Colors.blue.shade700 : Colors.green.shade700,
+                              color:
+                                  source == 'USGS'
+                                      ? Colors.blue.shade700
+                                      : Colors.green.shade700,
                             ),
                           ),
                         ),

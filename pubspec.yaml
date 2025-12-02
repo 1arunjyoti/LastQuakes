@@ -43,6 +43,9 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   crypto: ^3.0.3
   screenshot: ^2.1.0
+  introduction_screen: ^4.0.0
+  meta: ^1.17.0
+  geolocator_platform_interface: ^4.2.6
 
 dev_dependencies:
   flutter_test:

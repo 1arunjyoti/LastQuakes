@@ -1,30 +1,20 @@
-import 'dart:convert';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import 'package:lastquake/models/safe_zone.dart';
+import 'package:lastquake/presentation/providers/settings_provider.dart';
 import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/services/notification_service.dart';
-import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/widgets/appbar.dart';
-import 'package:lastquake/services/multi_source_api_service.dart';
+import 'package:lastquake/widgets/settings/clock_settings_card.dart';
+import 'package:lastquake/widgets/settings/theme_settings_card.dart';
+import 'package:lastquake/widgets/settings/units_settings_card.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:latlong2/latlong.dart';
 import 'map_picker_screen.dart';
-
-// Keys for SharedPreferences
-const String prefNotificationFilterType = 'notification_filter_type';
-const String prefNotificationMagnitude = 'notification_magnitude';
-const String prefNotificationCountry = 'notification_country';
-const String prefNotificationRadius = 'notification_radius';
-const String prefNotificationUseCurrentLoc = 'notification_use_current_loc';
-const String prefNotificationSafeZones =
-    'notification_safe_zones'; // Stored as JSON string list
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -34,28 +24,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-
-  // --- State Variables ---
-  NotificationFilterType _selectedFilterType = NotificationFilterType.none;
-  double _selectedMagnitude = 5.0;
-  String _selectedCountry = "ALL";
-  double _selectedRadius = 500.0; // Default radius if distance type is selected
-  bool _useCurrentLocationForDistance = false;
-  List<SafeZone> _safeZones = [];
-
-  bool _isLoaded = false;
-  /* final LocationService _locationService =
-      LocationService(); */ // Instance for permission/location checks
-
   // Expansion state
   bool _notificationSettingsExpanded = true;
   bool _dataSourcesExpanded = false;
-  bool _themeExpanded = false;
-  bool _unitsExpanded = false;
-  //bool _clockExpanded = false;
-
-  // Data sources
-  Set<DataSource> _selectedDataSources = {DataSource.usgs};
+  // bool _themeExpanded = false; // Handled in widget
+  // bool _unitsExpanded = false; // Handled in widget
+  // bool _clockExpanded = false; // Handled in widget
 
   // Data for dropdowns/sliders
   final List<String> _countryList = [
@@ -79,11 +53,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     "Greece",
     "Guatemala",
     "Iceland",
-
     "Indonesia",
     "Iran",
     "Italy",
-
     "Kyrgyzstan",
     "Malaysia",
     "Mexico",
@@ -117,7 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     13,
     (i) => 3.0 + i * 0.5,
   );
-  
+
   // Radius options in kilometers
   static final List<double> _radiusOptions = [
     100.0,
@@ -135,59 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeSettings();
-  }
-
-  // --- Initialization ---
-  Future<void> _initializeSettings() async {
-    await _loadNotificationSettings();
-    await _loadDataSourceSettings();
     _buildMemoizedItems();
-    if (mounted) {
-      setState(() {
-        _isLoaded = true;
-      });
-    }
-  }
-
-  // Load data source settings
-  Future<void> _loadDataSourceSettings() async {
-    try {
-      final sources = await MultiSourceApiService.getSelectedSources();
-      if (mounted) {
-        setState(() {
-          _selectedDataSources = sources;
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error loading data source settings: $e');
-      }
-    }
-  }
-
-  // Save data source settings
-  Future<void> _saveDataSourceSettings() async {
-    if (!_isLoaded) return;
-    
-    try {
-      await MultiSourceApiService.setSelectedSources(_selectedDataSources);
-      // Clear cache when sources change to force refresh
-      await MultiSourceApiService.clearCache();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Data source settings saved'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error saving data source settings: $e');
-      }
-    }
   }
 
   // Build memoized dropdown items
@@ -206,152 +126,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }).toList();
   }
 
-  // --- Load & Save Settings ---
-  Future<void> _loadNotificationSettings() async {
-    try {
-      // Load from secure storage first, fallback to SharedPreferences for migration
-      final secureSettings = await SecureStorageService.retrieveNotificationSettings();
-      final secureSafeZones = await SecureStorageService.retrieveSafeZones();
-      
-      if (secureSettings != null) {
-        // Use secure storage data
-        if (!mounted) return;
-        setState(() {
-          _selectedFilterType = NotificationFilterType.values.firstWhere(
-            (e) => e.name == secureSettings['filterType'],
-            orElse: () => NotificationFilterType.none,
-          );
-          _selectedMagnitude = (secureSettings['magnitude'] as num?)?.toDouble() ?? 5.0;
-          _selectedCountry = secureSettings['country'] as String? ?? "ALL";
-          _selectedRadius = (secureSettings['radius'] as num?)?.toDouble() ?? 500.0;
-          _useCurrentLocationForDistance = secureSettings['useCurrentLocation'] as bool? ?? false;
-          _safeZones = secureSafeZones;
-
-          // Ensure country selection is valid
-          if (!_countryList.contains(_selectedCountry)) {
-            _selectedCountry = "ALL";
-          }
-        });
-      } else {
-        // Migrate from SharedPreferences to secure storage
-        await _migrateFromSharedPreferences();
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error loading notification settings: $e');
-      }
-      // Fallback to SharedPreferences on error
-      await _migrateFromSharedPreferences();
+  String _getFilterTypeName(NotificationFilterType type) {
+    switch (type) {
+      case NotificationFilterType.none:
+        return "None (Notifications Disabled)";
+      case NotificationFilterType.worldwide:
+        return "Worldwide (All Earthquakes)";
+      case NotificationFilterType.country:
+        return "By Country";
+      case NotificationFilterType.distance:
+        return "By Distance / Safe Zones";
     }
   }
 
-  // Migrate existing data from SharedPreferences to secure storage
-  Future<void> _migrateFromSharedPreferences() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (!mounted) return;
-
-      setState(() {
-        _selectedFilterType = NotificationFilterType.values.firstWhere(
-          (e) => e.name == prefs.getString(prefNotificationFilterType),
-          orElse: () => NotificationFilterType.none,
-        );
-        _selectedMagnitude = prefs.getDouble(prefNotificationMagnitude) ?? 5.0;
-        _selectedCountry = prefs.getString(prefNotificationCountry) ?? "ALL";
-        _selectedRadius = prefs.getDouble(prefNotificationRadius) ?? 500.0;
-        _useCurrentLocationForDistance =
-            prefs.getBool(prefNotificationUseCurrentLoc) ?? false;
-
-        // Load safe zones from SharedPreferences
-        final List<String>? safeZonesJson = prefs.getStringList(
-          prefNotificationSafeZones,
-        );
-        if (safeZonesJson != null) {
-          _safeZones =
-              safeZonesJson
-                  .map((jsonString) => SafeZone.fromJson(jsonDecode(jsonString)))
-                  .toList();
-        } else {
-          _safeZones = [];
-        }
-
-        // Ensure country selection is valid
-        if (!_countryList.contains(_selectedCountry)) {
-          _selectedCountry = "ALL";
-        }
-      });
-
-      // Save to secure storage and clear from SharedPreferences
-      await _saveNotificationSettings(showSnackbar: false);
-      
-      // Clear sensitive data from SharedPreferences
-      await prefs.remove(prefNotificationSafeZones);
-      
-      if (kDebugMode) {
-        print('Successfully migrated notification settings to secure storage');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error during migration: $e');
-      }
-    }
+  // Helper to find closest value in a list
+  double _findClosestValue(double target, List<double> options) {
+    return options.reduce(
+      (a, b) => (target - a).abs() < (target - b).abs() ? a : b,
+    );
   }
 
-  // Save settings to secure storage
-  Future<void> _saveNotificationSettings({bool showSnackbar = true}) async {
-    if (!_isLoaded) return; 
+  // --- Permission Helpers ---
+  Future<bool> _requestNotificationPermission() async {
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+    bool? permissionGranted;
 
     try {
-      // Save to secure storage
-      final settings = {
-        'filterType': _selectedFilterType.name,
-        'magnitude': _selectedMagnitude,
-        'country': _selectedCountry,
-        'radius': _selectedRadius,
-        'useCurrentLocation': _useCurrentLocationForDistance,
-      };
-      
-      await SecureStorageService.storeNotificationSettings(settings);
-      await SecureStorageService.storeSafeZones(_safeZones);
-
-      // Also save non-sensitive settings to SharedPreferences for backward compatibility
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(prefNotificationFilterType, _selectedFilterType.name);
-      await prefs.setDouble(prefNotificationMagnitude, _selectedMagnitude);
-      await prefs.setString(prefNotificationCountry, _selectedCountry);
-      await prefs.setDouble(prefNotificationRadius, _selectedRadius);
-      await prefs.setBool(
-        prefNotificationUseCurrentLoc,
-        _useCurrentLocationForDistance,
-      );
-
-      // Notify the backend service about the changes
-      await NotificationService.instance.updateBackendRegistration();
-
-      // Show a snackbar confirmation
-      if (showSnackbar && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notification settings saved securely'),
-            duration: Duration(seconds: 2),
-          ),
+      if (Platform.isAndroid) {
+        final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+            flutterLocalNotificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >();
+        permissionGranted =
+            await androidImplementation?.requestNotificationsPermission();
+      } else if (Platform.isIOS) {
+        final IOSFlutterLocalNotificationsPlugin? iosImplementation =
+            flutterLocalNotificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  IOSFlutterLocalNotificationsPlugin
+                >();
+        permissionGranted = await iosImplementation?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
         );
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error saving notification settings: $e');
-      }
-      
-      if (showSnackbar && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error saving settings. Please try again.'),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint("Error requesting notification permission: $e");
+      permissionGranted = false;
     }
+    return permissionGranted ?? false;
+  }
+
+  Future<bool> _checkAndRequestLocationPermissionIfNeeded() async {
+    final status = await Permission.locationWhenInUse.status;
+    if (status.isGranted) return true;
+
+    final result = await Permission.locationWhenInUse.request();
+    if (result.isGranted) return true;
+
+    if (mounted) {
+      _showPermissionDeniedDialog('Location');
+    }
+    return false;
+  }
+
+  void _showPermissionDeniedDialog(String permissionName) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('$permissionName Permission Required'),
+            content: Text(
+              'Please enable $permissionName permission in settings to use this feature.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+    );
   }
 
   // --- UI Build Methods ---
@@ -361,31 +226,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: LastQuakesAppBar(title: 'Settings'),
-      body:
-          !_isLoaded
-              ? const Center(
-                child: CircularProgressIndicator(),
-              ) // Show loading indicator
-              : ListView(
-                padding: const EdgeInsets.all(12.0),
-                children: [
-                  _buildNotificationSettingsCard(),
-                  const SizedBox(height: 12),
-                  _buildDataSourcesCard(),
-                  const SizedBox(height: 12),
-                  _buildThemeSettingsCard(prefsProvider),
-                  const SizedBox(height: 12),
-                  _buildUnitsSettingsCard(prefsProvider),
-                  const SizedBox(height: 12),
-                  _buildClockSettingsCard(prefsProvider),
-                  const SizedBox(height: 12),
-                ],
+      body: Consumer<SettingsProvider>(
+        builder: (context, settingsProvider, child) {
+          if (settingsProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (settingsProvider.error != null) {
+            // Show error but allow interaction with other settings if possible,
+            // or just show a retry button.
+            // For now, let's show a snackbar (handled in provider usually, but here for safety)
+            // and display content.
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(12.0),
+            children: [
+              _buildNotificationSettingsCard(settingsProvider),
+              const SizedBox(height: 12),
+              _buildDataSourcesCard(settingsProvider),
+              const SizedBox(height: 12),
+              ThemeSettingsCard(
+                themeProvider: prefsProvider,
+                // expanded: _themeExpanded,
+                // onExpand: (val) => setState(() => _themeExpanded = val),
               ),
+              const SizedBox(height: 12),
+              UnitsSettingsCard(
+                themeProvider: prefsProvider,
+                // expanded: _unitsExpanded,
+                // onExpand: (val) => setState(() => _unitsExpanded = val),
+              ),
+              const SizedBox(height: 12),
+              ClockSettingsCard(
+                themeProvider: prefsProvider,
+                // expanded: _clockExpanded,
+                // onExpand: (val) => setState(() => _clockExpanded = val),
+              ),
+              const SizedBox(height: 12),
+            ],
+          );
+        },
+      ),
     );
   }
 
   // --- Notification Settings Card ---
-  Widget _buildNotificationSettingsCard() {
+  Widget _buildNotificationSettingsCard(SettingsProvider provider) {
+    final settings = provider.settings;
+
     return Card(
       margin: EdgeInsets.zero,
       elevation: 2,
@@ -422,36 +311,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFilterTypeDropdown(),
+                  _buildFilterTypeDropdown(provider),
                   const Divider(height: 20),
                   // --- Conditional Settings based on Filter Type ---
                   AnimatedOpacity(
                     opacity:
-                        _selectedFilterType != NotificationFilterType.none
+                        settings.filterType != NotificationFilterType.none
                             ? 1.0
                             : 0.5,
                     duration: const Duration(milliseconds: 300),
                     child: IgnorePointer(
                       ignoring:
-                          _selectedFilterType == NotificationFilterType.none,
+                          settings.filterType == NotificationFilterType.none,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildMagnitudeSlider(),
+                          _buildMagnitudeSlider(provider),
                           const SizedBox(height: 16),
-                          if (_selectedFilterType ==
+                          if (settings.filterType ==
                               NotificationFilterType.country) ...[
-                            _buildCountryDropdown(),
+                            _buildCountryDropdown(provider),
                             const SizedBox(height: 10),
                           ],
-                          if (_selectedFilterType ==
+                          if (settings.filterType ==
                               NotificationFilterType.distance) ...[
-                            _buildRadiusSlider(),
+                            _buildRadiusSlider(provider),
                             const SizedBox(height: 10),
-                            _buildUseCurrentLocationSwitch(),
+                            _buildUseCurrentLocationSwitch(provider),
                             const SizedBox(height: 10),
-                            _buildSafeZonesSection(),
-                            //const SizedBox(height: 16),
+                            _buildSafeZonesSection(provider),
                           ],
                         ],
                       ),
@@ -466,9 +354,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // --- Individual Setting Widgets ---
-  Widget _buildFilterTypeDropdown() {
+  Widget _buildFilterTypeDropdown(SettingsProvider provider) {
     return DropdownButtonFormField<NotificationFilterType>(
-      value: _selectedFilterType,
+      initialValue: provider.settings.filterType,
       isExpanded: true,
       decoration: const InputDecoration(
         labelText: "Notification Type",
@@ -477,32 +365,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       items: _memoizedFilterTypeItems,
       onChanged: (value) async {
-        if (value != null && value != _selectedFilterType) {
+        if (value != null && value != provider.settings.filterType) {
           bool proceed = true;
           // Request permission if changing to Distance type and using current location
           if (value == NotificationFilterType.distance &&
-              _useCurrentLocationForDistance) {
+              provider.settings.useCurrentLocation) {
             proceed = await _checkAndRequestLocationPermissionIfNeeded();
           }
 
           if (proceed) {
-            if (!mounted) return;
-            setState(() => _selectedFilterType = value);
             // Request notification permission if turning notifications ON from NONE
-            if (_selectedFilterType != NotificationFilterType.none) {
+            if (value != NotificationFilterType.none) {
               bool permissionGranted = await _requestNotificationPermission();
-              if (!mounted) return;
               if (!permissionGranted) {
-                if (!mounted) return;
-                _showPermissionDeniedDialog('Notification');
-                setState(
-                  () => _selectedFilterType = NotificationFilterType.none,
-                ); // Revert if permission denied
+                if (mounted) _showPermissionDeniedDialog('Notification');
+                return; // Do not update if permission denied
               }
             }
-            // Check mounted after potential awaits inside _saveNotificationSettings
-            if (!mounted) return;
-            await _saveNotificationSettings();
+            await provider.updateSettings(
+              provider.settings.copyWith(filterType: value),
+            );
           }
         }
       },
@@ -510,33 +392,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // Slider for minimum magnitude
-  Widget _buildMagnitudeSlider() {
+  Widget _buildMagnitudeSlider(SettingsProvider provider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Minimum Magnitude (≥ ${_selectedMagnitude.toStringAsFixed(1)})"),
+        Text(
+          "Minimum Magnitude (≥ ${provider.settings.magnitude.toStringAsFixed(1)})",
+        ),
         Slider(
-          value: _selectedMagnitude,
+          value: provider.settings.magnitude,
           min: _magnitudeOptions.first,
           max: _magnitudeOptions.last,
           divisions: _magnitudeOptions.length - 1,
-          label: "≥ ${_selectedMagnitude.toStringAsFixed(1)}",
+          label: "≥ ${provider.settings.magnitude.toStringAsFixed(1)}",
           onChanged: (value) {
-            setState(() {
-              _selectedMagnitude =
-                  (value * 2).round() / 2; // Snap to 0.5 increments
-            });
+            // Optimistic update handled by provider if we call updateSettings on change end
+            // But for slider drag, we might want local state or frequent updates?
+            // Provider's updateSettings does notifyListeners, so it should be fine.
+            // To avoid too many backend calls, we can update local state or use onChangeEnd.
+            // Here, let's just update the UI value via provider but only save on end?
+            // The provider implementation saves on every updateSettings call.
+            // So we should probably only call it on ChangeEnd.
+            // But we need the UI to update while dragging.
+            // Let's use a local state wrapper or just update on end.
+            // For simplicity and responsiveness, let's update on end, but we need visual feedback.
+            // Actually, Slider needs a value. If we don't update provider, it won't move.
+            // We can use a local variable for the slider value if needed, but let's try direct update.
+            // Ideally, separate "set" (memory) and "save" (persist).
+            // For now, let's update on end.
           },
-          onChangeEnd: (value) => _saveNotificationSettings(),
+          onChangeEnd: (value) {
+            final snapped = (value * 2).round() / 2;
+            provider.updateSettings(
+              provider.settings.copyWith(magnitude: snapped),
+            );
+          },
         ),
       ],
     );
   }
 
   // Dropdown for country selection
-  Widget _buildCountryDropdown() {
+  Widget _buildCountryDropdown(SettingsProvider provider) {
     return DropdownButtonFormField<String>(
-      value: _selectedCountry,
+      initialValue: provider.settings.country,
       isExpanded: true,
       decoration: const InputDecoration(
         labelText: "Notify for Country",
@@ -545,21 +444,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       items: _memoizedCountryItems,
       onChanged: (value) {
-        if (value != null && value != _selectedCountry) {
-          setState(() => _selectedCountry = value);
-          _saveNotificationSettings();
+        if (value != null && value != provider.settings.country) {
+          provider.updateSettings(provider.settings.copyWith(country: value));
         }
       },
     );
   }
 
   // Slider for radius selection
-  Widget _buildRadiusSlider() {
-    // Find the index of the closest value in _radiusOptions to _selectedRadius
+  Widget _buildRadiusSlider(SettingsProvider provider) {
+    // Find the index of the closest value in _radiusOptions
     int currentIndex = _radiusOptions.indexOf(
-      _findClosestValue(_selectedRadius, _radiusOptions),
+      _findClosestValue(provider.settings.radius, _radiusOptions),
     );
-    String radiusLabel = "${_selectedRadius.toStringAsFixed(0)} km";
+    String radiusLabel = "${provider.settings.radius.toStringAsFixed(0)} km";
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,45 +470,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
           divisions: _radiusOptions.length - 1,
           label: "${_radiusOptions[currentIndex].toStringAsFixed(0)} km",
           onChanged: (value) {
-            setState(() {
-              _selectedRadius = _radiusOptions[value.round()];
-            });
+            // Update on end
           },
-          onChangeEnd: (value) => _saveNotificationSettings(),
+          onChangeEnd: (value) {
+            final newRadius = _radiusOptions[value.round()];
+            provider.updateSettings(
+              provider.settings.copyWith(radius: newRadius),
+            );
+          },
         ),
       ],
     );
   }
 
   // Switch for using current location
-  Widget _buildUseCurrentLocationSwitch() {
+  Widget _buildUseCurrentLocationSwitch(SettingsProvider provider) {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       title: const Text("Use Current Location"),
       subtitle: const Text("Also check distance from your live location"),
-      value: _useCurrentLocationForDistance,
+      value: provider.settings.useCurrentLocation,
       onChanged: (value) async {
         bool proceed = true;
         if (value == true) {
-          // Only check permission when enabling
           proceed = await _checkAndRequestLocationPermissionIfNeeded();
         }
 
         if (proceed) {
-          if (!mounted) return;
-          setState(() => _useCurrentLocationForDistance = value);
-          if (!mounted) return;
-          await _saveNotificationSettings();
-        } else {
-          // Revert the switch if permission was denied
-          // setState(() => _useCurrentLocationForDistance = false);
+          provider.updateSettings(
+            provider.settings.copyWith(useCurrentLocation: value),
+          );
         }
       },
     );
   }
 
   // --- Safe Zones Section ---
-  Widget _buildSafeZonesSection() {
+  Widget _buildSafeZonesSection(SettingsProvider provider) {
+    final safeZones = provider.settings.safeZones;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -624,7 +522,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             IconButton(
               icon: const Icon(Icons.add_location_alt_outlined),
               tooltip: "Add Safe Zone",
-              onPressed: _addSafeZone,
+              onPressed: () => _addSafeZone(provider),
             ),
           ],
         ),
@@ -633,21 +531,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
         const SizedBox(height: 8),
-        if (_safeZones.isEmpty)
+        if (safeZones.isEmpty)
           const Center(
             child: Text(
               "No safe zones added yet.",
               style: TextStyle(fontStyle: FontStyle.italic),
             ),
           ),
-        if (_safeZones.isNotEmpty)
+        if (safeZones.isNotEmpty)
           ListView.builder(
-            shrinkWrap: true, 
-            physics:
-                const NeverScrollableScrollPhysics(),
-            itemCount: _safeZones.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: safeZones.length,
             itemBuilder: (context, index) {
-              final zone = _safeZones[index];
+              final zone = safeZones[index];
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.pin_drop_outlined),
@@ -658,7 +555,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   tooltip: "Delete Safe Zone",
-                  onPressed: () => _deleteSafeZone(index),
+                  onPressed: () => provider.removeSafeZone(index),
                 ),
               );
             },
@@ -666,29 +563,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     );
   }
-  
-  // --- Safe Zone Management ---
-  Future<void> _addSafeZone() async {
-    debugPrint("Opening map picker to add safe zone...");
 
-    if (!mounted) return;
+  // --- Safe Zone Management ---
+  Future<void> _addSafeZone(SettingsProvider provider) async {
+    debugPrint("Opening map picker to add safe zone...");
 
     // Open map picker screen
     final selectedLatLng = await Navigator.push<LatLng>(
       context,
-      MaterialPageRoute(
-        builder:
-            (context) =>
-                const MapPickerScreen(), 
-      ),
+      MaterialPageRoute(builder: (context) => const MapPickerScreen()),
     );
 
     if (!mounted) return;
 
     if (selectedLatLng != null) {
-      if (kDebugMode) {
-        debugPrint("Map picker returned coordinates");
-      }
       final String? zoneName = await showDialog<String>(
         context: context,
         builder: (context) => _EnterSafeZoneNameDialog(),
@@ -697,36 +585,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
 
       if (zoneName != null && zoneName.trim().isNotEmpty) {
-        debugPrint("User entered name: $zoneName");
         final newZone = SafeZone(
           name: zoneName.trim(),
           latitude: selectedLatLng.latitude,
           longitude: selectedLatLng.longitude,
         );
-
-        setState(() {
-          _safeZones.add(newZone);
-        });
-        await _saveNotificationSettings();
-        debugPrint("Safe zone added: $newZone");
-      } else {
-        debugPrint("User cancelled or entered empty name.");
+        await provider.addSafeZone(newZone);
       }
-    } else {
-      debugPrint("Map picker was cancelled.");
     }
   }
 
-  // Delete a safe zone by index
-  void _deleteSafeZone(int index) {
-    setState(() {
-      _safeZones.removeAt(index);
-    });
-    _saveNotificationSettings();
-  }
-
   // --- Data Sources Settings Card ---
-  Widget _buildDataSourcesCard() {
+  Widget _buildDataSourcesCard(SettingsProvider provider) {
+    final selectedSources = provider.selectedDataSources;
+
     return Card(
       margin: EdgeInsets.zero,
       elevation: 2,
@@ -738,7 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
-              '${_selectedDataSources.length} source${_selectedDataSources.length != 1 ? 's' : ''} selected',
+              '${selectedSources.length} source${selectedSources.length != 1 ? 's' : ''} selected',
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             trailing: IconButton(
@@ -747,9 +619,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? Icons.keyboard_arrow_up
                     : Icons.keyboard_arrow_down,
               ),
-              onPressed: () => setState(() => _dataSourcesExpanded = !_dataSourcesExpanded),
+              onPressed:
+                  () => setState(
+                    () => _dataSourcesExpanded = !_dataSourcesExpanded,
+                  ),
             ),
-            onTap: () => setState(() => _dataSourcesExpanded = !_dataSourcesExpanded),
+            onTap:
+                () => setState(
+                  () => _dataSourcesExpanded = !_dataSourcesExpanded,
+                ),
           ),
           if (_dataSourcesExpanded)
             Padding(
@@ -765,124 +643,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('USGS (United States Geological Survey)'),
-                    subtitle: const Text('Comprehensive global earthquake data'),
-                    value: _selectedDataSources.contains(DataSource.usgs),
+                    subtitle: const Text(
+                      'Comprehensive global earthquake data',
+                    ),
+                    value: selectedSources.contains(DataSource.usgs),
                     onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedDataSources.add(DataSource.usgs);
-                        } else {
-                          // Ensure at least one source is selected
-                          if (_selectedDataSources.length > 1) {
-                            _selectedDataSources.remove(DataSource.usgs);
-                          }
+                      final newSources = Set<DataSource>.from(selectedSources);
+                      if (value == true) {
+                        newSources.add(DataSource.usgs);
+                      } else {
+                        if (newSources.length > 1) {
+                          newSources.remove(DataSource.usgs);
                         }
-                      });
-                      _saveDataSourceSettings();
+                      }
+                      provider.updateDataSources(newSources);
                     },
                   ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('EMSC (European-Mediterranean Seismological Centre)'),
-                    subtitle: const Text('European and Mediterranean region focus'),
-                    value: _selectedDataSources.contains(DataSource.emsc),
-                    onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedDataSources.add(DataSource.emsc);
-                        } else {
-                          // Ensure at least one source is selected
-                          if (_selectedDataSources.length > 1) {
-                            _selectedDataSources.remove(DataSource.emsc);
-                          }
-                        }
-                      });
-                      _saveDataSourceSettings();
-                    },
-                  ),
-                  if (_selectedDataSources.length <= 1)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        'At least one data source must be selected.',
-                        style: TextStyle(fontSize: 12, color: Colors.orange),
-                      ),
+                    title: const Text(
+                      'EMSC (European-Mediterranean Seismological Centre)',
                     ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // --- Other Build Methods (Theme, Units, Clock) ---
-
-  Widget _buildThemeSettingsCard(ThemeProvider prefsProvider) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 2,
-      child: Column(
-        children: [
-          ListTile(
-            title: const Text(
-              "Theme",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            trailing: IconButton(
-              icon: Icon(
-                _themeExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
-              ),
-              onPressed: () => setState(() => _themeExpanded = !_themeExpanded),
-            ),
-            onTap: () => setState(() => _themeExpanded = !_themeExpanded),
-          ),
-          if (_themeExpanded)
-            Padding(
-              padding: const EdgeInsets.only(
-                bottom: 8.0,
-              ), 
-              child: Column(
-                children: [
-                  RadioListTile<ThemeMode>(
-                    title: const Text("Same as Device"),
-                    value: ThemeMode.system,
-                    groupValue: prefsProvider.themeMode, 
-                    onChanged: (ThemeMode? value) {
-                      if (value != null) {
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).setThemeMode(value);
+                    subtitle: const Text(
+                      'European and Mediterranean region focus',
+                    ),
+                    value: selectedSources.contains(DataSource.emsc),
+                    onChanged: (bool? value) {
+                      final newSources = Set<DataSource>.from(selectedSources);
+                      if (value == true) {
+                        newSources.add(DataSource.emsc);
+                      } else {
+                        if (newSources.length > 1) {
+                          newSources.remove(DataSource.emsc);
+                        }
                       }
-                    },
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: const Text("Always Light"),
-                    value: ThemeMode.light,
-                    groupValue: prefsProvider.themeMode,
-                    onChanged: (ThemeMode? value) {
-                      if (value != null) {
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).setThemeMode(value);
-                      }
-                    },
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: const Text("Always Dark"),
-                    value: ThemeMode.dark,
-                    groupValue: prefsProvider.themeMode,
-                    onChanged: (ThemeMode? value) {
-                      if (value != null) {
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).setThemeMode(value);
-                      }
+                      provider.updateDataSources(newSources);
                     },
                   ),
                 ],
@@ -890,312 +685,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildUnitsSettingsCard(ThemeProvider prefsProvider) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 2,
-      child: Column(
-        children: [
-          ListTile(
-            title: const Text(
-              "Units of Measurement",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            trailing: IconButton(
-              icon: Icon(
-                _unitsExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
-              ),
-              onPressed: () => setState(() => _unitsExpanded = !_unitsExpanded),
-            ),
-            onTap: () => setState(() => _unitsExpanded = !_unitsExpanded),
-          ),
-          if (_unitsExpanded)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Column(
-                children: [
-                  RadioListTile<DistanceUnit>(
-                    title: const Text("Kilometers (km)"),
-                    value: DistanceUnit.km,
-                    groupValue:
-                        prefsProvider.distanceUnit, 
-                    onChanged: (DistanceUnit? value) {
-                      if (value != null) {
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).setDistanceUnit(value);
-                      }
-                    },
-                  ),
-                  RadioListTile<DistanceUnit>(
-                    title: const Text("Miles (mi)"),
-                    value: DistanceUnit.miles,
-                    groupValue: prefsProvider.distanceUnit,
-                    onChanged: (DistanceUnit? value) {
-                      if (value != null) {
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).setDistanceUnit(value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildClockSettingsCard(ThemeProvider prefsProvider) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 2,
-      child: SwitchListTile(
-        title: const Text(
-          "Use 24-Hour Clock",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        value: prefsProvider.use24HourClock,
-        onChanged: (bool value) {
-          Provider.of<ThemeProvider>(
-            context,
-            listen: false,
-          ).setUse24HourClock(value);
-        },
-        secondary: Icon(
-          prefsProvider.use24HourClock
-              ? Icons.access_time_filled
-              : Icons.access_time,
-        ),
-      ),
-      /*
-       child: Column(
-         children: [
-           ListTile( ... expansion logic ... ),
-           if (_clockExpanded)
-             Padding(...) // Put the SwitchListTile here
-         ]
-       )
-       */
-    );
-  }
-
-  // --- Helper Methods ---
-
-  String _getFilterTypeName(NotificationFilterType type) {
-    switch (type) {
-      case NotificationFilterType.none:
-        return "None (Disabled)";
-      case NotificationFilterType.distance:
-        return "Nearby / Safe Zones";
-      case NotificationFilterType.country:
-        return "Specific Country";
-      case NotificationFilterType.worldwide:
-        return "Worldwide";
-    }
-  }
-
-  double _findClosestValue(double value, List<double> options) {
-    return options.reduce(
-      (a, b) => (a - value).abs() < (b - value).abs() ? a : b,
-    );
-  }
-
-  // --- Permission Handling ---
-
-  Future<bool> _checkAndRequestLocationPermissionIfNeeded({
-    bool showRationale = false,
-  }) async {
-    if (kDebugMode) {
-      debugPrint("Checking location permission");
-    }
-    PermissionStatus status = await Permission.locationWhenInUse.status;
-    if (kDebugMode) {
-      debugPrint("Initial permission status: $status");
-    } 
-
-    if (status.isGranted) {
-      debugPrint("Permission already granted."); 
-      return true;
-    }
-
-    if (status.isPermanentlyDenied) {
-      debugPrint("Permission permanently denied. Showing dialog."); 
-      if (!mounted) return false; 
-      _showPermissionDeniedDialog('Location');
-      return false; // Cannot request if permanently denied
-    }
-
-    // Show rationale if requested and permission not determined yet
-    if (showRationale) {
-      // Rationale needed if isDenied or not determined yet
-      debugPrint("Showing rationale dialog..."); 
-      if (!mounted) return false;
-      bool? userAgreed = await showDialog<bool>(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('Location Permission'),
-              content: const Text(
-                'This app needs access to your location to provide nearby earthquake alerts when using the "Distance" filter type.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-      );
-      if (userAgreed != true) {
-        debugPrint("User cancelled rationale."); 
-        return false; 
-      }
-    }
-
-    debugPrint("Requesting location permission..."); 
-    // Request permission
-    status = await Permission.locationWhenInUse.request();
-    debugPrint("Status after request: $status"); 
-
-    if (status.isGranted) {
-      debugPrint("Permission granted after request."); 
-      return true;
-    } else {
-      debugPrint("Permission denied after request. Showing dialog."); 
-      // Show dialog *before* returning false
-      if (!mounted) return false; 
-      _showPermissionDeniedDialog('Location');
-      return false;
-    }
-  }
-
-  // Request notification permission
-  Future<bool> _requestNotificationPermission() async {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-    bool? permissionGranted;
-
-    try {
-      if (Platform.isAndroid) {
-        final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-            flutterLocalNotificationsPlugin
-                .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin
-                >();
-        permissionGranted =
-            await androidImplementation?.requestNotificationsPermission();
-      } else if (Platform.isIOS) {
-        final IOSFlutterLocalNotificationsPlugin? iosImplementation =
-            flutterLocalNotificationsPlugin
-                .resolvePlatformSpecificImplementation<
-                  IOSFlutterLocalNotificationsPlugin
-                >();
-        permissionGranted = await iosImplementation?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-      }
-    } catch (e) {
-      debugPrint("Error requesting notification permission: $e");
-      permissionGranted = false;
-    }
-    return permissionGranted ?? false;
-  }
-
-  // Show dialog guiding user to app settings
-  void _showPermissionDeniedDialog(String permissionType) {
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('$permissionType Permission Required'),
-            content: Text(
-              '$permissionType permission is required for this feature. Please grant the permission in your device settings for this app.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  openAppSettings(); 
-                },
-                child: const Text('Open Settings'),
-              ),
-            ],
-          ),
     );
   }
 }
 
-// --- Simple Dialog for entering Safe Zone Name ---
+// Dialog for entering safe zone name
 class _EnterSafeZoneNameDialog extends StatefulWidget {
   @override
-  State<_EnterSafeZoneNameDialog> createState() =>
+  _EnterSafeZoneNameDialogState createState() =>
       _EnterSafeZoneNameDialogState();
 }
 
 class _EnterSafeZoneNameDialogState extends State<_EnterSafeZoneNameDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  void _submitName() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.of(context).pop(_nameController.text.trim());
-    }
-  }
+  final TextEditingController _controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text("Name Your Safe Zone"),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _nameController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: "Name (e.g., Home, Office)",
-            hintText: "Enter a descriptive name",
-          ),
-          validator:
-              (value) =>
-                  (value == null || value.trim().isEmpty)
-                      ? 'Name cannot be empty'
-                      : null,
-        ),
+      title: const Text('Name Safe Zone'),
+      content: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(hintText: "e.g., Home, Office"),
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text("Cancel"),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
         ),
-        ElevatedButton(
-          onPressed: _submitName, 
-          child: const Text("Save"),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Save'),
         ),
       ],
     );
