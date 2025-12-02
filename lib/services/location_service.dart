@@ -70,7 +70,7 @@ class LocationService {
       );
       _lastLocationFetchTime = DateTime.now();
       return _cachedPosition;
-    } on TimeoutException catch (e) {
+    } on TimeoutException {
       SecureLogger.warning(
         'Location fetch timed out, attempting fallback/retry',
       );

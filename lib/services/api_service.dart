@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/utils/secure_logger.dart';
-import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -58,20 +57,23 @@ class ApiService {
     File? cacheFileOverride,
     DateTime Function()? nowProvider,
     Future<Map<String, dynamic>> Function(List<dynamic> args)? processExecutor,
-    Future<List<Map<String, dynamic>>> Function(String cachedData)? decodeExecutor,
+    Future<List<Map<String, dynamic>>> Function(String cachedData)?
+    decodeExecutor,
   }) async {
     final prefs = prefsOverride ?? await SharedPreferences.getInstance();
     final cacheFile = cacheFileOverride ?? await _getCacheFile();
-    final process = processExecutor ??
+    final process =
+        processExecutor ??
         ((args) => compute<List<dynamic>, Map<String, dynamic>>(
-              _processEarthquakesIsolate,
-              args,
-            ));
-    final decode = decodeExecutor ??
+          _processEarthquakesIsolate,
+          args,
+        ));
+    final decode =
+        decodeExecutor ??
         ((data) => compute<String, List<Map<String, dynamic>>>(
-              _decodeCacheIsolate,
-              data,
-            ));
+          _decodeCacheIsolate,
+          data,
+        ));
 
     // Check for cached data if not force refreshing
     if (!forceRefresh) {
@@ -97,15 +99,19 @@ class ApiService {
     });
 
     try {
-      final response = await SecureHttpClient.instance.get(url, timeout: const Duration(seconds: 10));
-      SecureLogger.api("earthquake.usgs.gov/fdsnws/event/1/query", statusCode: response.statusCode, method: "GET");
+      final response = await SecureHttpClient.instance.get(
+        url,
+        timeout: const Duration(seconds: 10),
+      );
+      SecureLogger.api(
+        "earthquake.usgs.gov/fdsnws/event/1/query",
+        statusCode: response.statusCode,
+        method: "GET",
+      );
 
       if (response.statusCode == 200) {
         // Process response in isolate
-        final result = await process([
-          response.body,
-          minMagnitude,
-        ]);
+        final result = await process([response.body, minMagnitude]);
 
         // Save processed data to file cache
         await cacheFile.writeAsString(result["encoded"] as String);

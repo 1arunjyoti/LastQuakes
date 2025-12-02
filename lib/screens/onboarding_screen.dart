@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:introduction_screen/introduction_screen.dart';
 import 'package:lastquake/screens/home_screen.dart';
+import 'package:lastquake/utils/app_page_transitions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatelessWidget {
@@ -13,7 +14,7 @@ class OnboardingScreen extends StatelessWidget {
 
     if (context.mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const NavigationHandler()),
+        AppPageTransitions.fadeRoute(page: const NavigationHandler()),
       );
     }
   }

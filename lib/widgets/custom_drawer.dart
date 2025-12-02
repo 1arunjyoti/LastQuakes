@@ -5,6 +5,8 @@ import 'package:lastquake/screens/subscreens/about_screen.dart';
 import 'package:lastquake/screens/subscreens/emergency_contacts_screen.dart';
 import 'package:lastquake/screens/subscreens/preparedness_screen.dart';
 import 'package:lastquake/screens/subscreens/quiz_screen.dart';
+import 'package:lastquake/screens/statistics_screen.dart';
+import 'package:lastquake/utils/app_page_transitions.dart';
 import 'package:provider/provider.dart';
 
 // Define a simple structure for navigation destinations
@@ -39,6 +41,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
       EmergencyContactsScreen(),
     ),
     const NavigationItem(Icons.quiz, "Test Your Knowledge", QuizScreen()),
+    const NavigationItem(
+      Icons.bar_chart_outlined,
+      "Statistics & Insights",
+      StatisticsScreen(),
+    ),
     const NavigationItem(Icons.settings_outlined, "Settings", SettingsScreen()),
     const NavigationItem(Icons.info_outline, "About", AboutScreen()),
   ];
@@ -67,9 +74,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
           Future.delayed(const Duration(milliseconds: 150), () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => _destinations[index].screen,
-              ),
+              AppPageTransitions.slideRoute(page: _destinations[index].screen),
             );
             // Reset selection after navigation if you don't
             // want the item to stay selected after returning to the main screen.
@@ -82,7 +87,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
           _buildDrawerHeader(context, themeProvider),
           Divider(),
 
-          // Main destinations 
+          // Main destinations
           ..._destinations
               .take(3)
               .map(
@@ -148,19 +153,13 @@ class _CustomDrawerState extends State<CustomDrawer> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color:
-                  Theme.of(
-                    context,
-                  ).colorScheme.onSurface, 
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           Text(
             "Stay Informed, Stay Safe",
             style: TextStyle(
-              color:
-                  Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant, 
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],

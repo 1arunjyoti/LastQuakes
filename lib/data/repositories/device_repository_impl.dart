@@ -24,7 +24,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
         url,
         headers: {'Content-Type': 'application/json'},
         body: body,
-        timeout: const Duration(seconds: 20),
+        timeout: const Duration(seconds: 90),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

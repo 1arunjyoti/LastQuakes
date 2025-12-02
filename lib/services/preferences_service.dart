@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:lastquake/models/safe_zone.dart';
 import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/services/secure_storage_service.dart';

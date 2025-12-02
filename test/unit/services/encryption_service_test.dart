@@ -5,7 +5,6 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lastquake/services/encryption_service.dart';
-import 'package:lastquake/services/secure_storage_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,13 +48,15 @@ void main() {
       // 1. Setup legacy keys manually (simulating old app state)
       final random = Random(12345); // Fixed seed for reproducibility
       final keyBytes = Uint8List(32);
-      for (int i = 0; i < keyBytes.length; i++)
+      for (int i = 0; i < keyBytes.length; i++) {
         keyBytes[i] = random.nextInt(256);
+      }
       final masterKeyBase64 = base64Encode(keyBytes);
 
       final saltBytes = Uint8List(16);
-      for (int i = 0; i < saltBytes.length; i++)
+      for (int i = 0; i < saltBytes.length; i++) {
         saltBytes[i] = random.nextInt(256);
+      }
       final saltBase64 = base64Encode(saltBytes);
 
       FlutterSecureStorage.setMockInitialValues({
@@ -79,7 +80,9 @@ void main() {
       final plaintext = 'legacy secret';
       final plaintextBytes = utf8.encode(plaintext);
       final iv = Uint8List(16);
-      for (int i = 0; i < 16; i++) iv[i] = 0; // Simple IV for test
+      for (int i = 0; i < 16; i++) {
+        iv[i] = 0; // Simple IV for test
+      }
 
       final encryptedBytes = Uint8List(plaintextBytes.length);
       for (int i = 0; i < plaintextBytes.length; i++) {

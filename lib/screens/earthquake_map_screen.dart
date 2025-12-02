@@ -14,6 +14,7 @@ import 'package:lastquake/widgets/components/location_button.dart';
 import 'package:lastquake/widgets/components/map_layers_button.dart';
 import 'package:lastquake/widgets/components/zoom_controls.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
+import 'package:lastquake/utils/app_page_transitions.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
@@ -449,8 +450,8 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   void _showEarthquakeDetails(Earthquake quake) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EarthquakeDetailsScreen(earthquake: quake),
+      AppPageTransitions.scaleRoute(
+        page: EarthquakeDetailsScreen(earthquake: quake),
       ),
     );
   }

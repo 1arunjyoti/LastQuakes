@@ -4,6 +4,7 @@ import 'package:lastquake/screens/map_picker_screen.dart';
 import 'package:lastquake/services/preferences_service.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:lastquake/utils/app_page_transitions.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class NotificationSettingsCard extends StatefulWidget {
@@ -364,7 +365,7 @@ class _NotificationSettingsCardState extends State<NotificationSettingsCard> {
   Future<void> _addSafeZone() async {
     final selectedLatLng = await Navigator.push<LatLng>(
       context,
-      MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+      AppPageTransitions.fadeRoute(page: const MapPickerScreen()),
     );
 
     if (selectedLatLng != null && mounted) {

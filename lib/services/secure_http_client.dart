@@ -71,8 +71,8 @@ class SecureHttpClient {
     final httpClient = HttpClient(context: context);
 
     // Configure timeouts
-    httpClient.idleTimeout = const Duration(seconds: 10);
-    httpClient.connectionTimeout = const Duration(seconds: 10);
+    httpClient.idleTimeout = const Duration(seconds: 60);
+    httpClient.connectionTimeout = const Duration(seconds: 60);
 
     // Configure certificate validation with pinning
     httpClient.badCertificateCallback = (
@@ -150,7 +150,7 @@ class SecureHttpClient {
     return _makeSecureRequest(
       () => _client.get(url, headers: headers),
       url.host,
-      timeout ?? const Duration(seconds: 30),
+      timeout ?? const Duration(seconds: 60),
     );
   }
 
@@ -164,7 +164,7 @@ class SecureHttpClient {
     return _makeSecureRequest(
       () => _client.post(url, headers: headers, body: body),
       url.host,
-      timeout ?? const Duration(seconds: 30),
+      timeout ?? const Duration(seconds: 60),
     );
   }
 
@@ -178,7 +178,7 @@ class SecureHttpClient {
     return _makeSecureRequest(
       () => _client.put(url, headers: headers, body: body),
       url.host,
-      timeout ?? const Duration(seconds: 30),
+      timeout ?? const Duration(seconds: 60),
     );
   }
 
@@ -192,7 +192,7 @@ class SecureHttpClient {
     return _makeSecureRequest(
       () => _client.patch(url, headers: headers, body: body),
       url.host,
-      timeout ?? const Duration(seconds: 30),
+      timeout ?? const Duration(seconds: 60),
     );
   }
 
@@ -206,7 +206,7 @@ class SecureHttpClient {
     return _makeSecureRequest(
       () => _client.delete(url, headers: headers, body: body),
       url.host,
-      timeout ?? const Duration(seconds: 30),
+      timeout ?? const Duration(seconds: 60),
     );
   }
 
@@ -219,7 +219,7 @@ class SecureHttpClient {
     return _makeSecureRequest(
       () => _client.head(url, headers: headers),
       url.host,
-      timeout ?? const Duration(seconds: 30),
+      timeout ?? const Duration(seconds: 60),
     );
   }
 

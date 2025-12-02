@@ -6,6 +6,7 @@ import 'package:lastquake/screens/earthquake_details.dart';
 import 'package:lastquake/widgets/appbar.dart';
 import 'package:lastquake/widgets/custom_drawer.dart';
 import 'package:lastquake/widgets/earthquake_list_item.dart';
+import 'package:lastquake/utils/app_page_transitions.dart';
 import 'package:provider/provider.dart';
 
 class EarthquakeListScreen extends StatefulWidget {
@@ -186,11 +187,10 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => EarthquakeDetailsScreen(
-                                            earthquake: earthquake,
-                                          ),
+                                    AppPageTransitions.scaleRoute(
+                                      page: EarthquakeDetailsScreen(
+                                        earthquake: earthquake,
+                                      ),
                                     ),
                                   );
                                 },
