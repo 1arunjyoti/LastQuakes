@@ -1,11 +1,11 @@
 {
-    "name": "lastquake",
-    "short_name": "lastquake",
+    "name": "LastQuakes",
+    "short_name": "LastQuakes",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#001f3f",
+    "theme_color": "#001f3f",
+    "description": "Real-time earthquake alerts and preparedness info.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

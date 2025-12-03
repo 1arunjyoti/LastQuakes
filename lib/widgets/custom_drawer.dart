@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/screens/settings_screen.dart';
-import 'package:lastquake/screens/subscreens/about_screen.dart';
-import 'package:lastquake/screens/subscreens/emergency_contacts_screen.dart';
-import 'package:lastquake/screens/subscreens/preparedness_screen.dart';
-import 'package:lastquake/screens/subscreens/quiz_screen.dart';
+import 'package:lastquakes/provider/theme_provider.dart';
+import 'package:lastquakes/screens/settings_screen.dart';
+import 'package:lastquakes/screens/subscreens/about_screen.dart';
+import 'package:lastquakes/screens/subscreens/emergency_contacts_screen.dart';
+import 'package:lastquakes/screens/subscreens/preparedness_screen.dart';
+import 'package:lastquakes/screens/subscreens/quiz_screen.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:provider/provider.dart';
 
 // Define a simple structure for navigation destinations
@@ -62,14 +63,13 @@ class _CustomDrawerState extends State<CustomDrawer> {
           });
 
           // Close the drawer first
-          Navigator.pop(context);
+          // Close the drawer first
+          final navigator = Navigator.of(context);
+          navigator.pop();
 
           Future.delayed(const Duration(milliseconds: 150), () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => _destinations[index].screen,
-              ),
+            navigator.push(
+              AppPageTransitions.slideRoute(page: _destinations[index].screen),
             );
             // Reset selection after navigation if you don't
             // want the item to stay selected after returning to the main screen.
@@ -82,15 +82,21 @@ class _CustomDrawerState extends State<CustomDrawer> {
           _buildDrawerHeader(context, themeProvider),
           Divider(),
 
-          // Main destinations 
+          // Main destinations
           ..._destinations
               .take(3)
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
-                  label: Text(
-                    item.label, 
-                    style: const TextStyle(fontSize: 16),
+                  label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(fontSize: 15),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    ),
                   ),
                 ),
               ),
@@ -101,9 +107,15 @@ class _CustomDrawerState extends State<CustomDrawer> {
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
-                  label: Text(
-                    item.label,
-                    style: const TextStyle(fontSize: 16),
+                  label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(fontSize: 15),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    ),
                   ),
                 ),
               ),
@@ -136,19 +148,13 @@ class _CustomDrawerState extends State<CustomDrawer> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color:
-                  Theme.of(
-                    context,
-                  ).colorScheme.onSurface, 
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           Text(
             "Stay Informed, Stay Safe",
             style: TextStyle(
-              color:
-                  Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant, 
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],

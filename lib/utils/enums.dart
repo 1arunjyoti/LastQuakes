@@ -15,3 +15,8 @@ enum MapLayerType {
   terrain, // Topographic/Terrain Map
   dark, // Dark Mode Map
 }
+
+enum DataSource {
+  usgs, // United States Geological Survey
+  emsc, // European-Mediterranean Seismological Centre
+}

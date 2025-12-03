@@ -46,8 +46,17 @@ app.*.map.json
 /android/app/release
 
 
-my-firebase-backend
+# Security & Sensitive Configuration
+# Keep Firebase configuration out of version control
 android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Keystore and signing properties (NEVER commit credentials)
+key.properties
+*.jks
+*.keystore
+
+# Backend and IDE
+my-firebase-backend
 .vscode
 Readme files/
-key.properties
