@@ -517,7 +517,8 @@ class EarthquakeListWidgetState extends State<EarthquakeListWidget> {
                           controller: scrollController,
                           padding: const EdgeInsets.only(top: 4, bottom: 8),
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const Divider(height: 0),
+                          separatorBuilder:
+                              (context, index) => const Divider(height: 0),
                           itemBuilder: (context, index) {
                             final country = filtered[index];
                             final isSelected =
@@ -616,7 +617,8 @@ class EarthquakeListWidgetState extends State<EarthquakeListWidget> {
                   shrinkWrap: true,
                   physics: const ClampingScrollPhysics(),
                   itemCount: magnitudeOptions.length,
-                  separatorBuilder: (_, __) => const Divider(height: 0),
+                  separatorBuilder:
+                      (context, index) => const Divider(height: 0),
                   itemBuilder: (context, index) {
                     final mag = magnitudeOptions[index];
                     final isSelected = mag == provider.listSelectedMagnitude;

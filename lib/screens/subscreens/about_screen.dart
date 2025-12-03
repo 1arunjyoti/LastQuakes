@@ -96,7 +96,7 @@ class _AboutScreenState extends State<AboutScreen> {
   }
 
   // Helper to launch URL safely
-  Future<void> _launchUrlHelper(String urlString, BuildContext context) async {
+  Future<void> _launchUrlHelper(String urlString) async {
     final Uri url = Uri.parse(urlString);
     try {
       bool launched = await launchUrl(
@@ -183,7 +183,6 @@ class _AboutScreenState extends State<AboutScreen> {
                             onTap:
                                 () => _launchUrlHelper(
                                   'https://earthquake.usgs.gov/',
-                                  context,
                                 ),
                             child: Text(
                               'Visit USGS Earthquake Hazards Program',
@@ -198,7 +197,6 @@ class _AboutScreenState extends State<AboutScreen> {
                             onTap:
                                 () => _launchUrlHelper(
                                   "https://www.emsc-csem.org/",
-                                  context,
                                 ),
                             child: Text(
                               'Visit EMSC Seismicity Catalog',
@@ -224,12 +222,9 @@ class _AboutScreenState extends State<AboutScreen> {
                         color: colorScheme.secondary,
                       ),
                       title: const Text('Project License'),
-                      subtitle: const Text(
-                        'GNU General Public License v3.0',
-                      ),
+                      subtitle: const Text('GNU General Public License v3.0'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap:
-                          () => _showProjectLicense(context),
+                      onTap: () => _showProjectLicense(),
                     ),
 
                     const SizedBox(height: 8),
@@ -420,7 +415,8 @@ class _AboutScreenState extends State<AboutScreen> {
                           ],
                         );
                       },
-                      separatorBuilder: (_, __) => const Divider(height: 24),
+                      separatorBuilder:
+                          (context, index) => const Divider(height: 24),
                       itemCount: sections.length,
                     ),
                   ),
@@ -433,7 +429,7 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  Future<void> _showProjectLicense(BuildContext context) async {
+  Future<void> _showProjectLicense() async {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -456,7 +452,10 @@ class _AboutScreenState extends State<AboutScreen> {
             child: FractionallySizedBox(
               heightFactor: 0.9,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

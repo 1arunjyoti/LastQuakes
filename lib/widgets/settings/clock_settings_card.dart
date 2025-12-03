@@ -36,29 +36,25 @@ class _ClockSettingsCardState extends State<ClockSettingsCard> {
           if (_expanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                children: [
-                  RadioListTile<bool>(
-                    title: const Text('12-hour (AM/PM)'),
-                    value: false,
-                    groupValue: widget.themeProvider.use24HourClock,
-                    onChanged: (bool? value) {
-                      if (value != null) {
-                        widget.themeProvider.setUse24HourClock(value);
-                      }
-                    },
-                  ),
-                  RadioListTile<bool>(
-                    title: const Text('24-hour'),
-                    value: true,
-                    groupValue: widget.themeProvider.use24HourClock,
-                    onChanged: (bool? value) {
-                      if (value != null) {
-                        widget.themeProvider.setUse24HourClock(value);
-                      }
-                    },
-                  ),
-                ],
+              child: RadioGroup<bool>(
+                groupValue: widget.themeProvider.use24HourClock,
+                onChanged: (bool? value) {
+                  if (value != null) {
+                    widget.themeProvider.setUse24HourClock(value);
+                  }
+                },
+                child: Column(
+                  children: [
+                    RadioListTile<bool>(
+                      title: const Text('12-hour (AM/PM)'),
+                      value: false,
+                    ),
+                    RadioListTile<bool>(
+                      title: const Text('24-hour'),
+                      value: true,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

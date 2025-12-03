@@ -63,11 +63,12 @@ class _CustomDrawerState extends State<CustomDrawer> {
           });
 
           // Close the drawer first
-          Navigator.pop(context);
+          // Close the drawer first
+          final navigator = Navigator.of(context);
+          navigator.pop();
 
           Future.delayed(const Duration(milliseconds: 150), () {
-            Navigator.push(
-              context,
+            navigator.push(
               AppPageTransitions.slideRoute(page: _destinations[index].screen),
             );
             // Reset selection after navigation if you don't

@@ -37,29 +37,25 @@ class _UnitsSettingsCardState extends State<UnitsSettingsCard> {
           if (_expanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                children: [
-                  RadioListTile<DistanceUnit>(
-                    title: const Text('Kilometers (km)'),
-                    value: DistanceUnit.km,
-                    groupValue: widget.themeProvider.distanceUnit,
-                    onChanged: (DistanceUnit? value) {
-                      if (value != null) {
-                        widget.themeProvider.setDistanceUnit(value);
-                      }
-                    },
-                  ),
-                  RadioListTile<DistanceUnit>(
-                    title: const Text('Miles (mi)'),
-                    value: DistanceUnit.miles,
-                    groupValue: widget.themeProvider.distanceUnit,
-                    onChanged: (DistanceUnit? value) {
-                      if (value != null) {
-                        widget.themeProvider.setDistanceUnit(value);
-                      }
-                    },
-                  ),
-                ],
+              child: RadioGroup<DistanceUnit>(
+                groupValue: widget.themeProvider.distanceUnit,
+                onChanged: (DistanceUnit? value) {
+                  if (value != null) {
+                    widget.themeProvider.setDistanceUnit(value);
+                  }
+                },
+                child: Column(
+                  children: [
+                    RadioListTile<DistanceUnit>(
+                      title: const Text('Kilometers (km)'),
+                      value: DistanceUnit.km,
+                    ),
+                    RadioListTile<DistanceUnit>(
+                      title: const Text('Miles (mi)'),
+                      value: DistanceUnit.miles,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

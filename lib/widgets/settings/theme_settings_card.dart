@@ -36,39 +36,29 @@ class _ThemeSettingsCardState extends State<ThemeSettingsCard> {
           if (_expanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                children: [
-                  RadioListTile<ThemeMode>(
-                    title: const Text('System Default'),
-                    value: ThemeMode.system,
-                    groupValue: widget.themeProvider.themeMode,
-                    onChanged: (ThemeMode? value) {
-                      if (value != null) {
-                        widget.themeProvider.setThemeMode(value);
-                      }
-                    },
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('Light Theme'),
-                    value: ThemeMode.light,
-                    groupValue: widget.themeProvider.themeMode,
-                    onChanged: (ThemeMode? value) {
-                      if (value != null) {
-                        widget.themeProvider.setThemeMode(value);
-                      }
-                    },
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('Dark Theme'),
-                    value: ThemeMode.dark,
-                    groupValue: widget.themeProvider.themeMode,
-                    onChanged: (ThemeMode? value) {
-                      if (value != null) {
-                        widget.themeProvider.setThemeMode(value);
-                      }
-                    },
-                  ),
-                ],
+              child: RadioGroup<ThemeMode>(
+                groupValue: widget.themeProvider.themeMode,
+                onChanged: (ThemeMode? value) {
+                  if (value != null) {
+                    widget.themeProvider.setThemeMode(value);
+                  }
+                },
+                child: Column(
+                  children: [
+                    RadioListTile<ThemeMode>(
+                      title: const Text('System Default'),
+                      value: ThemeMode.system,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: const Text('Light Theme'),
+                      value: ThemeMode.light,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: const Text('Dark Theme'),
+                      value: ThemeMode.dark,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

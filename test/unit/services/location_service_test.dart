@@ -18,7 +18,6 @@ class _FakeGeolocator extends GeolocatorPlatform {
     required this.serviceEnabled,
     required this.permission,
     this.currentPosition,
-    this.lastKnownPosition,
   });
 
   Position? lastKnownPosition;

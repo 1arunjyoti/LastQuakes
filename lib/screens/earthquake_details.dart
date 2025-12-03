@@ -36,7 +36,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   void initState() {
     super.initState();
     _mapController = MapController();
-    
+
     // Log earthquake detail view
     AnalyticsService.instance.logEarthquakeDetailView(
       earthquakeId: widget.earthquake.id,
@@ -147,8 +147,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                                     TileLayer(
                                       urlTemplate:
                                           "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
-                                      userAgentPackageName:
-                                          'app.lastquakes',
+                                      userAgentPackageName: 'app.lastquakes',
                                     ),
                                     MarkerLayer(
                                       markers: [
@@ -577,10 +576,13 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
       final magnitude = widget.earthquake.magnitude.toStringAsFixed(1);
       final location = widget.earthquake.place;
 
-      await Share.shareXFiles([
-        XFile(imagePath.path),
-      ], subject: 'Earthquake Information: M $magnitude near $location');
-      
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(imagePath.path)],
+          subject: 'Earthquake Information: M $magnitude near $location',
+        ),
+      );
+
       // Log share event
       AnalyticsService.instance.logShare(
         contentType: 'earthquake',
