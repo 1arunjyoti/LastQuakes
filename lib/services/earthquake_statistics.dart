@@ -97,7 +97,11 @@ class EarthquakeStats {
 /// Utility class for calculating earthquake statistics
 class EarthquakeStatistics {
   /// Calculate comprehensive statistics from a list of earthquakes
-  static EarthquakeStats calculate(List<Earthquake> earthquakes) {
+  /// Calculate comprehensive statistics from a list of earthquakes
+  static EarthquakeStats calculate(
+    List<Earthquake> earthquakes, {
+    DateTime? now,
+  }) {
     if (earthquakes.isEmpty) {
       return const EarthquakeStats(
         totalCount: 0,
@@ -111,6 +115,8 @@ class EarthquakeStatistics {
         dailyTrend: [],
       );
     }
+
+    final referenceTime = now ?? DateTime.now();
 
     final totalCount = earthquakes.length;
 
@@ -145,13 +151,16 @@ class EarthquakeStatistics {
     final sourceBreakdown = _calculateSourceBreakdown(earthquakes);
 
     // Calculate last 7 days trend
-    final last7DaysTrend = _calculateLast7DaysTrend(earthquakes);
+    final last7DaysTrend = _calculateLast7DaysTrend(earthquakes, referenceTime);
 
     // Calculate complete daily trend
     final dailyTrend = _calculateDailyTrend(earthquakes);
 
     // Calculate weekly comparison
-    final weeklyComparison = _calculateWeeklyComparison(earthquakes);
+    final weeklyComparison = _calculateWeeklyComparison(
+      earthquakes,
+      referenceTime,
+    );
 
     return EarthquakeStats(
       totalCount: totalCount,
@@ -274,8 +283,8 @@ class EarthquakeStatistics {
   /// Calculate earthquake count for the last 7 days
   static List<TemporalStats> _calculateLast7DaysTrend(
     List<Earthquake> earthquakes,
+    DateTime now,
   ) {
-    final now = DateTime.now();
     final Map<String, int> dayCounts = {};
 
     // Initialize last 7 days
@@ -345,10 +354,10 @@ class EarthquakeStatistics {
   /// Calculate weekly comparison statistics
   static WeeklyComparison? _calculateWeeklyComparison(
     List<Earthquake> earthquakes,
+    DateTime now,
   ) {
     if (earthquakes.isEmpty) return null;
 
-    final now = DateTime.now();
     final Map<String, int> dailyCounts = {};
 
     int thisWeek = 0;

@@ -1,34 +1,40 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:provider/provider.dart';
+import 'package:mocktail/mocktail.dart';
 
-import 'package:lastquakes/main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+class MockGetEarthquakesUseCase extends Mock implements GetEarthquakesUseCase {}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({'seenOnboarding': true});
-    final prefs = await SharedPreferences.getInstance();
+  testWidgets('EarthquakeProvider smoke test', (WidgetTester tester) async {
+    final mockGetEarthquakesUseCase = MockGetEarthquakesUseCase();
 
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(MyApp(seenOnboarding: true, prefs: prefs));
+    // Build app with provider
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create:
+                (_) => EarthquakeProvider(
+                  getEarthquakesUseCase: mockGetEarthquakesUseCase,
+                ),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Consumer<EarthquakeProvider>(
+              builder: (context, provider, _) {
+                return const Text('Provider Loaded');
+              },
+            ),
+          ),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify it builds and finds provider
+    expect(find.text('Provider Loaded'), findsOneWidget);
   });
 }

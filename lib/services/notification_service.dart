@@ -2,6 +2,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:lastquakes/services/location_service.dart';
+import 'package:flutter/foundation.dart';
 
 // Keys need to match settings_screen.dart
 const String prefNotificationFilterType = 'notification_filter_type';
@@ -22,10 +23,18 @@ class NotificationService {
   }
 
   // Private constructor
-  NotificationService._();
+  NotificationService._({FlutterLocalNotificationsPlugin? plugin})
+    : flutterLocalNotificationsPlugin =
+          plugin ?? FlutterLocalNotificationsPlugin();
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  @visibleForTesting
+  factory NotificationService.test({
+    required FlutterLocalNotificationsPlugin plugin,
+  }) {
+    return NotificationService._(plugin: plugin);
+  }
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
   final LocationService locationService =
       LocationService(); // For getting user location
 

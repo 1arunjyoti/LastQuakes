@@ -361,118 +361,569 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     );
   }
 
-  /// Show Add Contact Dialog with M3 styling
+  /// Show Add Contact Dialog - web-optimized for web, simple for mobile
   void _showAddContactDialog(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     TextEditingController nameController = TextEditingController();
     TextEditingController numberController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Add Custom Contact",
-                  style: textTheme.headlineSmall?.copyWith(
-                    // M3 Headline Small
-                    // fontWeight: FontWeight.bold, // Default weight is usually fine
-                  ),
-                ),
-                const SizedBox(height: 16),
+    // Use web-optimized dialog for web, simple dialog for mobile
+    if (kIsWeb) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return _WebAddContactDialog(
+            nameController: nameController,
+            numberController: numberController,
+            colorScheme: colorScheme,
+            textTheme: textTheme,
+            isWeb: true,
+            onAddContact: (name, number) {
+              _addCustomContact(name, number);
+              Navigator.of(dialogContext).pop();
+            },
+          );
+        },
+      );
+    } else {
+      // Simple mobile dialog
+      showDialog(
+        context: context,
+        builder: (dialogContext) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Add Custom Contact", style: textTheme.headlineSmall),
+                  const SizedBox(height: 16),
 
-                // Name TextField
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: "Contact Name",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  // Name TextField
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: "Contact Name",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.person,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    prefixIcon: Icon(
-                      Icons.person,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    textInputAction: TextInputAction.next,
                   ),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Phone Number TextField
-                TextField(
-                  controller: numberController,
-                  decoration: InputDecoration(
-                    labelText: "Phone Number",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  // Phone Number TextField
+                  TextField(
+                    controller: numberController,
+                    decoration: InputDecoration(
+                      labelText: "Phone Number",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.phone,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    prefixIcon: Icon(
-                      Icons.phone,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.done,
                   ),
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text("Cancel"),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () {
-                        final name = nameController.text.trim();
-                        final number = numberController.text.trim();
-                        if (name.isNotEmpty && number.isNotEmpty) {
-                          // Basic phone number validation
-                          if (RegExp(
-                            r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$',
-                          ).hasMatch(number)) {
-                            _addCustomContact(name, number);
-                            Navigator.of(dialogContext).pop();
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text("Cancel"),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () {
+                          final name = nameController.text.trim();
+                          final number = numberController.text.trim();
+                          if (name.isNotEmpty && number.isNotEmpty) {
+                            // Basic phone number validation
+                            if (RegExp(
+                              r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\\s\\./0-9]*$',
+                            ).hasMatch(number)) {
+                              _addCustomContact(name, number);
+                              Navigator.of(dialogContext).pop();
+                            } else {
+                              // Show error if number is invalid
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    "Please enter a valid phone number.",
+                                  ),
+                                ),
+                              );
+                            }
                           } else {
-                            // Show error if number is invalid
+                            // Show error if fields are empty
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  "Please enter a valid phone number.",
-                                ),
+                                content: Text("Please fill in both fields."),
                               ),
                             );
                           }
-                        } else {
-                          // Show error if fields are empty
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Please fill in both fields."),
+                        },
+                        child: const Text("Add"),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+  }
+}
+
+/// Web-optimized Add Contact Dialog Widget
+/// Features: Real-time validation, glassmorphic design, enhanced UX for web
+class _WebAddContactDialog extends StatefulWidget {
+  final TextEditingController nameController;
+  final TextEditingController numberController;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+  final bool isWeb;
+  final Function(String name, String number) onAddContact;
+
+  const _WebAddContactDialog({
+    required this.nameController,
+    required this.numberController,
+    required this.colorScheme,
+    required this.textTheme,
+    required this.isWeb,
+    required this.onAddContact,
+  });
+
+  @override
+  State<_WebAddContactDialog> createState() => _WebAddContactDialogState();
+}
+
+class _WebAddContactDialogState extends State<_WebAddContactDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  String? _nameError;
+  String? _numberError;
+  bool _isNameValid = false;
+  bool _isNumberValid = false;
+
+  final _phoneRegex = RegExp(r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$');
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize animation controller
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _animationController.forward();
+
+    // Add listeners for real-time validation
+    widget.nameController.addListener(_validateName);
+    widget.numberController.addListener(_validateNumber);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    widget.nameController.removeListener(_validateName);
+    widget.numberController.removeListener(_validateNumber);
+    widget.nameController.dispose();
+    widget.numberController.dispose();
+    super.dispose();
+  }
+
+  void _validateName() {
+    final name = widget.nameController.text.trim();
+    setState(() {
+      if (name.isEmpty) {
+        _nameError = null;
+        _isNameValid = false;
+      } else if (name.length < 2) {
+        _nameError = "Name must be at least 2 characters";
+        _isNameValid = false;
+      } else {
+        _nameError = null;
+        _isNameValid = true;
+      }
+    });
+  }
+
+  void _validateNumber() {
+    final number = widget.numberController.text.trim();
+    setState(() {
+      if (number.isEmpty) {
+        _numberError = null;
+        _isNumberValid = false;
+      } else if (!_phoneRegex.hasMatch(number)) {
+        _numberError = "Please enter a valid phone number";
+        _isNumberValid = false;
+      } else if (number.length < 5) {
+        _numberError = "Phone number is too short";
+        _isNumberValid = false;
+      } else {
+        _numberError = null;
+        _isNumberValid = true;
+      }
+    });
+  }
+
+  void _handleSubmit() {
+    _validateName();
+    _validateNumber();
+
+    if (_isNameValid && _isNumberValid) {
+      widget.onAddContact(
+        widget.nameController.text.trim(),
+        widget.numberController.text.trim(),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dialogWidth = widget.isWeb ? 560.0 : 400.0;
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Dialog(
+          backgroundColor: widget.colorScheme.surface,
+          surfaceTintColor: widget.colorScheme.surfaceTint,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Container(
+            width: dialogWidth,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(widget.isWeb ? 32.0 : 24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with icon
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: widget.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.contact_emergency,
+                            size: 28,
+                            color: widget.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Add Emergency Contact",
+                                style: widget.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: widget.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Add a trusted contact for emergencies",
+                                style: widget.textTheme.bodyMedium?.copyWith(
+                                  color: widget.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: widget.isWeb ? 32.0 : 24.0),
+
+                    // Divider
+                    Divider(
+                      color: widget.colorScheme.outlineVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                      height: 1,
+                    ),
+
+                    SizedBox(height: widget.isWeb ? 32.0 : 24.0),
+
+                    // Name TextField with enhanced styling
+                    TextField(
+                      controller: widget.nameController,
+                      decoration: InputDecoration(
+                        labelText: "Contact Name *",
+                        helperText: "Full name of your emergency contact",
+                        helperStyle: widget.textTheme.bodySmall?.copyWith(
+                          color: widget.colorScheme.onSurfaceVariant,
+                        ),
+                        errorText: _nameError,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.outline,
+                            width: 1.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.outline,
+                            width: 1.5,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.primary,
+                            width: 2.5,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.error,
+                            width: 2.0,
+                          ),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.error,
+                            width: 2.5,
+                          ),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.person_outline_rounded,
+                          color:
+                              _isNameValid
+                                  ? widget.colorScheme.primary
+                                  : widget.colorScheme.onSurfaceVariant,
+                        ),
+                        suffixIcon:
+                            _isNameValid
+                                ? Icon(
+                                  Icons.check_circle,
+                                  color: widget.colorScheme.primary,
+                                  size: 24,
+                                )
+                                : null,
+                        filled: true,
+                        fillColor: widget.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
+                      ),
+                      textInputAction: TextInputAction.next,
+                      style: widget.textTheme.bodyLarge,
+                    ),
+
+                    SizedBox(height: widget.isWeb ? 24.0 : 20.0),
+
+                    // Phone Number TextField with enhanced styling
+                    TextField(
+                      controller: widget.numberController,
+                      decoration: InputDecoration(
+                        labelText: "Phone Number *",
+                        helperText: "Include country code (e.g., +1 555-0100)",
+                        helperStyle: widget.textTheme.bodySmall?.copyWith(
+                          color: widget.colorScheme.onSurfaceVariant,
+                        ),
+                        errorText: _numberError,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.outline,
+                            width: 1.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.outline,
+                            width: 1.5,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.primary,
+                            width: 2.5,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.error,
+                            width: 2.0,
+                          ),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: widget.colorScheme.error,
+                            width: 2.5,
+                          ),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.phone_outlined,
+                          color:
+                              _isNumberValid
+                                  ? widget.colorScheme.primary
+                                  : widget.colorScheme.onSurfaceVariant,
+                        ),
+                        suffixIcon:
+                            _isNumberValid
+                                ? Icon(
+                                  Icons.check_circle,
+                                  color: widget.colorScheme.primary,
+                                  size: 24,
+                                )
+                                : null,
+                        filled: true,
+                        fillColor: widget.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
+                      ),
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _handleSubmit(),
+                      style: widget.textTheme.bodyLarge,
+                    ),
+
+                    SizedBox(height: widget.isWeb ? 32.0 : 24.0),
+
+                    // Info card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: widget.colorScheme.secondaryContainer.withValues(
+                          alpha: 0.3,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: widget.colorScheme.secondary.withValues(
+                            alpha: 0.2,
+                          ),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: widget.colorScheme.secondary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              "This contact will be saved securely and can be quickly accessed during emergencies",
+                              style: widget.textTheme.bodySmall?.copyWith(
+                                color: widget.colorScheme.onSecondaryContainer,
+                                height: 1.4,
+                              ),
                             ),
-                          );
-                        }
-                      },
-                      child: const Text("Add"),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: widget.isWeb ? 32.0 : 24.0),
+
+                    // Action Buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: widget.isWeb ? 24 : 16,
+                              vertical: widget.isWeb ? 16 : 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            "Cancel",
+                            style: widget.textTheme.labelLarge,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          onPressed:
+                              _isNameValid && _isNumberValid
+                                  ? _handleSubmit
+                                  : null,
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: widget.isWeb ? 28 : 20,
+                              vertical: widget.isWeb ? 18 : 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: _isNameValid && _isNumberValid ? 2 : 0,
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 20),
+                          label: Text(
+                            "Add Contact",
+                            style: widget.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

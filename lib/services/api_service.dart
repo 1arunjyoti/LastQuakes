@@ -11,7 +11,8 @@ class ApiService {
   static const String _cacheFilename = 'earthquake_data_cache.json';
 
   /// Process earthquakes data in an isolate
-  static Map<String, dynamic> _processEarthquakesIsolate(List<dynamic> args) {
+  @visibleForTesting
+  static Map<String, dynamic> processEarthquakesIsolate(List<dynamic> args) {
     String rawData = args[0];
     double minMagnitude = args[1];
 
@@ -37,7 +38,8 @@ class ApiService {
   }
 
   /// Decode cached data in isolate
-  static List<Map<String, dynamic>> _decodeCacheIsolate(String cachedData) {
+  @visibleForTesting
+  static List<Map<String, dynamic>> decodeCacheIsolate(String cachedData) {
     final List<dynamic> decoded = json.decode(cachedData);
     return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
   }
@@ -65,21 +67,23 @@ class ApiService {
     final process =
         processExecutor ??
         ((args) => compute<List<dynamic>, Map<String, dynamic>>(
-          _processEarthquakesIsolate,
+          processEarthquakesIsolate,
           args,
         ));
     final decode =
         decodeExecutor ??
         ((data) => compute<String, List<Map<String, dynamic>>>(
-          _decodeCacheIsolate,
+          decodeCacheIsolate,
           data,
         ));
+
+    final DateTime now = nowProvider?.call() ?? DateTime.now();
 
     // Check for cached data if not force refreshing
     if (!forceRefresh) {
       final cachedTimestamp = prefs.getInt(_cacheTimestampKey);
       if (cachedTimestamp != null && await cacheFile.exists()) {
-        final currentTime = DateTime.now().millisecondsSinceEpoch;
+        final currentTime = now.millisecondsSinceEpoch;
         if (currentTime - cachedTimestamp < 3600000) {
           // 1 hour cache
           final String cachedData = await cacheFile.readAsString();
@@ -87,8 +91,6 @@ class ApiService {
         }
       }
     }
-
-    final DateTime now = nowProvider?.call() ?? DateTime.now();
     final DateTime startDate = now.subtract(Duration(days: days));
 
     final Uri url = Uri.https("earthquake.usgs.gov", "/fdsnws/event/1/query", {

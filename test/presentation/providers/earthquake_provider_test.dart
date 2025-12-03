@@ -1,20 +1,46 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/models/earthquake_adapter.dart';
 import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
 import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockGetEarthquakesUseCase extends Mock implements GetEarthquakesUseCase {}
 
 void main() {
   late MockGetEarthquakesUseCase mockGetEarthquakesUseCase;
   late EarthquakeProvider provider;
+  late Directory tempDir;
 
-  setUp(() {
+  setUp(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    // Initialize Hive
+    tempDir = await Directory.systemTemp.createTemp();
+    Hive.init(tempDir.path);
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(EarthquakeAdapter());
+    }
+
     mockGetEarthquakesUseCase = MockGetEarthquakesUseCase();
     provider = EarthquakeProvider(
       getEarthquakesUseCase: mockGetEarthquakesUseCase,
     );
+  });
+
+  tearDown(() async {
+    if (Hive.isBoxOpen('earthquakes_cache')) {
+      await Hive.box('earthquakes_cache').clear();
+      await Hive.box('earthquakes_cache').close();
+    }
+    await Hive.deleteFromDisk();
+    if (tempDir.existsSync()) {
+      await tempDir.delete(recursive: true);
+    }
   });
 
   final testEarthquakes = [
