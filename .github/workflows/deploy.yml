@@ -16,6 +16,11 @@ jobs:
           flutter-version: '3.38.2'  # or your Flutter version
           channel: 'stable'
       
+      - name: Create .env file
+        run: |
+          echo "# Server Configuration" >> .env
+          echo "SERVER_URL=${{ secrets.SERVER_URL }}" >> .env
+      
       - name: Get dependencies
         run: flutter pub get
       
