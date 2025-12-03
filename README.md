@@ -6,8 +6,7 @@ A comprehensive Flutter application providing real-time global earthquake monito
 
 ## 📱 Screenshots
 
-<img src="graphics\screenshots\home_screen.png" width="200" height="400">, <img src="graphics\screenshots\details_screen.png" width="200" height="400">, <img src="graphics\screenshots\map_screen.png" width="200" height="400">, <img src="graphics\screenshots\settings_screen.png" width="200" height="400">, <img src="graphics\screenshots\stats_screen.png" width="200" height="400">,
-<img src="graphics\screenshots\web_dashboard.png">
+<img src="graphics\screenshots\home_screen.png" width="200" height="400">, <img src="graphics\screenshots\details_screen.png" width="200" height="400">, <img src="graphics\screenshots\map_screen.png" width="200" height="400">, <img src="graphics\screenshots\settings_screen.png" width="200" height="400">, <img src="graphics\screenshots\stats_screen.png" width="200" height="400">, <img src="graphics\screenshots\web_dashboard.png">
 
 ---
 
