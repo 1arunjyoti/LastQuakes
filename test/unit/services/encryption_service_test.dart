@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lastquake/services/encryption_service.dart';
+import 'package:lastquakes/services/encryption_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

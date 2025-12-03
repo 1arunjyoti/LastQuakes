@@ -2,8 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:introduction_screen/introduction_screen.dart';
-import 'package:lastquake/screens/home_screen.dart';
-import 'package:lastquake/utils/app_page_transitions.dart';
+import 'package:lastquakes/screens/home_screen.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatelessWidget {
@@ -13,6 +14,10 @@ class OnboardingScreen extends StatelessWidget {
 
   Future<void> _onIntroEnd(BuildContext context) async {
     await prefs.setBool('seenOnboarding', true);
+    
+    // Log onboarding completion
+    AnalyticsService.instance.logOnboardingComplete();
+    AnalyticsService.instance.logScreenView('onboarding_complete');
 
     if (context.mounted) {
       Navigator.of(context).pushReplacement(

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lastquake/models/safe_zone.dart';
+import 'package:lastquakes/models/safe_zone.dart';
 
 void main() {
   group('SafeZone.fromJson', () {

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/screens/settings_screen.dart';
-import 'package:lastquake/screens/subscreens/about_screen.dart';
-import 'package:lastquake/screens/subscreens/emergency_contacts_screen.dart';
-import 'package:lastquake/screens/subscreens/preparedness_screen.dart';
-import 'package:lastquake/screens/subscreens/quiz_screen.dart';
-import 'package:lastquake/screens/statistics_screen.dart';
-import 'package:lastquake/utils/app_page_transitions.dart';
+import 'package:lastquakes/provider/theme_provider.dart';
+import 'package:lastquakes/screens/settings_screen.dart';
+import 'package:lastquakes/screens/subscreens/about_screen.dart';
+import 'package:lastquakes/screens/subscreens/emergency_contacts_screen.dart';
+import 'package:lastquakes/screens/subscreens/preparedness_screen.dart';
+import 'package:lastquakes/screens/subscreens/quiz_screen.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:provider/provider.dart';
 
 // Define a simple structure for navigation destinations
@@ -41,11 +40,6 @@ class _CustomDrawerState extends State<CustomDrawer> {
       EmergencyContactsScreen(),
     ),
     const NavigationItem(Icons.quiz, "Test Your Knowledge", QuizScreen()),
-    const NavigationItem(
-      Icons.bar_chart_outlined,
-      "Statistics & Insights",
-      StatisticsScreen(),
-    ),
     const NavigationItem(Icons.settings_outlined, "Settings", SettingsScreen()),
     const NavigationItem(Icons.info_outline, "About", AboutScreen()),
   ];

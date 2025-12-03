@@ -1,7 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:lastquake/services/location_service.dart';
+import 'package:lastquakes/services/location_service.dart';
 
 // Keys need to match settings_screen.dart
 const String prefNotificationFilterType = 'notification_filter_type';

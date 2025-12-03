@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/widgets/appbar.dart';
+import 'package:flutter/services.dart';
+import 'package:lastquakes/widgets/appbar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -83,10 +84,8 @@ class _AboutScreenState extends State<AboutScreen> {
       final PackageInfo info = await PackageInfo.fromPlatform();
       if (mounted) {
         setState(() {
-          _appName =
-              info.appName.isNotEmpty
-                  ? info.appName
-                  : 'LastQuakes'; // Use package name if available
+          // Always use "LastQuakes" as the display name for consistency
+          _appName = 'LastQuakes';
           _version = info.version;
           _buildNumber = info.buildNumber;
         });
@@ -212,6 +211,27 @@ class _AboutScreenState extends State<AboutScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    const Divider(),
+
+                    const SizedBox(height: 8),
+                    const Divider(),
+
+                    // Project License
+                    ListTile(
+                      leading: Icon(
+                        Icons.description_outlined,
+                        color: colorScheme.secondary,
+                      ),
+                      title: const Text('Project License'),
+                      subtitle: const Text(
+                        'GNU General Public License v3.0',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap:
+                          () => _showProjectLicense(context),
+                    ),
+
                     const SizedBox(height: 8),
                     const Divider(),
 
@@ -411,6 +431,87 @@ class _AboutScreenState extends State<AboutScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showProjectLicense(BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    String licenseText = '';
+    try {
+      licenseText = await rootBundle.loadString('LICENSE');
+    } catch (e) {
+      licenseText = 'Failed to load LICENSE file: $e';
+    }
+
+    if (mounted) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetContext) {
+          return SafeArea(
+            child: FractionallySizedBox(
+              heightFactor: 0.9,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.description_outlined,
+                          color: colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Project License',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'GNU General Public License v3.0',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Text(
+                          licenseText,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 }
 

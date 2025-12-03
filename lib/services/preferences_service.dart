@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/services/secure_storage_service.dart';
-import 'package:lastquake/utils/enums.dart';
-import 'package:lastquake/utils/notification_registration_coordinator.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/services/secure_storage_service.dart';
+import 'package:lastquakes/utils/enums.dart';
+import 'package:lastquakes/utils/notification_registration_coordinator.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Keys for SharedPreferences (kept for backward compatibility/migration)

@@ -1,4 +1,4 @@
-package com.example.lastquake
+package app.lastquakes
 
 import io.flutter.embedding.android.FlutterActivity
 

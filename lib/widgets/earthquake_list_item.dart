@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/utils/formatting.dart';
+import 'package:lastquakes/utils/formatting.dart';
 
 /// Pre-computed source badge styles to avoid rebuilding on every frame
 class _SourceBadgeStyles {

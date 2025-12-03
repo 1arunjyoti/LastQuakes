@@ -5,26 +5,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:lastquake/models/earthquake_adapter.dart';
-import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/screens/home_screen.dart';
-import 'package:lastquake/screens/onboarding_screen.dart';
-import 'package:lastquake/services/earthquake_cache_service.dart';
-import 'package:lastquake/services/multi_source_api_service.dart';
-import 'package:lastquake/services/notification_service.dart';
-import 'package:lastquake/services/secure_storage_service.dart';
-import 'package:lastquake/services/secure_token_service.dart';
-import 'package:lastquake/services/token_migration_service.dart';
-import 'package:lastquake/theme/app_theme.dart';
-import 'package:lastquake/utils/notification_registration_coordinator.dart';
-import 'package:lastquake/utils/secure_logger.dart';
-import 'package:lastquake/data/repositories/earthquake_repository_impl.dart';
-import 'package:lastquake/domain/usecases/get_earthquakes_usecase.dart';
-import 'package:lastquake/presentation/providers/earthquake_provider.dart';
-import 'package:lastquake/presentation/providers/settings_provider.dart';
-import 'package:lastquake/presentation/providers/map_picker_provider.dart';
-import 'package:lastquake/data/repositories/settings_repository_impl.dart';
-import 'package:lastquake/data/repositories/device_repository_impl.dart';
+import 'package:lastquakes/models/earthquake_adapter.dart';
+import 'package:lastquakes/provider/theme_provider.dart';
+import 'package:lastquakes/screens/home_screen.dart';
+import 'package:lastquakes/screens/onboarding_screen.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/services/earthquake_cache_service.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
+import 'package:lastquakes/services/notification_service.dart';
+import 'package:lastquakes/services/secure_storage_service.dart';
+import 'package:lastquakes/services/secure_token_service.dart';
+import 'package:lastquakes/services/token_migration_service.dart';
+import 'package:lastquakes/theme/app_theme.dart';
+import 'package:lastquakes/utils/notification_registration_coordinator.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
+import 'package:lastquakes/data/repositories/earthquake_repository_impl.dart';
+import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/presentation/providers/settings_provider.dart';
+import 'package:lastquakes/presentation/providers/map_picker_provider.dart';
+import 'package:lastquakes/data/repositories/settings_repository_impl.dart';
+import 'package:lastquakes/data/repositories/device_repository_impl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -68,6 +69,12 @@ void main() async {
   // Register Hive adapters (must happen after Hive init)
   Hive.registerAdapter(EarthquakeAdapter());
   SecureLogger.success("Hive initialized with Earthquake adapter");
+
+  // Initialize Analytics and Crashlytics (after Firebase init)
+  if (!kIsWeb) {
+    await AnalyticsService.instance.initialize();
+    await AnalyticsService.instance.logAppOpen();
+  }
 
   // Set up Firebase background message handler
   if (!kIsWeb) {

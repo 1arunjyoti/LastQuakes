@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/provider/theme_provider.dart';
+import 'package:lastquakes/provider/theme_provider.dart';
 
 class ThemeSettingsCard extends StatefulWidget {
   final ThemeProvider themeProvider;

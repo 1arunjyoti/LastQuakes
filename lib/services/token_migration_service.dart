@@ -1,6 +1,6 @@
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lastquake/services/secure_token_service.dart';
+import 'package:lastquakes/services/secure_token_service.dart';
 
 class TokenMigrationService {
   static const String _migrationCompleteKey = 'token_migration_complete';

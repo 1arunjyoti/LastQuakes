@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/services/secure_http_client.dart';
-import 'package:lastquake/services/sources/earthquake_data_source.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/services/secure_http_client.dart';
+import 'package:lastquakes/services/sources/earthquake_data_source.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UsgsDataSource implements EarthquakeDataSource {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquakes/models/earthquake.dart';
 
 void main() {
   group('Earthquake.fromUsgs', () {

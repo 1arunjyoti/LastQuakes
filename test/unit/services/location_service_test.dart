@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
-import 'package:lastquake/services/location_service.dart';
+import 'package:lastquakes/services/location_service.dart';
 
 class _FakeGeolocator extends GeolocatorPlatform {
   bool serviceEnabled;

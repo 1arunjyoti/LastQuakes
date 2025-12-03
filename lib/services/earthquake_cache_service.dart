@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
-import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquakes/models/earthquake.dart';
 
 /// Service for caching earthquake data using Hive for ultra-fast performance
 class EarthquakeCacheService {

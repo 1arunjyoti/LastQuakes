@@ -4,18 +4,19 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/presentation/providers/settings_provider.dart';
-import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/utils/enums.dart';
-import 'package:lastquake/widgets/appbar.dart';
-import 'package:lastquake/widgets/settings/clock_settings_card.dart';
-import 'package:lastquake/widgets/settings/theme_settings_card.dart';
-import 'package:lastquake/widgets/settings/units_settings_card.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/presentation/providers/settings_provider.dart';
+import 'package:lastquakes/provider/theme_provider.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/utils/enums.dart';
+import 'package:lastquakes/widgets/appbar.dart';
+import 'package:lastquakes/widgets/settings/clock_settings_card.dart';
+import 'package:lastquakes/widgets/settings/theme_settings_card.dart';
+import 'package:lastquakes/widgets/settings/units_settings_card.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:lastquake/utils/app_page_transitions.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'map_picker_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -110,6 +111,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _buildMemoizedItems();
+    
+    // Log screen view
+    AnalyticsService.instance.logScreenView('settings');
   }
 
   // Build memoized dropdown items
@@ -297,6 +301,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text(
               'Notification Settings',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            subtitle: const Text(
+              'Notification service only uses USGS as the source',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             trailing: IconButton(
               icon: Icon(

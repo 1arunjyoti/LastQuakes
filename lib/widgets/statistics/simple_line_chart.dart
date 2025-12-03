@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/services/earthquake_statistics.dart';
+import 'package:lastquakes/services/earthquake_statistics.dart';
 import 'dart:math' as math;
 
 class SimpleLineChart extends StatelessWidget {

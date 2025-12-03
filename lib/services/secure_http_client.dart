@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:lastquake/services/http_client_factory.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/services/http_client_factory.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 
 /// HTTP client implementation
 class SecureHttpClient {

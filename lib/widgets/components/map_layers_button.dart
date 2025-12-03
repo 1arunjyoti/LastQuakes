@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Map Layers Button Widget for Map Controls

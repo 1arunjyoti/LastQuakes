@@ -22,6 +22,8 @@ tasks.register<Delete>("clean") {
 
 plugins {
   // Add the dependency for the Google services Gradle plugin
-
-  id("com.google.gms.google-services") version "4.4.2" apply false
+  id("com.google.gms.google-services") version "4.4.4" apply false
+  
+  // Add the dependency for the Crashlytics Gradle plugin
+  id("com.google.firebase.crashlytics") version "3.0.3" apply false
 }

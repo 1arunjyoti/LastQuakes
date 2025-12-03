@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/screens/map_picker_screen.dart';
-import 'package:lastquake/services/preferences_service.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/screens/map_picker_screen.dart';
+import 'package:lastquakes/services/preferences_service.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:lastquake/utils/app_page_transitions.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class NotificationSettingsCard extends StatefulWidget {
@@ -103,6 +103,10 @@ class _NotificationSettingsCardState extends State<NotificationSettingsCard> {
             title: const Text(
               'Notification Settings',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            subtitle: const Text(
+              'Notification service only uses USGS as the source',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             trailing: IconButton(
               icon: Icon(

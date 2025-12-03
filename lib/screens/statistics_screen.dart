@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/presentation/providers/earthquake_provider.dart';
-import 'package:lastquake/services/earthquake_statistics.dart';
-import 'package:lastquake/widgets/appbar.dart';
-import 'package:lastquake/widgets/statistics/simple_line_chart.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/services/earthquake_statistics.dart';
+import 'package:lastquakes/widgets/appbar.dart';
+import 'package:lastquakes/widgets/custom_drawer.dart';
+import 'package:lastquakes/widgets/statistics/simple_line_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -32,6 +33,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const LastQuakesAppBar(title: 'Statistics & Insights'),
+      drawer: const CustomDrawer(),
       body: Consumer<EarthquakeProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.listEarthquakes.isEmpty) {

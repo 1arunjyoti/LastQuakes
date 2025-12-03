@@ -4,8 +4,8 @@
 // ignore_for_file: avoid_print
 
 import 'package:flutter/widgets.dart';
-import 'package:lastquake/services/multi_source_api_service.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
+import 'package:lastquakes/utils/enums.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

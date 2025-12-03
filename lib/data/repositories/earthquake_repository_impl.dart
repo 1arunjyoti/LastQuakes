@@ -1,6 +1,6 @@
-import 'package:lastquake/domain/repositories/earthquake_repository.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/services/multi_source_api_service.dart';
+import 'package:lastquakes/domain/repositories/earthquake_repository.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
 
 class EarthquakeRepositoryImpl implements EarthquakeRepository {
   final MultiSourceApiService _apiService;

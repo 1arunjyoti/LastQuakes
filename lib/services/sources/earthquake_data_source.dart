@@ -1,4 +1,4 @@
-import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquakes/models/earthquake.dart';
 
 /// Interface for earthquake data sources
 abstract class EarthquakeDataSource {

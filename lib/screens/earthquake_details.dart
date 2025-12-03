@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/utils/formatting.dart';
-import 'package:lastquake/widgets/appbar.dart';
-import 'package:lastquake/widgets/components/zoom_controls.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/utils/formatting.dart';
+import 'package:lastquakes/widgets/appbar.dart';
+import 'package:lastquakes/widgets/components/zoom_controls.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -35,6 +36,15 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   void initState() {
     super.initState();
     _mapController = MapController();
+    
+    // Log earthquake detail view
+    AnalyticsService.instance.logEarthquakeDetailView(
+      earthquakeId: widget.earthquake.id,
+      magnitude: widget.earthquake.magnitude,
+      location: widget.earthquake.place,
+      source: widget.earthquake.source,
+    );
+    AnalyticsService.instance.logScreenView('earthquake_details');
   }
 
   @override
@@ -138,7 +148,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                                       urlTemplate:
                                           "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
                                       userAgentPackageName:
-                                          'com.example.lastquake',
+                                          'app.lastquakes',
                                     ),
                                     MarkerLayer(
                                       markers: [
@@ -570,8 +580,19 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
       await Share.shareXFiles([
         XFile(imagePath.path),
       ], subject: 'Earthquake Information: M $magnitude near $location');
+      
+      // Log share event
+      AnalyticsService.instance.logShare(
+        contentType: 'earthquake',
+        method: 'screenshot',
+        earthquakeId: widget.earthquake.id,
+      );
     } catch (e) {
       debugPrint('Error sharing: $e');
+      AnalyticsService.instance.logError(
+        error: e,
+        reason: 'Failed to share earthquake details',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -677,7 +698,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                     urlTemplate:
                         "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", // USGS Topo Alt
                     userAgentPackageName:
-                        'com.example.lastquake', // Use your package name
+                        'app.lastquakes', // Use your package name
                   ),
                   MarkerLayer(
                     markers: [

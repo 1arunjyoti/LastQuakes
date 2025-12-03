@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/scheduler.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/presentation/providers/earthquake_provider.dart';
-import 'package:lastquake/screens/earthquake_details.dart';
-import 'package:lastquake/widgets/earthquake_list_item.dart';
-import 'package:lastquake/utils/app_page_transitions.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/screens/earthquake_details.dart';
+import 'package:lastquakes/widgets/earthquake_list_item.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:provider/provider.dart';
 
 class EarthquakeListWidget extends StatefulWidget {

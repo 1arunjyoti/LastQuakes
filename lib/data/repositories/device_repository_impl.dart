@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:lastquake/domain/repositories/device_repository.dart';
-import 'package:lastquake/services/secure_http_client.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/domain/repositories/device_repository.dart';
+import 'package:lastquakes/services/secure_http_client.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 
 class DeviceRepositoryImpl implements DeviceRepository {
   static String? get serverUrl => dotenv.env['SERVER_URL'];
@@ -17,7 +17,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
 
     SecureLogger.api("/api/devices/register", method: "POST");
     SecureLogger.token("Sending registration with token", token: token);
-    SecureLogger.info("Preferences: ${SecureLogger.sanitizeData(preferences)}");
+    // Note: Preferences logged via sanitizeData - non-sensitive config only
 
     try {
       final response = await SecureHttpClient.instance.post(

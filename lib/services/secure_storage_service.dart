@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:lastquake/models/safe_zone.dart';
+import 'package:lastquakes/models/safe_zone.dart';
 import 'encryption_service.dart';
 
 /// Service for securely storing and retrieving sensitive personal data

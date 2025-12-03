@@ -1,6 +1,6 @@
-import 'package:lastquake/domain/models/notification_settings_model.dart';
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/domain/models/notification_settings_model.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/utils/enums.dart';
 
 abstract class SettingsRepository {
   Future<NotificationSettingsModel> getNotificationSettings();

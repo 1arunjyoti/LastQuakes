@@ -1,5 +1,5 @@
-import 'package:lastquake/domain/repositories/earthquake_repository.dart';
-import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquakes/domain/repositories/earthquake_repository.dart';
+import 'package:lastquakes/models/earthquake.dart';
 
 class GetEarthquakesUseCase {
   final EarthquakeRepository repository;

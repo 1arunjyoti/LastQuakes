@@ -12,7 +12,7 @@
 
 
     <application
-        android:label="LastQuake"
+        android:label="LastQuakes"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

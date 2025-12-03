@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:lastquake/domain/usecases/get_earthquakes_usecase.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/services/earthquake_cache_service.dart';
-import 'package:lastquake/services/location_service.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/services/earthquake_cache_service.dart';
+import 'package:lastquakes/services/location_service.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -316,6 +317,7 @@ class EarthquakeProvider extends ChangeNotifier {
     }
 
     _error = null;
+    final stopwatch = Stopwatch()..start();
 
     try {
       // Try to load from cache first for instant display
@@ -330,6 +332,14 @@ class EarthquakeProvider extends ChangeNotifier {
           }
           _isLoading = false;
           notifyListeners();
+          
+          // Log cached data load
+          AnalyticsService.instance.logDataRefresh(
+            source: 'cache',
+            success: true,
+            earthquakeCount: cachedData.length,
+            loadTimeMs: stopwatch.elapsedMilliseconds,
+          );
 
           // Fetch fresh data in background
           _fetchFreshDataInBackground();
@@ -354,8 +364,29 @@ class EarthquakeProvider extends ChangeNotifier {
       if (_userPosition != null) {
         await _preCalculateDistances();
       }
+      
+      stopwatch.stop();
+      // Log successful data refresh
+      AnalyticsService.instance.logDataRefresh(
+        source: forceRefresh ? 'manual' : 'auto',
+        success: true,
+        earthquakeCount: _allEarthquakes.length,
+        loadTimeMs: stopwatch.elapsedMilliseconds,
+      );
     } catch (e) {
       _error = "Failed to load earthquakes: ${e.toString()}";
+      stopwatch.stop();
+      
+      // Log failed data refresh
+      AnalyticsService.instance.logDataRefresh(
+        source: forceRefresh ? 'manual' : 'auto',
+        success: false,
+        loadTimeMs: stopwatch.elapsedMilliseconds,
+      );
+      AnalyticsService.instance.logError(
+        error: e,
+        reason: 'Failed to load earthquakes',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();

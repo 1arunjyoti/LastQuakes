@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:lastquake/services/location_service.dart';
+import 'package:lastquakes/services/location_service.dart';
 
 class MapPickerProvider with ChangeNotifier {
   final LocationService _locationService = LocationService();

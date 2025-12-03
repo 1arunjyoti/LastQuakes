@@ -1,4 +1,4 @@
-import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquakes/models/earthquake.dart';
 
 abstract class EarthquakeRepository {
   Future<List<Earthquake>> getEarthquakes({

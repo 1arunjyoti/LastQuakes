@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
-import 'package:lastquake/provider/theme_provider.dart';
-import 'package:lastquake/utils/enums.dart';
-import 'package:lastquake/utils/formatting.dart';
+import 'package:lastquakes/provider/theme_provider.dart';
+import 'package:lastquakes/utils/enums.dart';
+import 'package:lastquakes/utils/formatting.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 
 class SecureTokenService {
   static SecureTokenService? _instance;

@@ -4,12 +4,12 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/services/cache_manager/cache_manager.dart';
-import 'package:lastquake/services/multi_source_api_service.dart';
-import 'package:lastquake/services/secure_http_client.dart';
-import 'package:lastquake/services/sources/earthquake_data_source.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/services/cache_manager/cache_manager.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
+import 'package:lastquakes/services/secure_http_client.dart';
+import 'package:lastquakes/services/sources/earthquake_data_source.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeHttpClient extends SecureHttpClient {

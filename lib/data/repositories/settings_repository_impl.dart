@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:lastquake/domain/models/notification_settings_model.dart';
-import 'package:lastquake/domain/repositories/settings_repository.dart';
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/services/multi_source_api_service.dart';
-import 'package:lastquake/services/secure_storage_service.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/domain/models/notification_settings_model.dart';
+import 'package:lastquakes/domain/repositories/settings_repository.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
+import 'package:lastquakes/services/secure_storage_service.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {

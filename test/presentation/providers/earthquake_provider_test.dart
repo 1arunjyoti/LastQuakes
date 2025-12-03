@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/presentation/providers/earthquake_provider.dart';
-import 'package:lastquake/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockGetEarthquakesUseCase extends Mock implements GetEarthquakesUseCase {}

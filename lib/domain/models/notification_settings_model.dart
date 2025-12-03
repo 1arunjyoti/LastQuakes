@@ -1,5 +1,5 @@
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/utils/enums.dart';
 
 class NotificationSettingsModel {
   final NotificationFilterType filterType;

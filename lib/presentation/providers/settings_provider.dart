@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:lastquake/domain/models/notification_settings_model.dart';
-import 'package:lastquake/domain/repositories/device_repository.dart';
-import 'package:lastquake/domain/repositories/settings_repository.dart';
-import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/services/location_service.dart';
-import 'package:lastquake/services/secure_token_service.dart';
-import 'package:lastquake/utils/enums.dart';
-import 'package:lastquake/utils/notification_registration_coordinator.dart';
+import 'package:lastquakes/domain/models/notification_settings_model.dart';
+import 'package:lastquakes/domain/repositories/device_repository.dart';
+import 'package:lastquakes/domain/repositories/settings_repository.dart';
+import 'package:lastquakes/models/safe_zone.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/services/location_service.dart';
+import 'package:lastquakes/services/secure_token_service.dart';
+import 'package:lastquakes/utils/enums.dart';
+import 'package:lastquakes/utils/notification_registration_coordinator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class SettingsProvider extends ChangeNotifier {
@@ -57,8 +58,21 @@ class SettingsProvider extends ChangeNotifier {
     try {
       await _settingsRepository.saveNotificationSettings(newSettings);
       await _syncWithBackend();
+      
+      // Log notification settings change
+      AnalyticsService.instance.logNotificationSettingsChange(
+        enabled: newSettings.filterType != NotificationFilterType.none,
+        minMagnitude: newSettings.magnitude,
+        radiusKm: newSettings.filterType == NotificationFilterType.distance
+            ? newSettings.radius.toInt()
+            : null,
+      );
     } catch (e) {
       _error = "Failed to save settings: $e";
+      AnalyticsService.instance.logError(
+        error: e,
+        reason: 'Failed to save notification settings',
+      );
       // Revert or reload could be done here
       notifyListeners();
     }

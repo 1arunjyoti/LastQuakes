@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/utils/enums.dart';
 
 class DataSourceSettingsCard extends StatefulWidget {
   final Set<DataSource> selectedDataSources;

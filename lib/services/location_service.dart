@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:meta/meta.dart';
 
 class LocationService {

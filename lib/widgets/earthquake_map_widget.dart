@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/presentation/providers/earthquake_provider.dart';
-import 'package:lastquake/screens/earthquake_details.dart';
-import 'package:lastquake/services/location_service.dart';
-import 'package:lastquake/utils/enums.dart';
-import 'package:lastquake/widgets/components/location_button.dart';
-import 'package:lastquake/widgets/components/map_layers_button.dart';
-import 'package:lastquake/widgets/components/zoom_controls.dart';
-import 'package:lastquake/utils/app_page_transitions.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/screens/earthquake_details.dart';
+import 'package:lastquakes/services/location_service.dart';
+import 'package:lastquakes/utils/enums.dart';
+import 'package:lastquakes/widgets/components/location_button.dart';
+import 'package:lastquakes/widgets/components/map_layers_button.dart';
+import 'package:lastquakes/widgets/components/zoom_controls.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
@@ -261,7 +261,7 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
               children: [
                 TileLayer(
                   urlTemplate: _getTileUrl(provider.mapLayerType),
-                  userAgentPackageName: 'com.example.lastquake',
+                  userAgentPackageName: 'app.lastquakes',
                 ),
                 if (provider.showFaultLines)
                   PolylineLayer(polylines: provider.faultLines),
@@ -504,16 +504,12 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
     }
 
     Color color;
-    if (magnitude < 4.0) {
-      color = Colors.green;
-    } else if (magnitude < 5.0) {
-      color = Colors.yellow;
-    } else if (magnitude < 6.0) {
+    if (magnitude >= 7.0) {
+      color = Colors.red.shade900;
+    } else if (magnitude >= 5.0) {
       color = Colors.orange;
-    } else if (magnitude < 7.0) {
-      color = Colors.red;
     } else {
-      color = Colors.purple;
+      color = Colors.green;
     }
 
     _markerColorCache[magnitude] = color;

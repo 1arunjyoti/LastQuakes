@@ -2,14 +2,14 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/services/cache_manager/cache_manager.dart';
-import 'package:lastquake/services/secure_http_client.dart';
-import 'package:lastquake/services/sources/earthquake_data_source.dart';
-import 'package:lastquake/services/sources/emsc_data_source.dart';
-import 'package:lastquake/services/sources/usgs_data_source.dart';
-import 'package:lastquake/utils/enums.dart';
-import 'package:lastquake/utils/secure_logger.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/services/cache_manager/cache_manager.dart';
+import 'package:lastquakes/services/secure_http_client.dart';
+import 'package:lastquakes/services/sources/earthquake_data_source.dart';
+import 'package:lastquakes/services/sources/emsc_data_source.dart';
+import 'package:lastquakes/services/sources/usgs_data_source.dart';
+import 'package:lastquakes/utils/enums.dart';
+import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Optimized multi-source API service with performance and memory optimizations

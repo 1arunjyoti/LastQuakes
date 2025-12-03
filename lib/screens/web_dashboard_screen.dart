@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:lastquake/models/earthquake.dart';
-import 'package:lastquake/presentation/providers/earthquake_provider.dart';
-import 'package:lastquake/widgets/appbar.dart';
-import 'package:lastquake/widgets/custom_drawer.dart';
-import 'package:lastquake/widgets/earthquake_list_widget.dart';
-import 'package:lastquake/widgets/earthquake_map_widget.dart';
+import 'package:lastquakes/models/earthquake.dart';
+import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/widgets/appbar.dart';
+import 'package:lastquakes/widgets/custom_drawer.dart';
+import 'package:lastquakes/widgets/earthquake_list_widget.dart';
+import 'package:lastquakes/widgets/earthquake_map_widget.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 

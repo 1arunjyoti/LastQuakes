@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lastquake/utils/enums.dart';
+import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider with ChangeNotifier {
@@ -59,6 +60,9 @@ class ThemeProvider with ChangeNotifier {
       _themeMode = mode;
       _saveThemePreference();
       notifyListeners();
+      
+      // Log theme change
+      AnalyticsService.instance.logThemeChange(theme: mode.name);
     }
   }
 
@@ -67,6 +71,12 @@ class ThemeProvider with ChangeNotifier {
       _distanceUnit = unit;
       _saveDistanceUnitPreference();
       notifyListeners();
+      
+      // Log filter change
+      AnalyticsService.instance.logFilterChange(
+        filterName: 'distance_unit',
+        value: unit.name,
+      );
     }
   }
 
@@ -75,6 +85,12 @@ class ThemeProvider with ChangeNotifier {
       _use24HourClock = use24Hour;
       _saveClockPreference();
       notifyListeners();
+      
+      // Log filter change
+      AnalyticsService.instance.logFilterChange(
+        filterName: 'clock_format',
+        value: use24Hour ? '24h' : '12h',
+      );
     }
   }
 

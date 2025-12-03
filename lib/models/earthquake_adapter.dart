@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquakes/models/earthquake.dart';
 
 /// Hive TypeAdapter for Earthquake model
 /// TypeId 0 is reserved for Earthquake
