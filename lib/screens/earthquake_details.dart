@@ -75,103 +75,230 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          // --- Main Information Card ---
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RepaintBoundary(
-                    key: _globalKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // --- Impact Section Header (Magnitude & Tsunami) ---
-                        _buildMagnitudeHeader(
-                          context,
-                          magnitude: earthquake.magnitude,
-                          tsunami: earthquake.tsunami == 1,
-                        ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= 800;
 
-                        // --- Details Section ---
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 12.0,
-                          ),
+          if (isDesktop) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- Left Panel: Information ---
+                      Expanded(
+                        flex: 2,
+                        child: SingleChildScrollView(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // --- Location Title ---
-                              Text(
+                              _buildMainInfoCard(
+                                context,
+                                earthquake,
+                                formattedTime,
+                                formattedDepth,
                                 displayLocationTitle,
-                                style: textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                hasValidUsgsUrl,
+                                hasCoordinates,
+                                colorScheme,
+                                textTheme,
                               ),
-                              const SizedBox(height: 8),
-
-                              // --- Location Details Group ---
-                              _buildSectionHeader(context, "LOCATION DETAILS"),
-                              _buildDetailRow(
-                                context: context,
-                                icon: Icons.layers_outlined,
-                                iconColor: colorScheme.secondary,
-                                label: "Depth",
-                                value: formattedDepth,
-                              ),
-                              _buildCoordinatesRow(
-                                context: context,
-                                lat: earthquake.latitude,
-                                lon: earthquake.longitude,
-                              ),
-                              const SizedBox(height: 8),
-
-                              // --- Time Details Group ---
-                              _buildSectionHeader(context, "TIME"),
-                              _buildDetailRow(
-                                context: context,
-                                icon: Icons.schedule_outlined,
-                                iconColor: colorScheme.tertiary,
-                                label: "Occurred",
-                                value: formattedTime,
-                              ),
-
-                              const SizedBox(height: 8),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 16),
+                      // --- Right Panel: Map ---
+                      if (hasCoordinates)
+                        Expanded(
+                          flex: 3,
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Stack(
+                              children: [
+                                FlutterMap(
+                                  mapController: _mapController,
+                                  options: MapOptions(
+                                    initialCenter: LatLng(
+                                      earthquake.latitude,
+                                      earthquake.longitude,
+                                    ),
+                                    initialZoom: _zoomLevel,
+                                    minZoom: _minZoom,
+                                    maxZoom: _maxZoom,
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+                                      userAgentPackageName:
+                                          'com.example.lastquake',
+                                    ),
+                                    MarkerLayer(
+                                      markers: [
+                                        Marker(
+                                          point: LatLng(
+                                            earthquake.latitude,
+                                            earthquake.longitude,
+                                          ),
+                                          width: 50,
+                                          height: 50,
+                                          child: const Icon(
+                                            Icons.location_on,
+                                            color: Colors.red,
+                                            size: 40,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                Positioned(
+                                  bottom: 10,
+                                  right: 10,
+                                  child: ZoomControls(
+                                    zoomLevel: _zoomLevel,
+                                    mapController: _mapController,
+                                    minZoom: _minZoom,
+                                    maxZoom: _maxZoom,
+                                    onZoomChanged: (newZoom) {
+                                      setState(() {
+                                        _zoomLevel = newZoom;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  // --- Action Buttons ---
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 4.0,
-                    ),
-                    child: _buildActionButtons(
-                      context: context,
-                      hasValidUsgsUrl: hasValidUsgsUrl,
-                      hasCoordinates: hasCoordinates,
-                    ),
-                  ),
-                ],
+                ),
               ),
+            );
+          } else {
+            // --- Mobile Layout ---
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: _buildMainInfoCard(
+                        context,
+                        earthquake,
+                        formattedTime,
+                        formattedDepth,
+                        displayLocationTitle,
+                        hasValidUsgsUrl,
+                        hasCoordinates,
+                        colorScheme,
+                        textTheme,
+                      ),
+                    ),
+                    if (hasCoordinates) _buildMapSection(),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildMainInfoCard(
+    BuildContext context,
+    Earthquake earthquake,
+    String formattedTime,
+    String formattedDepth,
+    String displayLocationTitle,
+    bool hasValidUsgsUrl,
+    bool hasCoordinates,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+  ) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RepaintBoundary(
+            key: _globalKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMagnitudeHeader(
+                  context,
+                  magnitude: earthquake.magnitude,
+                  tsunami: earthquake.tsunami == 1,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 12.0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayLocationTitle,
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSectionHeader(context, "LOCATION DETAILS"),
+                      _buildDetailRow(
+                        context: context,
+                        icon: Icons.layers_outlined,
+                        iconColor: colorScheme.secondary,
+                        label: "Depth",
+                        value: formattedDepth,
+                      ),
+                      _buildCoordinatesRow(
+                        context: context,
+                        lat: earthquake.latitude,
+                        lon: earthquake.longitude,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSectionHeader(context, "TIME"),
+                      _buildDetailRow(
+                        context: context,
+                        icon: Icons.schedule_outlined,
+                        iconColor: colorScheme.tertiary,
+                        label: "Occurred",
+                        value: formattedTime,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-
-          // --- Map Section (Below the main info card) ---
-          if (hasCoordinates) _buildMapSection(),
-          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 4.0,
+            ),
+            child: _buildActionButtons(
+              context: context,
+              hasValidUsgsUrl: hasValidUsgsUrl,
+              hasCoordinates: hasCoordinates,
+            ),
+          ),
         ],
       ),
     );
@@ -381,11 +508,11 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
             icon: const Icon(Icons.public),
             label: Text(
               (() {
-              final url = widget.earthquake.url ?? '';
-              final host = Uri.tryParse(url)?.host ?? '';
-              if (host.contains('emsc')) return 'View on EMSC';
-              if (host.contains('usgs')) return 'View on USGS';
-              return 'View on Web';
+                final url = widget.earthquake.url ?? '';
+                final host = Uri.tryParse(url)?.host ?? '';
+                if (host.contains('emsc')) return 'View on EMSC';
+                if (host.contains('usgs')) return 'View on USGS';
+                return 'View on Web';
               })(),
             ),
             style: ElevatedButton.styleFrom(elevation: 1),

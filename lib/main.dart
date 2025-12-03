@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -41,17 +42,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   // Parallelize independent Phase 1 initializations
   final phase1Results = await Future.wait<dynamic>([
     dotenv.load(fileName: ".env"),
     Hive.initFlutter(),
-    Firebase.initializeApp(),
+    // Initialize Firebase if supported or configured (Mobile only)
+    !kIsWeb
+        ? (Firebase.initializeApp() as Future<dynamic>).catchError((e) {
+          SecureLogger.error("Firebase initialization failed", e);
+          return null;
+        })
+        : Future.value(null),
     SharedPreferences.getInstance(),
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]),
+    !kIsWeb
+        ? SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ])
+        : Future.value(null),
   ]);
 
   // Extract results from parallel operations
@@ -62,12 +70,19 @@ void main() async {
   SecureLogger.success("Hive initialized with Earthquake adapter");
 
   // Set up Firebase background message handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
 
   // Parallelize Phase 2: Secure storage and local notifications initialization
   await Future.wait([
-    SecureStorageService.initialize(),
-    NotificationService.instance.initNotifications(),
+    SecureStorageService.initialize().catchError((e) {
+      SecureLogger.error("Secure storage initialization failed", e);
+    }),
+    if (!kIsWeb)
+      NotificationService.instance.initNotifications().catchError((e) {
+        SecureLogger.error("Notification initialization failed", e);
+      }),
   ]);
   SecureLogger.success("Secure storage service initialized");
 
@@ -75,7 +90,9 @@ void main() async {
   await TokenMigrationService.migrateTokenIfNeeded();
 
   // Start background initializations (non-blocking)
-  _runBackgroundInitializations();
+  if (!kIsWeb) {
+    _runBackgroundInitializations();
+  }
 
   final bool seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
 
@@ -112,6 +129,8 @@ void main() async {
 
 /// Run background initializations that don't block app startup
 Future<void> _runBackgroundInitializations() async {
+  if (kIsWeb) return;
+
   // Store initial FCM token securely
   String? fcmToken = await FirebaseMessaging.instance.getToken();
   if (fcmToken != null) {
@@ -184,7 +203,7 @@ class _MyAppState extends State<MyApp> {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          title: 'LastQuake',
+          title: 'LastQuakes',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,

@@ -11,7 +11,16 @@ class PreparednessScreen extends StatelessWidget {
         title: const Text("Earthquake Preparedness"),
         surfaceTintColor: colorScheme.surfaceTint,
       ),
-      body: const _PreparednessList(),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: const _PreparednessList(),
+            ),
+          );
+        },
+      ),
     );
   }
 }

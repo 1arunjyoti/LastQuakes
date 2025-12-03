@@ -29,13 +29,14 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   Future<void> _loadSavedCountry() async {
     try {
       // Try to load from secure storage first
-      String? savedCountry = await SecureStorageService.retrieveSelectedCountry();
-      
+      String? savedCountry =
+          await SecureStorageService.retrieveSelectedCountry();
+
       if (savedCountry == null) {
         // Migrate from SharedPreferences if not found in secure storage
         SharedPreferences prefs = await SharedPreferences.getInstance();
         savedCountry = prefs.getString("selected_country");
-        
+
         if (savedCountry != null) {
           // Save to secure storage and remove from SharedPreferences
           await SecureStorageService.storeSelectedCountry(savedCountry);
@@ -79,34 +80,38 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   Future<void> _loadCustomContacts() async {
     try {
       // Try to load from secure storage first
-      List<Map<String, String>> savedContacts = await SecureStorageService.retrieveEmergencyContacts();
-      
+      List<Map<String, String>> savedContacts =
+          await SecureStorageService.retrieveEmergencyContacts();
+
       if (savedContacts.isEmpty) {
         // Migrate from SharedPreferences if not found in secure storage
         SharedPreferences prefs = await SharedPreferences.getInstance();
         List<String>? legacyContacts = prefs.getStringList("custom_contacts");
-        
+
         if (legacyContacts != null) {
-          savedContacts = legacyContacts.map((contact) {
-            List<String> parts = contact.split('|');
-            // Add validation in case the split doesn't yield two parts
-            if (parts.length == 2) {
-              return {"name": parts[0], "number": parts[1]};
-            }
-            return {"name": "Invalid Contact", "number": ""};
-          }).toList();
-          
+          savedContacts =
+              legacyContacts.map((contact) {
+                List<String> parts = contact.split('|');
+                // Add validation in case the split doesn't yield two parts
+                if (parts.length == 2) {
+                  return {"name": parts[0], "number": parts[1]};
+                }
+                return {"name": "Invalid Contact", "number": ""};
+              }).toList();
+
           // Filter out invalid contacts
           savedContacts.removeWhere(
             (contact) => contact["name"] == "Invalid Contact",
           );
-          
+
           // Save to secure storage and remove from SharedPreferences
           if (savedContacts.isNotEmpty) {
             await SecureStorageService.storeEmergencyContacts(savedContacts);
             await prefs.remove("custom_contacts");
             if (kDebugMode) {
-              print('Migrated ${savedContacts.length} emergency contacts to secure storage');
+              print(
+                'Migrated ${savedContacts.length} emergency contacts to secure storage',
+              );
             }
           }
         }
@@ -124,7 +129,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       });
     }
   }
-  
+
   // Save custom contacts to secure storage
   Future<void> _saveCustomContacts() async {
     try {
@@ -165,71 +170,78 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Emergency Contacts"),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Select Your Country:",
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w500,
+      appBar: AppBar(title: const Text("Emergency Contacts")),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Select Your Country:",
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Country Dropdown Menu
+                    DropdownButton<String>(
+                      value: _selectedCountry,
+                      isExpanded: true,
+                      items:
+                          emergencyNumbers.keys.map((String country) {
+                            return DropdownMenuItem(
+                              value: country,
+                              child: Text(country),
+                            );
+                          }).toList(),
+                      onChanged: (String? newCountry) {
+                        if (newCountry != null) {
+                          setState(() {
+                            _selectedCountry = newCountry;
+                            _contacts = emergencyNumbers[newCountry]!;
+                          });
+                          _saveCountry(newCountry);
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    ///Emergency Contacts List
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          ..._contacts.map(
+                            (contact) => _buildContactTile(
+                              context,
+                              contact['name']!,
+                              contact['number']!,
+                            ),
+                          ),
+                          ..._customContacts.asMap().entries.map(
+                            (entry) => _buildCustomContactTile(
+                              context,
+                              entry.key,
+                              entry.value,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 10),
-
-            // Country Dropdown Menu
-            DropdownButton<String>(
-              value: _selectedCountry,
-              isExpanded: true,
-              items:
-                  emergencyNumbers.keys.map((String country) {
-                    return DropdownMenuItem(
-                      value: country,
-                      child: Text(country),
-                    );
-                  }).toList(),
-              onChanged: (String? newCountry) {
-                if (newCountry != null) {
-                  setState(() {
-                    _selectedCountry = newCountry;
-                    _contacts = emergencyNumbers[newCountry]!;
-                  });
-                  _saveCountry(newCountry);
-                }
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            ///Emergency Contacts List
-            Expanded(
-              child: ListView(
-                children: [
-                  ..._contacts.map(
-                    (contact) => _buildContactTile(
-                      context,
-                      contact['name']!,
-                      contact['number']!,
-                    ),
-                  ),
-                  ..._customContacts.asMap().entries.map(
-                    (entry) => _buildCustomContactTile(
-                      context,
-                      entry.key,
-                      entry.value,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
-      
+
       // Floating Action Buttons for adding contact and SOS
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -297,10 +309,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       ),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: Icon(
-          Icons.phone,
-          color: colorScheme.primary,
-        ),
+        leading: Icon(Icons.phone, color: colorScheme.primary),
         title: Text(name, style: textTheme.titleMedium),
         subtitle: Text(
           "Call: $phone",
@@ -333,10 +342,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       ),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: Icon(
-          Icons.contact_emergency,
-          color: colorScheme.secondary,
-        ),
+        leading: Icon(Icons.contact_emergency, color: colorScheme.secondary),
         title: Text(contact['name']!, style: textTheme.titleMedium),
         subtitle: Text(
           "Call: ${contact['number']}",
@@ -382,7 +388,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     // fontWeight: FontWeight.bold, // Default weight is usually fine
                   ),
                 ),
-                const SizedBox(height: 16), 
+                const SizedBox(height: 16),
 
                 // Name TextField
                 TextField(
@@ -390,16 +396,14 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   decoration: InputDecoration(
                     labelText: "Contact Name",
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     prefixIcon: Icon(
                       Icons.person,
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  textInputAction: TextInputAction.next, 
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
 
@@ -417,7 +421,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     ),
                   ),
                   keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done, 
+                  textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: 24),
 
@@ -426,11 +430,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed:
-                          () =>
-                              Navigator.of(
-                                dialogContext,
-                              ).pop(),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
                       child: const Text("Cancel"),
                     ),
                     const SizedBox(width: 8),
@@ -444,9 +444,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                             r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$',
                           ).hasMatch(number)) {
                             _addCustomContact(name, number);
-                            Navigator.of(
-                              dialogContext,
-                            ).pop(); 
+                            Navigator.of(dialogContext).pop();
                           } else {
                             // Show error if number is invalid
                             ScaffoldMessenger.of(context).showSnackBar(

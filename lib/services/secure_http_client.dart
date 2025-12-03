@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
+import 'package:lastquake/services/http_client_factory.dart';
 import 'package:lastquake/utils/secure_logger.dart';
 
 /// HTTP client implementation
@@ -37,24 +36,9 @@ class SecureHttpClient {
     _instance = client;
   }
 
-  /// Create HTTP client without certificate validation
+  /// Create HTTP client using factory
   http.Client _createSecureClient() {
-    final httpClient = HttpClient();
-
-    // Configure timeouts
-    httpClient.idleTimeout = const Duration(seconds: 60);
-    httpClient.connectionTimeout = const Duration(seconds: 60);
-
-    // Accept all certificates (certificate validation disabled)
-    httpClient.badCertificateCallback = (
-      X509Certificate cert,
-      String host,
-      int port,
-    ) {
-      return true;
-    };
-
-    return IOClient(httpClient);
+    return createHttpClient();
   }
 
   /// GET request
@@ -154,23 +138,22 @@ class SecureHttpClient {
       );
 
       return response;
-    } on SocketException catch (e) {
-      SecureLogger.error('Network error for host $host', e);
-      throw Exception('Network error: Unable to connect to $host');
-    } on HandshakeException catch (e) {
-      SecureLogger.error(
-        'SSL/TLS handshake failed for host $host',
-        e,
-      );
-      throw Exception('SSL/TLS error: Connection failed for $host');
-    } on TimeoutException catch (e) {
-      SecureLogger.error('Request timeout for host $host', e);
-      throw Exception(
-        'Request timeout: $host did not respond within ${timeout.inSeconds} seconds',
-      );
     } catch (e) {
-      SecureLogger.error('Unexpected error for host $host', e);
-      rethrow;
+      if (isSocketException(e)) {
+        SecureLogger.error('Network error for host $host', e);
+        throw Exception('Network error: Unable to connect to $host');
+      } else if (isHandshakeException(e)) {
+        SecureLogger.error('SSL/TLS handshake failed for host $host', e);
+        throw Exception('SSL/TLS error: Connection failed for $host');
+      } else if (e is TimeoutException) {
+        SecureLogger.error('Request timeout for host $host', e);
+        throw Exception(
+          'Request timeout: $host did not respond within ${timeout.inSeconds} seconds',
+        );
+      } else {
+        SecureLogger.error('Unexpected error for host $host', e);
+        rethrow;
+      }
     }
   }
 

@@ -73,26 +73,75 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
           return RefreshIndicator(
             onRefresh: () => provider.loadData(forceRefresh: true),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildOverviewCard(context, stats),
-                const SizedBox(height: 16),
-                if (stats.dailyTrend.isNotEmpty)
-                  _buildHistoricalTrendCard(context, stats),
-                if (stats.dailyTrend.isNotEmpty) const SizedBox(height: 16),
-                if (stats.weeklyComparison != null)
-                  _buildWeeklyComparisonCard(context, stats),
-                if (stats.weeklyComparison != null) const SizedBox(height: 16),
-                _buildTopRegionsCard(context, stats),
-                const SizedBox(height: 16),
-                _buildMagnitudeDistributionCard(context, stats),
-                const SizedBox(height: 16),
-                _buildLast7DaysTrendCard(context, stats),
-                const SizedBox(height: 16),
-                _buildDataSourcesCard(context, stats),
-                const SizedBox(height: 16),
-              ],
+            child: Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 900;
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Column(
+                          children: [
+                            _buildOverviewCard(context, stats),
+                            const SizedBox(height: 16),
+                            if (stats.dailyTrend.isNotEmpty)
+                              _buildHistoricalTrendCard(context, stats),
+                            if (stats.dailyTrend.isNotEmpty)
+                              const SizedBox(height: 16),
+                            if (stats.weeklyComparison != null)
+                              _buildWeeklyComparisonCard(context, stats),
+                            if (stats.weeklyComparison != null)
+                              const SizedBox(height: 16),
+                            if (isWide)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      children: [
+                                        _buildTopRegionsCard(context, stats),
+                                        const SizedBox(height: 16),
+                                        _buildLast7DaysTrendCard(
+                                          context,
+                                          stats,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      children: [
+                                        _buildMagnitudeDistributionCard(
+                                          context,
+                                          stats,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        _buildDataSourcesCard(context, stats),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else ...[
+                              _buildTopRegionsCard(context, stats),
+                              const SizedBox(height: 16),
+                              _buildMagnitudeDistributionCard(context, stats),
+                              const SizedBox(height: 16),
+                              _buildLast7DaysTrendCard(context, stats),
+                              const SizedBox(height: 16),
+                              _buildDataSourcesCard(context, stats),
+                            ],
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           );
         },
@@ -567,7 +616,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               data: stats.dailyTrend,
               showMovingAverage: true,
               lineColor: Theme.of(context).colorScheme.primary,
-              fillColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              fillColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
             ),
             const SizedBox(height: 12),
             Center(

@@ -275,112 +275,120 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Progress Bar
-            LinearProgressIndicator(
-              value: (_currentQuestion + 1) / _questions.length,
-              backgroundColor: Colors.grey.shade300,
-              color: Colors.blue,
-            ),
-            const SizedBox(height: 20),
-
-            // Timer Display
-            Text(
-              "Time Left: $_timeLeft sec",
-              style: TextStyle(
-                color:
-                    _timeLeft <= 3
-                        ? Colors.red
-                        : Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-
-            // Question
-            Text(
-              currentQuestionData.question,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-
-            // Options List
-            ...List.generate(
-              currentQuestionData.options.length,
-              (index) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: ElevatedButton(
-                  onPressed: () => _checkAnswer(index),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Progress Bar
+                    LinearProgressIndicator(
+                      value: (_currentQuestion + 1) / _questions.length,
+                      backgroundColor: Colors.grey.shade300,
+                      color: Colors.blue,
                     ),
-                    backgroundColor:
-                        _selectedAnswerIndex == null
-                            ? Colors.blue
-                            : index == currentQuestionData.correctIndex
-                            ? Colors.green
-                            : index == _selectedAnswerIndex
-                            ? Colors.red
-                            : Colors.blue,
-                  ),
-                  child: Text(
-                    currentQuestionData.options[index],
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                  ),
+                    const SizedBox(height: 20),
+
+                    // Timer Display
+                    Text(
+                      "Time Left: $_timeLeft sec",
+                      style: TextStyle(
+                        color:
+                            _timeLeft <= 3
+                                ? Colors.red
+                                : Theme.of(context).brightness ==
+                                    Brightness.dark
+                                ? Colors.white
+                                : Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Question
+                    Text(
+                      currentQuestionData.question,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Options List
+                    ...List.generate(
+                      currentQuestionData.options.length,
+                      (index) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: ElevatedButton(
+                          onPressed: () => _checkAnswer(index),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor:
+                                _selectedAnswerIndex == null
+                                    ? Colors.blue
+                                    : index == currentQuestionData.correctIndex
+                                    ? Colors.green
+                                    : index == _selectedAnswerIndex
+                                    ? Colors.red
+                                    : Colors.blue,
+                          ),
+                          child: Text(
+                            currentQuestionData.options[index],
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Show Hint Button
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _showHint = !_showHint;
+                        });
+                      },
+                      child: const Text("Show Hint"),
+                    ),
+
+                    // Display Hint
+                    if (_showHint)
+                      Text(
+                        currentQuestionData.hint,
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                    const Spacer(),
+
+                    // Question Count
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Text(
+                        "Question ${_currentQuestion + 1}/${_questions.length}",
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
             ),
-
-            // Show Hint Button
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _showHint = !_showHint;
-                });
-              },
-              child: const Text("Show Hint"),
-            ),
-
-            // Display Hint
-            if (_showHint)
-              Text(
-                currentQuestionData.hint,
-                style: TextStyle(
-                  color: Colors.orange,
-                  fontStyle: FontStyle.italic,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-            const Spacer(),
-
-            // Question Count
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Text(
-                "Question ${_currentQuestion + 1}/${_questions.length}",
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

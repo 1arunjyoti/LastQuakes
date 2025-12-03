@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -227,45 +228,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: LastQuakesAppBar(title: 'Settings'),
-      body: Consumer<SettingsProvider>(
-        builder: (context, settingsProvider, child) {
-          if (settingsProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: Consumer<SettingsProvider>(
+                builder: (context, settingsProvider, child) {
+                  if (settingsProvider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-          if (settingsProvider.error != null) {
-            // Show error but allow interaction with other settings if possible,
-            // or just show a retry button.
-            // For now, let's show a snackbar (handled in provider usually, but here for safety)
-            // and display content.
-          }
+                  if (settingsProvider.error != null) {
+                    // Show error but allow interaction with other settings if possible,
+                    // or just show a retry button.
+                    // For now, let's show a snackbar (handled in provider usually, but here for safety)
+                    // and display content.
+                  }
 
-          return ListView(
-            padding: const EdgeInsets.all(12.0),
-            children: [
-              _buildNotificationSettingsCard(settingsProvider),
-              const SizedBox(height: 12),
-              _buildDataSourcesCard(settingsProvider),
-              const SizedBox(height: 12),
-              ThemeSettingsCard(
-                themeProvider: prefsProvider,
-                // expanded: _themeExpanded,
-                // onExpand: (val) => setState(() => _themeExpanded = val),
+                  return ListView(
+                    padding: const EdgeInsets.all(12.0),
+                    children: [
+                      if (!kIsWeb) ...[
+                        _buildNotificationSettingsCard(settingsProvider),
+                        const SizedBox(height: 12),
+                      ],
+                      _buildDataSourcesCard(settingsProvider),
+                      const SizedBox(height: 12),
+                      ThemeSettingsCard(
+                        themeProvider: prefsProvider,
+                        // expanded: _themeExpanded,
+                        // onExpand: (val) => setState(() => _themeExpanded = val),
+                      ),
+                      const SizedBox(height: 12),
+                      UnitsSettingsCard(
+                        themeProvider: prefsProvider,
+                        // expanded: _unitsExpanded,
+                        // onExpand: (val) => setState(() => _unitsExpanded = val),
+                      ),
+                      const SizedBox(height: 12),
+                      ClockSettingsCard(
+                        themeProvider: prefsProvider,
+                        // expanded: _clockExpanded,
+                        // onExpand: (val) => setState(() => _clockExpanded = val),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 12),
-              UnitsSettingsCard(
-                themeProvider: prefsProvider,
-                // expanded: _unitsExpanded,
-                // onExpand: (val) => setState(() => _unitsExpanded = val),
-              ),
-              const SizedBox(height: 12),
-              ClockSettingsCard(
-                themeProvider: prefsProvider,
-                // expanded: _clockExpanded,
-                // onExpand: (val) => setState(() => _clockExpanded = val),
-              ),
-              const SizedBox(height: 12),
-            ],
+            ),
           );
         },
       ),

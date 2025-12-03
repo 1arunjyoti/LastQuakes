@@ -1,16 +1,15 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquake/services/cache_manager/cache_manager.dart';
 import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/services/sources/earthquake_data_source.dart';
 import 'package:lastquake/services/sources/emsc_data_source.dart';
 import 'package:lastquake/services/sources/usgs_data_source.dart';
 import 'package:lastquake/utils/enums.dart';
 import 'package:lastquake/utils/secure_logger.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Optimized multi-source API service with performance and memory optimizations
@@ -27,7 +26,7 @@ class MultiSourceApiService {
       24; // Allow up to 24h old data if network fails
 
   final SharedPreferences _prefs;
-  final Directory _cacheDir;
+  final CacheManager _cacheManager;
   final Map<DataSource, EarthquakeDataSource> _sources;
 
   // Cache for expensive operations
@@ -36,10 +35,10 @@ class MultiSourceApiService {
   MultiSourceApiService({
     required SharedPreferences prefs,
     required SecureHttpClient client,
-    required Directory cacheDir,
+    required CacheManager cacheManager,
     Map<DataSource, EarthquakeDataSource>? sources,
   }) : _prefs = prefs,
-       _cacheDir = cacheDir,
+       _cacheManager = cacheManager,
        _sources =
            sources ??
            {
@@ -51,11 +50,11 @@ class MultiSourceApiService {
   static Future<MultiSourceApiService> create() async {
     final prefs = await SharedPreferences.getInstance();
     final client = SecureHttpClient.instance;
-    final cacheDir = await getApplicationDocumentsDirectory();
+    final cacheManager = await CacheManager.create();
     return MultiSourceApiService(
       prefs: prefs,
       client: client,
-      cacheDir: cacheDir,
+      cacheManager: cacheManager,
     );
   }
 
@@ -114,12 +113,11 @@ class MultiSourceApiService {
     }
   }
 
-  /// Get cache file path for specific sources
-  File _getCacheFile(Set<DataSource> sources) {
+  /// Get cache file key for specific sources
+  String _getCacheKey(Set<DataSource> sources) {
     try {
       final sourceKey = sources.map((s) => s.name).toList()..sort();
-      final filename = 'multi_source_cache_${sourceKey.join('_')}.json';
-      return File('${_cacheDir.path}/$filename');
+      return 'multi_source_cache_${sourceKey.join('_')}.json';
     } catch (e) {
       SecureLogger.error("Error getting cache file path", e);
       rethrow;
@@ -134,12 +132,12 @@ class MultiSourceApiService {
 
   /// Check if cache is valid and within size limits
   Future<bool> _isCacheValid(
-    File cacheFile,
+    String cacheKey,
     int timestamp, {
     bool allowStale = false,
   }) async {
     try {
-      if (!await cacheFile.exists()) return false;
+      if (!await _cacheManager.exists(cacheKey)) return false;
 
       final currentTime = DateTime.now().millisecondsSinceEpoch;
       final cacheAge = currentTime - timestamp;
@@ -149,7 +147,7 @@ class MultiSourceApiService {
 
       if (cacheAge > validityWindow) return false;
 
-      final fileSize = await cacheFile.length();
+      final fileSize = await _cacheManager.getSize(cacheKey);
       if (fileSize > _maxCacheSize) {
         SecureLogger.warning("Cache file too large: $fileSize bytes");
         return false;
@@ -192,28 +190,30 @@ class MultiSourceApiService {
         }
       }
 
-      final cacheFile = _getCacheFile(selectedSources);
+      final cacheFileKey = _getCacheKey(selectedSources);
       final cacheTimestampKey = _getCacheTimestampKey(selectedSources);
 
       // Check disk cache
       if (!forceRefresh) {
         final cachedTimestamp = _prefs.getInt(cacheTimestampKey);
         if (cachedTimestamp != null &&
-            await _isCacheValid(cacheFile, cachedTimestamp)) {
+            await _isCacheValid(cacheFileKey, cachedTimestamp)) {
           try {
-            final String cachedData = await cacheFile.readAsString();
-            // Use compute for JSON parsing
-            final earthquakes = await compute(
-              _parseEarthquakesJson,
-              cachedData,
-            );
+            final String? cachedData = await _cacheManager.read(cacheFileKey);
+            if (cachedData != null) {
+              // Use compute for JSON parsing
+              final earthquakes = await compute(
+                _parseEarthquakesJson,
+                cachedData,
+              );
 
-            // Store in memory cache
-            _memoryCache[cacheKey] = earthquakes;
-            SecureLogger.info(
-              "Returning ${earthquakes.length} earthquakes from disk cache",
-            );
-            return earthquakes;
+              // Store in memory cache
+              _memoryCache[cacheKey] = earthquakes;
+              SecureLogger.info(
+                "Returning ${earthquakes.length} earthquakes from disk cache",
+              );
+              return earthquakes;
+            }
           } catch (e) {
             SecureLogger.error("Error reading cache", e);
           }
@@ -296,7 +296,7 @@ class MultiSourceApiService {
             _encodeEarthquakesJson,
             allEarthquakes,
           );
-          await cacheFile.writeAsString(encodedData);
+          await _cacheManager.write(cacheFileKey, encodedData);
           await _prefs.setInt(
             cacheTimestampKey,
             DateTime.now().millisecondsSinceEpoch,
@@ -317,22 +317,24 @@ class MultiSourceApiService {
           final cachedTimestamp = _prefs.getInt(cacheTimestampKey);
           if (cachedTimestamp != null &&
               await _isCacheValid(
-                cacheFile,
+                cacheFileKey,
                 cachedTimestamp,
                 allowStale: true,
               )) {
             try {
-              final String cachedData = await cacheFile.readAsString();
-              // Use compute for JSON parsing
-              final staleEarthquakes = await compute(
-                _parseEarthquakesJson,
-                cachedData,
-              );
+              final String? cachedData = await _cacheManager.read(cacheFileKey);
+              if (cachedData != null) {
+                // Use compute for JSON parsing
+                final staleEarthquakes = await compute(
+                  _parseEarthquakesJson,
+                  cachedData,
+                );
 
-              SecureLogger.info(
-                "Returning ${staleEarthquakes.length} earthquakes from STALE disk cache",
-              );
-              return staleEarthquakes;
+                SecureLogger.info(
+                  "Returning ${staleEarthquakes.length} earthquakes from STALE disk cache",
+                );
+                return staleEarthquakes;
+              }
             } catch (e) {
               SecureLogger.error("Error reading stale cache", e);
             }
@@ -371,26 +373,15 @@ class MultiSourceApiService {
       }
 
       // Remove old cache file
-      final oldCacheFile = File('${_cacheDir.path}/$_cacheFilename');
-      if (await oldCacheFile.exists()) {
-        await oldCacheFile.delete();
+      if (await _cacheManager.exists(_cacheFilename)) {
+        await _cacheManager.delete(_cacheFilename);
       }
       await _prefs.remove(_cacheTimestampKey);
 
       // Remove all source-specific cache files
-      final files = _cacheDir.listSync().where(
-        (file) =>
-            file.path.contains('multi_source_cache_') &&
-            file.path.endsWith('.json'),
-      );
-
-      for (final file in files) {
-        try {
-          await file.delete();
-        } catch (e) {
-          SecureLogger.error("Error deleting cache file: ${file.path}", e);
-        }
-      }
+      // Note: CacheManager doesn't support listing files easily in abstract way
+      // So we rely on clear() method
+      await _cacheManager.clear();
 
       SecureLogger.info("All caches cleared successfully");
     } catch (e) {

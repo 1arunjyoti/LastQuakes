@@ -126,128 +126,137 @@ class _AboutScreenState extends State<AboutScreen> {
 
     return Scaffold(
       appBar: LastQuakesAppBar(title: 'About $_appName'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            const SizedBox(height: 16),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    const SizedBox(height: 16),
 
-            // App Name
-            Text(
-              _appName,
-              style: textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
+                    // App Name
+                    Text(
+                      _appName,
+                      style: textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
 
-            // Version Info
-            Text(
-              'Version $_version${_buildNumber.isNotEmpty ? ' ($_buildNumber)' : ''}',
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
+                    // Version Info
+                    Text(
+                      'Version $_version${_buildNumber.isNotEmpty ? ' ($_buildNumber)' : ''}',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
 
-            // App Description
-            Text(
-              'Providing near real-time earthquake information from around the globe to help you stay informed and prepared.',
-              style: textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
+                    // App Description
+                    Text(
+                      'Providing near real-time earthquake information from around the globe to help you stay informed and prepared.',
+                      style: textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(),
+                    const SizedBox(height: 8),
 
-            // Data Source Section
-            _buildInfoSection(
-              context: context,
-              title: 'Data Source',
-              icon: Icons.cloud_circle_outlined,
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Earthquake data is provided by the U.S. Geological Survey (USGS) and European-Mediterranean Seismological Centre (EMSC).',
-                  ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap:
-                        () => _launchUrlHelper(
-                          'https://earthquake.usgs.gov/',
-                          context,
-                        ),
-                    child: Text(
-                      'Visit USGS Earthquake Hazards Program',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        decoration: TextDecoration.underline,
+                    // Data Source Section
+                    _buildInfoSection(
+                      context: context,
+                      title: 'Data Source',
+                      icon: Icons.cloud_circle_outlined,
+                      content: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Earthquake data is provided by the U.S. Geological Survey (USGS) and European-Mediterranean Seismological Centre (EMSC).',
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap:
+                                () => _launchUrlHelper(
+                                  'https://earthquake.usgs.gov/',
+                                  context,
+                                ),
+                            child: Text(
+                              'Visit USGS Earthquake Hazards Program',
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap:
+                                () => _launchUrlHelper(
+                                  "https://www.emsc-csem.org/",
+                                  context,
+                                ),
+                            child: Text(
+                              'Visit EMSC Seismicity Catalog',
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap:
-                        () => _launchUrlHelper(
-                          "https://www.emsc-csem.org/",
-                          context,
-                        ),
-                    child: Text(
-                      'Visit EMSC Seismicity Catalog',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        decoration: TextDecoration.underline,
+                    const SizedBox(height: 8),
+                    const Divider(),
+
+                    // Open Source Licenses
+                    ListTile(
+                      leading: Icon(
+                        Icons.description_outlined,
+                        color: colorScheme.secondary,
                       ),
+                      title: const Text('Open Source Licenses'),
+                      subtitle: const Text(
+                        'View licenses for packages used in this app.',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap:
+                          () => showLicensePage(
+                            context: context,
+                            applicationName: _appName,
+                            applicationVersion: _version,
+                          ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 8),
+                    const Divider(),
+
+                    // Privacy Policy & Terms of Service
+                    _buildPolicyTile(
+                      context: context,
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Privacy Policy',
+                      sections: _privacyPolicySections,
+                    ),
+                    _buildPolicyTile(
+                      context: context,
+                      icon: Icons.gavel_outlined,
+                      title: 'Terms of Service',
+                      sections: _termsOfServiceSections,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            const Divider(),
-
-            // Open Source Licenses
-            ListTile(
-              leading: Icon(
-                Icons.description_outlined,
-                color: colorScheme.secondary,
-              ),
-              title: const Text('Open Source Licenses'),
-              subtitle: const Text(
-                'View licenses for packages used in this app.',
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap:
-                  () => showLicensePage(
-                    context: context,
-                    applicationName: _appName,
-                    applicationVersion: _version,
-                  ),
-            ),
-
-            const SizedBox(height: 8),
-            const Divider(),
-
-            // Privacy Policy & Terms of Service
-            _buildPolicyTile(
-              context: context,
-              icon: Icons.privacy_tip_outlined,
-              title: 'Privacy Policy',
-              sections: _privacyPolicySections,
-            ),
-            _buildPolicyTile(
-              context: context,
-              icon: Icons.gavel_outlined,
-              title: 'Terms of Service',
-              sections: _termsOfServiceSections,
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

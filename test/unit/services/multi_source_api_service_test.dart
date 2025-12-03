@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lastquake/models/earthquake.dart';
+import 'package:lastquake/services/cache_manager/cache_manager.dart';
 import 'package:lastquake/services/multi_source_api_service.dart';
 import 'package:lastquake/services/secure_http_client.dart';
 import 'package:lastquake/services/sources/earthquake_data_source.dart';
@@ -31,6 +32,68 @@ class MockDataSource implements EarthquakeDataSource {
   }
 }
 
+class TestCacheManager implements CacheManager {
+  final Directory dir;
+
+  TestCacheManager(this.dir);
+
+  @override
+  Future<void> init() async {}
+
+  File _getFile(String key) => File('${dir.path}/$key');
+
+  @override
+  Future<String?> read(String key) async {
+    final file = _getFile(key);
+    if (await file.exists()) {
+      return await file.readAsString();
+    }
+    return null;
+  }
+
+  @override
+  Future<void> write(String key, String content) async {
+    final file = _getFile(key);
+    await file.writeAsString(content);
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    final file = _getFile(key);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+
+  @override
+  Future<void> clear() async {
+    final files = dir.listSync();
+    for (final file in files) {
+      if (file is File && file.path.endsWith('.json')) {
+        try {
+          await file.delete();
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+    }
+  }
+
+  @override
+  Future<bool> exists(String key) async {
+    return await _getFile(key).exists();
+  }
+
+  @override
+  Future<int> getSize(String key) async {
+    final file = _getFile(key);
+    if (await file.exists()) {
+      return await file.length();
+    }
+    return 0;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -39,6 +102,7 @@ void main() {
   late File multiCacheFile;
   late MultiSourceApiService service;
   late SharedPreferences prefs;
+  late TestCacheManager testCacheManager;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -46,6 +110,7 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp('multi_service_test');
     usgsCacheFile = File('${tempDir.path}/multi_source_cache_usgs.json');
     multiCacheFile = File('${tempDir.path}/multi_source_cache_emsc_usgs.json');
+    testCacheManager = TestCacheManager(tempDir);
   });
 
   tearDown(() async {
@@ -62,7 +127,7 @@ void main() {
       service = MultiSourceApiService(
         prefs: prefs,
         client: _FakeHttpClient(mockClient),
-        cacheDir: tempDir,
+        cacheManager: testCacheManager,
       );
 
       expect(service.getSelectedSources(), {DataSource.usgs});
@@ -100,7 +165,7 @@ void main() {
       service = MultiSourceApiService(
         prefs: prefs,
         client: _FakeHttpClient(mockClient),
-        cacheDir: tempDir,
+        cacheManager: testCacheManager,
       );
 
       final result = await service.fetchEarthquakes(
@@ -146,7 +211,7 @@ void main() {
       service = MultiSourceApiService(
         prefs: prefs,
         client: _FakeHttpClient(mockClient),
-        cacheDir: tempDir,
+        cacheManager: testCacheManager,
         sources: {
           DataSource.usgs: MockDataSource(earthquakes: [usgsQuake]),
           DataSource.emsc: MockDataSource(earthquakes: [emscQuake]),
@@ -204,7 +269,7 @@ void main() {
         service = MultiSourceApiService(
           prefs: prefs,
           client: _FakeHttpClient(mockClient),
-          cacheDir: tempDir,
+          cacheManager: testCacheManager,
           sources: {DataSource.usgs: MockDataSource(shouldThrow: true)},
         );
 
@@ -226,7 +291,7 @@ void main() {
       service = MultiSourceApiService(
         prefs: prefs,
         client: _FakeHttpClient(mockClient),
-        cacheDir: tempDir,
+        cacheManager: testCacheManager,
         sources: {DataSource.usgs: MockDataSource(shouldThrow: true)},
       );
 
@@ -272,7 +337,7 @@ void main() {
     service = MultiSourceApiService(
       prefs: prefs,
       client: _FakeHttpClient(mockClient),
-      cacheDir: tempDir,
+      cacheManager: testCacheManager,
       sources: {
         DataSource.usgs: MockDataSource(earthquakes: [usgsQuake]),
         DataSource.emsc: MockDataSource(earthquakes: [emscQuake]),
@@ -307,7 +372,7 @@ void main() {
       service = MultiSourceApiService(
         prefs: prefs,
         client: _FakeHttpClient(mockClient),
-        cacheDir: tempDir,
+        cacheManager: testCacheManager,
       );
 
       await service.clearCache();
