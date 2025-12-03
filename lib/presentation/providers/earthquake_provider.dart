@@ -233,6 +233,10 @@ class EarthquakeProvider extends ChangeNotifier {
   static const String _showFaultLinesPrefKey = 'show_fault_lines_preference';
   static const String _faultLineDataUrl =
       'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json';
+  static const String _faultLinesCacheKey = 'fault_lines_geojson_cache_v1';
+  static const String _faultLinesCacheTimestampKey =
+      'fault_lines_geojson_cache_ts_v1';
+  static const Duration _faultLinesCacheTtl = Duration(days: 7);
 
   // --- Getters ---
 
@@ -592,24 +596,63 @@ class EarthquakeProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_showFaultLinesPrefKey, show);
 
-    if (show && _faultLines.isEmpty) {
+    if (show) {
       _loadFaultLines();
     }
   }
 
-  Future<void> _loadFaultLines() async {
-    if (_isLoadingFaultLines || _faultLines.isNotEmpty) return;
+  bool _isFaultLineCacheFresh(int? timestamp) {
+    if (timestamp == null) return false;
+    final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return DateTime.now().difference(cacheTime) <= _faultLinesCacheTtl;
+  }
+
+  Future<void> _loadFaultLines({bool forceRefresh = false}) async {
+    if (_isLoadingFaultLines) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final cacheTimestamp = prefs.getInt(_faultLinesCacheTimestampKey);
+    final cacheFresh = _isFaultLineCacheFresh(cacheTimestamp);
+
+    if (_faultLines.isNotEmpty && cacheFresh && !forceRefresh) {
+      return;
+    }
 
     _isLoadingFaultLines = true;
     notifyListeners();
 
     try {
-      final response = await http.get(Uri.parse(_faultLineDataUrl));
-      if (response.statusCode == 200) {
-        _faultLines = await compute(
+      final cachedData = prefs.getString(_faultLinesCacheKey);
+      final bool hasCacheData = cachedData != null;
+
+      if (_faultLines.isEmpty && cachedData != null) {
+        final cachedPolylines = await compute(
           _parseGeoJsonFaultLinesIsolate,
-          response.body,
+          cachedData,
         );
+        if (cachedPolylines.isNotEmpty) {
+          _faultLines = cachedPolylines;
+          notifyListeners();
+        }
+      }
+
+      final bool shouldFetchRemote =
+          forceRefresh || !cacheFresh || !hasCacheData;
+
+      if (shouldFetchRemote) {
+        final response = await http.get(Uri.parse(_faultLineDataUrl));
+        if (response.statusCode == 200) {
+          final parsedPolylines = await compute(
+            _parseGeoJsonFaultLinesIsolate,
+            response.body,
+          );
+          if (parsedPolylines.isNotEmpty) {
+            _faultLines = parsedPolylines;
+            final nowMillis = DateTime.now().millisecondsSinceEpoch;
+            await prefs.setString(_faultLinesCacheKey, response.body);
+            await prefs.setInt(_faultLinesCacheTimestampKey, nowMillis);
+          }
+        }
       }
     } catch (e) {
       debugPrint("Error loading fault lines: $e");

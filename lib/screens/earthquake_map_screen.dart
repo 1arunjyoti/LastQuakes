@@ -264,59 +264,71 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         // Schedule marker update after build completes (not during build)
         _scheduleMarkerUpdate(earthquakes);
 
-        return FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: const LatLng(20.0, 0.0),
-            initialZoom: _zoomLevel,
-            minZoom: _minZoom,
-            maxZoom: _maxZoom,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-            ),
-            onPositionChanged: (position, hasGesture) {
-              if (hasGesture) {
-                _zoomLevel = position.zoom;
-              }
-            },
-          ),
+        final attributionText = _getAttributionText(provider.mapLayerType);
+
+        return Stack(
           children: [
-            TileLayer(
-              urlTemplate: _getTileUrl(provider.mapLayerType),
-              userAgentPackageName: 'com.example.lastquake',
-            ),
-            if (provider.showFaultLines)
-              PolylineLayer(polylines: provider.faultLines),
-            MarkerClusterLayerWidget(
-              options: MarkerClusterLayerOptions(
-                maxClusterRadius: 45,
-                size: const Size(40, 40),
-                alignment: Alignment.center,
-                padding: const EdgeInsets.all(50),
-                maxZoom: 15,
-                markers: _currentMarkers,
-                builder: (context, markers) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.9),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        markers.length.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  );
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: const LatLng(20.0, 0.0),
+                initialZoom: _zoomLevel,
+                minZoom: _minZoom,
+                maxZoom: _maxZoom,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+                onPositionChanged: (position, hasGesture) {
+                  if (hasGesture) {
+                    _zoomLevel = position.zoom;
+                  }
                 },
               ),
+              children: [
+                TileLayer(
+                  urlTemplate: _getTileUrl(provider.mapLayerType),
+                  userAgentPackageName: 'com.example.lastquake',
+                ),
+                if (provider.showFaultLines)
+                  PolylineLayer(polylines: provider.faultLines),
+                MarkerClusterLayerWidget(
+                  options: MarkerClusterLayerOptions(
+                    maxClusterRadius: 45,
+                    size: const Size(40, 40),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(50),
+                    maxZoom: 15,
+                    markers: _currentMarkers,
+                    builder: (context, markers) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Center(
+                          child: Text(
+                            markers.length.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                if (_userPosition != null)
+                  MarkerLayer(markers: [_buildUserLocationMarker()]),
+              ],
             ),
-            if (_userPosition != null)
-              MarkerLayer(markers: [_buildUserLocationMarker()]),
+            if (attributionText.isNotEmpty)
+              Positioned(
+                left: 16,
+                bottom: 16,
+                child: _buildAttributionBadge(context, attributionText),
+              ),
           ],
         );
       },
@@ -334,6 +346,47 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
       case MapLayerType.dark:
         return 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png';
     }
+  }
+
+  String _getAttributionText(MapLayerType type) {
+    switch (type) {
+      case MapLayerType.osm:
+        return '© OpenStreetMap contributors';
+      case MapLayerType.satellite:
+        return 'Imagery © Esri & partners';
+      case MapLayerType.terrain:
+        return 'Terrain © Esri & USGS';
+      case MapLayerType.dark:
+        return '© CARTO & OpenStreetMap contributors';
+    }
+  }
+
+  Widget _buildAttributionBadge(BuildContext context, String attribution) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: 'Map attribution',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          attribution,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurface,
+            fontSize: 10,
+          ),
+        ),
+      ),
+    );
   }
 
   Marker _buildUserLocationMarker() {

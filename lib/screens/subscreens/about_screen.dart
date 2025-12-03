@@ -15,12 +15,68 @@ class _AboutScreenState extends State<AboutScreen> {
   String _version = '...'; // Placeholder for version
   String _buildNumber = ''; // Placeholder for build number
 
+  static const List<_PolicyItem> _privacyPolicySections = [
+    _PolicyItem(
+      heading: 'Information We Collect',
+      body:
+          'We access your precise or approximate location only when you enable location-based alerts. Basic, non-personal device metadata such as operating system version and language preferences may also be gathered so we can correctly display notifications.',
+    ),
+    _PolicyItem(
+      heading: 'How Your Data Is Used',
+      body:
+          'Location inputs are used to personalize nearby earthquake alerts and to help you understand regional risk. Aggregated analytics help us improve reliability, and we never sell your information or use it for advertising.',
+    ),
+    _PolicyItem(
+      heading: 'Data Sharing & Storage',
+      body:
+          'Earthquake information is sourced from the U.S. Geological Survey (USGS). We only share limited, anonymized data with infrastructure providers that host notifications so they can deliver messages on our behalf.',
+    ),
+    _PolicyItem(
+      heading: 'Your Choices',
+      body:
+          'You can revoke location access at any time through your system settings. Notification preferences can be adjusted inside the app, and deleting the app removes cached data from your device.',
+    ),
+    _PolicyItem(
+      heading: 'Contact',
+      body:
+          'Questions about privacy can be directed to https://github.com/1arunjyoti/LastQuakes. We will respond within 30 days of receiving your message.',
+    ),
+  ];
+
+  static const List<_PolicyItem> _termsOfServiceSections = [
+    _PolicyItem(
+      heading: 'Service Description',
+      body:
+          'LastQuakes delivers near real-time earthquake reports and preparedness tips. The service is informational and not a substitute for official emergency directives.',
+    ),
+    _PolicyItem(
+      heading: 'Acceptable Use',
+      body:
+          'You agree not to misuse the app, interfere with its infrastructure, or redistribute its data without attribution. Access may be revoked if suspicious activity is detected.',
+    ),
+    _PolicyItem(
+      heading: 'Accounts & Notifications',
+      body:
+          'You are responsible for managing your device permissions and ensuring notifications are enabled if you rely on alerts. Wireless carriers may charge fees for data or push delivery.',
+    ),
+    _PolicyItem(
+      heading: 'Disclaimer of Warranties',
+      body:
+          'While we strive for accuracy, earthquake reporting depends on third-party sensors and networks. We do not guarantee uninterrupted service or perfectly precise alerts.',
+    ),
+    _PolicyItem(
+      heading: 'Changes & Contact',
+      body:
+          'We may update these terms to reflect new features or legal requirements. Material updates will be announced inside the app, and questions can be sent to support@lastquake.app.',
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadAppInfo();
   }
-  
+
   // Load app info asynchronously
   Future<void> _loadAppInfo() async {
     try {
@@ -75,16 +131,6 @@ class _AboutScreenState extends State<AboutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            /* const SizedBox(height: 20),
-
-            // App Icon
-            Icon(
-              Icons
-                  .track_changes_outlined, // Or Icons.public, or custom logo asset
-              size: 80,
-              color: colorScheme.primary,
-            ), */
-
             const SizedBox(height: 16),
 
             // App Name
@@ -126,7 +172,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Earthquake data is provided by the U.S. Geological Survey (USGS).',
+                    'Earthquake data is provided by the U.S. Geological Survey (USGS) and European-Mediterranean Seismological Centre (EMSC).',
                   ),
                   const SizedBox(height: 8),
                   InkWell(
@@ -137,6 +183,21 @@ class _AboutScreenState extends State<AboutScreen> {
                         ),
                     child: Text(
                       'Visit USGS Earthquake Hazards Program',
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap:
+                        () => _launchUrlHelper(
+                          "https://www.emsc-csem.org/",
+                          context,
+                        ),
+                    child: Text(
+                      'Visit EMSC Seismicity Catalog',
                       style: TextStyle(
                         color: colorScheme.primary,
                         decoration: TextDecoration.underline,
@@ -165,32 +226,24 @@ class _AboutScreenState extends State<AboutScreen> {
                     context: context,
                     applicationName: _appName,
                     applicationVersion: _version,
-                    
-                    // Add your logo here
-
-                    // applicationIcon: Padding(
-                    //   padding: const EdgeInsets.all(8.0),
-                    //   child: Icon(Icons.track_changes_outlined, size: 40, color: colorScheme.primary),
-                    // ),
                   ),
             ),
 
             const SizedBox(height: 8),
             const Divider(),
 
-            // --- Add Privacy Policy / Terms of Service links ---
-
-            _buildLinkItem(
+            // Privacy Policy & Terms of Service
+            _buildPolicyTile(
               context: context,
               icon: Icons.privacy_tip_outlined,
               title: 'Privacy Policy',
-              url: 'YOUR_PRIVACY_POLICY_URL_HERE',
+              sections: _privacyPolicySections,
             ),
-            _buildLinkItem(
+            _buildPolicyTile(
               context: context,
               icon: Icons.gavel_outlined,
               title: 'Terms of Service',
-              url: 'YOUR_TERMS_URL_HERE',
+              sections: _termsOfServiceSections,
             ),
             const SizedBox(height: 20),
           ],
@@ -237,18 +290,124 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  // Helper for simple link list items
-  Widget _buildLinkItem({
+  Widget _buildPolicyTile({
     required BuildContext context,
     required IconData icon,
     required String title,
-    required String url,
+    required List<_PolicyItem> sections,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Theme.of(context).colorScheme.secondary),
-      title: Text(title),
-      trailing: const Icon(Icons.open_in_new),
-      onTap: () => _launchUrlHelper(url, context),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: Icon(icon, color: colorScheme.secondary),
+        title: Text(title),
+        subtitle: const Text('Tap to read details'),
+        trailing: const Icon(Icons.menu_book_outlined),
+        onTap:
+            () => _showPolicySheet(
+              context: context,
+              title: title,
+              sections: sections,
+              icon: icon,
+            ),
+      ),
     );
   }
+
+  Future<void> _showPolicySheet({
+    required BuildContext context,
+    required String title,
+    required List<_PolicyItem> sections,
+    IconData? icon,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final colorScheme = theme.colorScheme;
+        return SafeArea(
+          child: FractionallySizedBox(
+            heightFactor: 0.9,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colorScheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: colorScheme.secondary),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView.separated(
+                      itemBuilder: (_, index) {
+                        final section = sections[index];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              section.heading,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              section.body,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                      separatorBuilder: (_, __) => const Divider(height: 24),
+                      itemCount: sections.length,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PolicyItem {
+  final String heading;
+  final String body;
+
+  const _PolicyItem({required this.heading, required this.body});
 }
