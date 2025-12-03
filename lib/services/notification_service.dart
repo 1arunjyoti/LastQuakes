@@ -87,21 +87,4 @@ class NotificationService {
       payload: data['earthquakeId']?.toString(),
     );
   }
-
-  // Send the new preference structure
-  // MOVED TO DeviceRepository and SettingsProvider
-  // Keeping this method signature if needed for legacy calls, or removing entirely.
-  // Since we refactored SettingsScreen, we can remove this.
-  // However, main.dart might still call it. Let's check main.dart.
-  // main.dart calls NotificationService.instance.initialRegisterOrUpdate();
-  // We should remove that call from main.dart as well.
-
-  // For now, let's keep empty methods to avoid breaking main.dart until we update it.
-  Future<void> updateBackendRegistration() async {
-    // Deprecated: Logic moved to SettingsProvider/DeviceRepository
-  }
-
-  Future<void> initialRegisterOrUpdate() async {
-    // Deprecated: Logic moved to SettingsProvider/DeviceRepository
-  }
 }

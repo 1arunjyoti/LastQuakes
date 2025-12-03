@@ -402,7 +402,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
 
       // Build markers using cache where possible
       final List<Marker> newMarkers = [];
-      
+
       for (int i = 0; i < earthquakesToProcess.length; i += _markerBatchSize) {
         if (!mounted || _isDisposed) return;
 
@@ -432,7 +432,7 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
   Marker? _getOrCreateMarker(Earthquake quake) {
     try {
       final String id = quake.id;
-      
+
       // Return cached marker if available
       if (_markerCache.containsKey(id)) {
         return _markerCache[id];
@@ -527,161 +527,160 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                // Header with magnitude and close button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Magnitude badge
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _getMarkerColorOptimized(quake.magnitude),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      child: Text(
-                        'M ${quake.magnitude.toStringAsFixed(1)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                  // Header with magnitude and close button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Magnitude badge
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _getMarkerColorOptimized(quake.magnitude),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          'M ${quake.magnitude.toStringAsFixed(1)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                      constraints: const BoxConstraints(),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Location
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        quake.place,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-                // Time
-                Row(
-                  children: [
-                    Icon(
-                      Icons.schedule,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _formatDateTime(quake.time),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Coordinates
-                Row(
-                  children: [
-                    Icon(
-                      Icons.map,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${quake.latitude.toStringAsFixed(2)}°, ${quake.longitude.toStringAsFixed(2)}°',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // Depth if available
-                if (quake.depth != null) ...[
-                  const SizedBox(height: 12),
+                  // Location
                   Row(
                     children: [
                       Icon(
-                        Icons.arrow_downward,
+                        Icons.location_on,
                         size: 20,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Depth: ${quake.depth!.toStringAsFixed(1)} km',
+                          quake.place,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Time
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _formatDateTime(quake.time),
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
                     ],
                   ),
-                ],
+                  const SizedBox(height: 12),
 
-                // Source
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.source,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Source: ${quake.source}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                  // Coordinates
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.map,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${quake.latitude.toStringAsFixed(2)}°, ${quake.longitude.toStringAsFixed(2)}°',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Depth if available
+                  if (quake.depth != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.arrow_downward,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Depth: ${quake.depth!.toStringAsFixed(1)} km',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
 
-                const SizedBox(height: 20),
+                  // Source
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.source,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Source: ${quake.source}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
 
-                // View More button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showEarthquakeDetails(quake);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primary,
-                      foregroundColor:
-                          Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    child: const Text(
-                      'View More Details',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                  const SizedBox(height: 20),
+
+                  // View More button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showEarthquakeDetails(quake);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
+                      ),
+                      child: const Text(
+                        'View More Details',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
-                ),
                 ],
               ),
             ),
@@ -689,7 +688,9 @@ class _EarthquakeMapScreenState extends State<EarthquakeMapScreen>
         );
       },
     );
-  }  String _formatDateTime(DateTime dateTime) {
+  }
+
+  String _formatDateTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 

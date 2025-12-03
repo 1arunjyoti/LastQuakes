@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/scheduler.dart';
 import 'package:lastquake/presentation/providers/earthquake_provider.dart';
 import 'package:lastquake/screens/earthquake_details.dart';
 import 'package:lastquake/widgets/appbar.dart';
@@ -19,6 +20,8 @@ class EarthquakeListScreen extends StatefulWidget {
 class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   // UI State
   bool showFilters = false;
+  bool _isScrolling = false;
+  
   // Animation
   Duration _filterAnimDuration = const Duration(milliseconds: 220);
   Curve _filterAnimCurve = Curves.easeInOut;
@@ -26,22 +29,22 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   // Scroll Controller
   late ScrollController _scrollController;
   Timer? _filterDebounce;
+  Timer? _scrollDebounce;
+  
+  // Constants for list item height (for itemExtent optimization)
+  static const double _itemHeight = 120.0; // Approximate height of EarthquakeListItem
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
-
-    // Initial fetch
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EarthquakeProvider>().loadData();
-    });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     _filterDebounce?.cancel();
+    _scrollDebounce?.cancel();
     super.dispose();
   }
 
@@ -49,18 +52,32 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
     final position = _scrollController.position;
     final direction = position.userScrollDirection;
 
-    // Auto-dismiss filters
-    if (direction == ScrollDirection.reverse && showFilters) {
-      setState(() {
-        _filterAnimDuration = const Duration(milliseconds: 320);
-        _filterAnimCurve = Curves.easeOutCubic;
-        showFilters = false;
+    // Auto-dismiss filters with debounce to avoid setState during scroll
+    if (direction == ScrollDirection.reverse && showFilters && !_isScrolling) {
+      _isScrolling = true;
+      // Use post-frame callback to avoid setState during scroll
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted && showFilters) {
+          setState(() {
+            _filterAnimDuration = const Duration(milliseconds: 320);
+            _filterAnimCurve = Curves.easeOutCubic;
+            showFilters = false;
+          });
+        }
+      });
+      // Reset scrolling flag after a short delay
+      _scrollDebounce?.cancel();
+      _scrollDebounce = Timer(const Duration(milliseconds: 150), () {
+        _isScrolling = false;
       });
     }
 
-    // Lazy Loading
+    // Lazy Loading - only trigger when not already loading
     if (position.pixels >= position.maxScrollExtent * 0.8) {
-      context.read<EarthquakeProvider>().loadMoreList();
+      final provider = context.read<EarthquakeProvider>();
+      if (!provider.listIsLoadingMore) {
+        provider.loadMoreList();
+      }
     }
   }
 
@@ -155,13 +172,19 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                               () => provider.loadData(forceRefresh: true),
                           child: ListView.builder(
                             controller: _scrollController,
-                            // Performance optimizations
-                            cacheExtent: 500, // Pre-render items outside viewport
+                            // Performance optimizations for high refresh rate displays
+                            cacheExtent: 800, // Increased cache for smoother scrolling
                             addAutomaticKeepAlives: false,
                             addRepaintBoundaries: true,
+                            // Use physics with reduced overscroll for smoother feel
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
                             itemCount:
                                 provider.listVisibleEarthquakes.length +
                                 (provider.listIsLoadingMore ? 1 : 0),
+                            // Using prototypeItem for better performance than itemExtent
+                            // when items have consistent but not exact heights
                             itemBuilder: (context, index) {
                               if (index ==
                                   provider.listVisibleEarthquakes.length) {
@@ -179,25 +202,27 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                                 earthquake.id,
                               );
 
-                              return EarthquakeListItem(
-                                location: earthquake.place,
-                                distanceKm: distance,
-                                timestamp: earthquake.time,
-                                magnitude: earthquake.magnitude,
-                                magnitudeColor: _getMagnitudeColor(
-                                  earthquake.magnitude,
-                                ),
-                                source: earthquake.source,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    AppPageTransitions.scaleRoute(
-                                      page: EarthquakeDetailsScreen(
-                                        earthquake: earthquake,
+                              return RepaintBoundary(
+                                child: EarthquakeListItem(
+                                  location: earthquake.place,
+                                  distanceKm: distance,
+                                  timestamp: earthquake.time,
+                                  magnitude: earthquake.magnitude,
+                                  magnitudeColor: _getMagnitudeColor(
+                                    earthquake.magnitude,
+                                  ),
+                                  source: earthquake.source,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      AppPageTransitions.scaleRoute(
+                                        page: EarthquakeDetailsScreen(
+                                          earthquake: earthquake,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               );
                             },
                           ),

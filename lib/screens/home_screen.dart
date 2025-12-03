@@ -15,11 +15,9 @@ class NavigationHandler extends StatefulWidget {
 class _NavigationHandlerState extends State<NavigationHandler> {
   int _currentIndex = 0;
 
-  // Store the screen widgets in a final list.
-  final List<Widget> _screens = const [
-    EarthquakeListScreen(),
-    EarthquakeMapScreen(),
-  ];
+  // Cache for lazy-loaded screens (only load when needed)
+  final Map<int, Widget> _screenCache = {};
+
   // Handle bottom navigation tap
   void _onBottomNavTap(int index) {
     if (_currentIndex != index) {
@@ -41,6 +39,31 @@ class _NavigationHandlerState extends State<NavigationHandler> {
     });
   }
 
+  /// Factory method to create or retrieve cached screen widget
+  Widget _getScreen(int index) {
+    // Return cached screen if available
+    if (_screenCache.containsKey(index)) {
+      return _screenCache[index]!;
+    }
+
+    // Lazy-load screen on-demand
+    final Widget screen;
+    switch (index) {
+      case 0:
+        screen = const EarthquakeListScreen();
+        break;
+      case 1:
+        screen = const EarthquakeMapScreen();
+        break;
+      default:
+        screen = const EarthquakeListScreen();
+    }
+
+    // Cache for future use (avoid recreating)
+    _screenCache[index] = screen;
+    return screen;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Calculate responsive height, e.g., 8% of screen height, clamped between 60 and 80
@@ -48,7 +71,7 @@ class _NavigationHandlerState extends State<NavigationHandler> {
     final responsiveNavBarHeight = (screenHeight * 0.08).clamp(60.0, 80.0);
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _getScreen(_currentIndex),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _onBottomNavTap,

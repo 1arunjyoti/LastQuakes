@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:lastquake/models/safe_zone.dart';
-import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/utils/enums.dart';
+import 'package:lastquake/utils/notification_registration_coordinator.dart';
 import 'package:lastquake/utils/secure_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -122,8 +122,8 @@ class PreferencesService {
       await prefs.setDouble(prefNotificationRadius, radius);
       await prefs.setBool(prefNotificationUseCurrentLoc, useCurrentLocation);
 
-      // Update backend
-      await NotificationService.instance.updateBackendRegistration();
+      // Update backend via the shared coordinator
+      await NotificationRegistrationCoordinator.requestSync();
 
       SecureLogger.success("Settings saved successfully");
     } catch (e) {

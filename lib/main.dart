@@ -8,12 +8,14 @@ import 'package:lastquake/models/earthquake_adapter.dart';
 import 'package:lastquake/provider/theme_provider.dart';
 import 'package:lastquake/screens/home_screen.dart';
 import 'package:lastquake/screens/onboarding_screen.dart';
+import 'package:lastquake/services/earthquake_cache_service.dart';
 import 'package:lastquake/services/multi_source_api_service.dart';
 import 'package:lastquake/services/notification_service.dart';
 import 'package:lastquake/services/secure_storage_service.dart';
 import 'package:lastquake/services/secure_token_service.dart';
 import 'package:lastquake/services/token_migration_service.dart';
 import 'package:lastquake/theme/app_theme.dart';
+import 'package:lastquake/utils/notification_registration_coordinator.dart';
 import 'package:lastquake/utils/secure_logger.dart';
 import 'package:lastquake/data/repositories/earthquake_repository_impl.dart';
 import 'package:lastquake/domain/usecases/get_earthquakes_usecase.dart';
@@ -103,7 +105,7 @@ void main() async {
         ),
         ChangeNotifierProvider(create: (_) => MapPickerProvider()),
       ],
-      child: MyApp(seenOnboarding: seenOnboarding),
+      child: MyApp(seenOnboarding: seenOnboarding, prefs: prefs),
     ),
   );
 }
@@ -115,6 +117,7 @@ Future<void> _runBackgroundInitializations() async {
   if (fcmToken != null) {
     SecureLogger.token("Initial FCM Token obtained", token: fcmToken);
     await SecureTokenService.instance.storeFCMToken(fcmToken);
+    await NotificationRegistrationCoordinator.requestSync();
   }
 
   // Request permissions and perform initial backend registration
@@ -132,14 +135,14 @@ Future<void> _runBackgroundInitializations() async {
 
   if (settings.authorizationStatus == AuthorizationStatus.authorized ||
       settings.authorizationStatus == AuthorizationStatus.provisional) {
-    SecureLogger.init("Triggering initial backend registration");
-    await NotificationService.instance.initialRegisterOrUpdate();
+    SecureLogger.init("Notification permission granted");
   } else {
     SecureLogger.warning(
       "FCM permission denied. Registration will be attempted, but notifications may not be received",
     );
-    await NotificationService.instance.initialRegisterOrUpdate();
   }
+
+  await NotificationRegistrationCoordinator.requestSync();
 
   // Set up foreground message listener
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -152,17 +155,29 @@ Future<void> _runBackgroundInitializations() async {
     SecureLogger.token("FCM Token refreshed", token: token);
     try {
       await SecureTokenService.instance.storeFCMToken(token);
-      await NotificationService.instance.updateBackendRegistration();
+      await NotificationRegistrationCoordinator.requestSync();
     } catch (e) {
       SecureLogger.error("Error handling token refresh", e);
     }
   });
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final bool seenOnboarding;
+  final SharedPreferences prefs;
 
-  const MyApp({super.key, required this.seenOnboarding});
+  const MyApp({super.key, required this.seenOnboarding, required this.prefs});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void dispose() {
+    EarthquakeCacheService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -174,9 +189,9 @@ class MyApp extends StatelessWidget {
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
           home:
-              seenOnboarding
+              widget.seenOnboarding
                   ? const NavigationHandler()
-                  : const OnboardingScreen(),
+                  : OnboardingScreen(prefs: widget.prefs),
           debugShowCheckedModeBanner: false,
         );
       },

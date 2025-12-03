@@ -212,6 +212,7 @@ class EarthquakeProvider extends ChangeNotifier {
   bool _isLoadingLocation = false;
   final Map<String, double> _distanceCache = {};
   static const int _maxCacheSize = 500; // Prevent unbounded memory growth
+  String? _locationError;
 
   // --- Map View State ---
   List<Earthquake> _mapFilteredEarthquakes = [];
@@ -249,6 +250,7 @@ class EarthquakeProvider extends ChangeNotifier {
   bool get listHasMoreData => _listHasMoreData;
   bool get isLoadingLocation => _isLoadingLocation;
   Position? get userPosition => _userPosition;
+  String? get locationError => _locationError;
 
   List<Earthquake> get listVisibleEarthquakes {
     final count = (_listCurrentPage * _itemsPerPage);
@@ -435,23 +437,59 @@ class EarthquakeProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> fetchUserLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+  Future<void> fetchUserLocation({bool forceRefresh = true}) async {
+    if (_isLoadingLocation) return;
+
+    _locationError = null;
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _locationError =
+          'Location services are disabled. Please enable GPS to see nearby distances.';
+      notifyListeners();
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _locationError =
+          'Location permission is required. Grant access from system settings.';
+      notifyListeners();
+      return;
+    }
 
     _isLoadingLocation = true;
     notifyListeners();
 
     try {
-      _userPosition = await _locationService.getCurrentLocation(
-        forceRefresh: true,
+      final position = await _locationService.getCurrentLocation(
+        forceRefresh: forceRefresh,
       );
-      _distanceCache.clear();
-      await _preCalculateDistances();
+
+      if (position != null) {
+        _userPosition = position;
+        _distanceCache.clear();
+        await _preCalculateDistances();
+      } else {
+        _locationError = 'Unable to determine your location. Please try again.';
+      }
     } catch (e) {
       debugPrint('Error fetching location: $e');
+      _locationError = 'Error fetching location. Please try again.';
     } finally {
       _isLoadingLocation = false;
+      notifyListeners();
+    }
+  }
+
+  void clearLocationError() {
+    if (_locationError != null) {
+      _locationError = null;
       notifyListeners();
     }
   }

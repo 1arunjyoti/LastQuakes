@@ -7,6 +7,7 @@ import 'package:lastquake/models/safe_zone.dart';
 import 'package:lastquake/services/location_service.dart';
 import 'package:lastquake/services/secure_token_service.dart';
 import 'package:lastquake/utils/enums.dart';
+import 'package:lastquake/utils/notification_registration_coordinator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class SettingsProvider extends ChangeNotifier {
@@ -40,6 +41,7 @@ class SettingsProvider extends ChangeNotifier {
     try {
       _settings = await _settingsRepository.getNotificationSettings();
       _selectedDataSources = await _settingsRepository.getSelectedDataSources();
+      NotificationRegistrationCoordinator.registerSyncCallback(syncWithBackend);
     } catch (e) {
       _error = "Failed to load settings: $e";
     } finally {
@@ -68,6 +70,7 @@ class SettingsProvider extends ChangeNotifier {
 
     try {
       await _settingsRepository.saveSelectedDataSources(sources);
+      await _syncWithBackend();
     } catch (e) {
       _error = "Failed to save data sources: $e";
       notifyListeners();
@@ -123,5 +126,13 @@ class SettingsProvider extends ChangeNotifier {
         print("Backend sync failed: $e");
       }
     }
+  }
+
+  Future<void> syncWithBackend() => _syncWithBackend();
+
+  @override
+  void dispose() {
+    NotificationRegistrationCoordinator.unregisterSyncCallback(syncWithBackend);
+    super.dispose();
   }
 }

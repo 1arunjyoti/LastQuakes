@@ -1,15 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:introduction_screen/introduction_screen.dart';
 import 'package:lastquake/screens/home_screen.dart';
 import 'package:lastquake/utils/app_page_transitions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key});
+  final SharedPreferences prefs;
+
+  const OnboardingScreen({super.key, required this.prefs});
 
   Future<void> _onIntroEnd(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('seenOnboarding', true);
 
     if (context.mounted) {
@@ -19,57 +21,86 @@ class OnboardingScreen extends StatelessWidget {
     }
   }
 
+  Widget _buildImage(IconData icon, Color color) {
+    return Container(
+      width: 160,
+      height: 160,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Center(child: Icon(icon, size: 80, color: color)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const bodyStyle = TextStyle(fontSize: 19.0);
+    const bodyStyle = TextStyle(fontSize: 18.0, color: Colors.black54);
 
     const pageDecoration = PageDecoration(
-      titleTextStyle: TextStyle(fontSize: 28.0, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(
+        fontSize: 26.0,
+        fontWeight: FontWeight.bold,
+        color: Colors.black87,
+      ),
       bodyTextStyle: bodyStyle,
-      bodyPadding: EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
+      bodyPadding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
       pageColor: Colors.white,
-      imagePadding: EdgeInsets.zero,
+      imagePadding: EdgeInsets.only(top: 40),
+      imageFlex: 2,
+      bodyFlex: 3,
     );
 
     return IntroductionScreen(
       globalBackgroundColor: Colors.white,
       allowImplicitScrolling: true,
-      autoScrollDuration: 3000,
-      infiniteAutoScroll: true,
 
       pages: [
         PageViewModel(
-          title: "Track Earthquakes",
-          body: "Monitor seismic activity around the globe in near real-time.",
-          image: const Icon(Icons.public, size: 100, color: Colors.blue),
+          title: "Global Monitoring",
+          body:
+              "Track seismic activity worldwide in real-time from reliable sources.",
+          image: _buildImage(FontAwesomeIcons.earthAmericas, Colors.blue),
           decoration: pageDecoration,
         ),
         PageViewModel(
-          title: "Stay Safe",
+          title: "Interactive Maps",
           body:
-              "Set up Safe Zones to get alerts for earthquakes near your important locations.",
-          image: const Icon(Icons.security, size: 100, color: Colors.green),
+              "Visualize earthquake locations and magnitudes on detailed interactive maps.",
+          image: _buildImage(FontAwesomeIcons.mapLocationDot, Colors.teal),
           decoration: pageDecoration,
         ),
         PageViewModel(
-          title: "Filter & Analyze",
+          title: "Smart Alerts",
           body:
-              "Filter by magnitude, region, and date to find exactly what you're looking for.",
-          image: const Icon(Icons.filter_list, size: 100, color: Colors.orange),
+              "Create Safe Zones and receive instant notifications for earthquakes near you.",
+          image: _buildImage(FontAwesomeIcons.bell, Colors.orange),
+          decoration: pageDecoration,
+        ),
+        PageViewModel(
+          title: "Detailed Insights",
+          body:
+              "Analyze historical data and trends with comprehensive statistics.",
+          image: _buildImage(FontAwesomeIcons.chartLine, Colors.purple),
           decoration: pageDecoration,
         ),
       ],
       onDone: () => _onIntroEnd(context),
-      onSkip: () => _onIntroEnd(context), // You can override onSkip callback
+      onSkip: () => _onIntroEnd(context),
       showSkipButton: true,
       skipOrBackFlex: 0,
       nextFlex: 0,
       showBackButton: false,
-      //rtl: true, // Display as right-to-left
       back: const Icon(Icons.arrow_back),
-      skip: const Text('Skip', style: TextStyle(fontWeight: FontWeight.w600)),
-      next: const Icon(Icons.arrow_forward),
-      done: const Text('Done', style: TextStyle(fontWeight: FontWeight.w600)),
+      skip: const Text(
+        'Skip',
+        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey),
+      ),
+      next: const Icon(Icons.arrow_forward, color: Colors.blue),
+      done: const Text(
+        'Get Started',
+        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue),
+      ),
       curve: Curves.fastLinearToSlowEaseIn,
       controlsMargin: const EdgeInsets.all(16),
       controlsPadding:
@@ -80,14 +111,9 @@ class OnboardingScreen extends StatelessWidget {
         size: Size(10.0, 10.0),
         color: Color(0xFFBDBDBD),
         activeSize: Size(22.0, 10.0),
+        activeColor: Colors.blue,
         activeShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(25.0)),
-        ),
-      ),
-      dotsContainerDecorator: const ShapeDecoration(
-        color: Colors.black87,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8.0)),
         ),
       ),
     );

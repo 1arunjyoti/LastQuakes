@@ -17,7 +17,16 @@ class StatisticsScreen extends StatefulWidget {
 class _StatisticsScreenState extends State<StatisticsScreen> {
   // Cache statistics to avoid recalculating on every rebuild
   EarthquakeStats? _cachedStats;
-  List<Earthquake>? _lastDataSnapshot;
+  String? _lastCacheKey;
+
+  /// Generate a cache key based on list content, not reference
+  String _generateCacheKey(List<Earthquake> earthquakes) {
+    if (earthquakes.isEmpty) return 'empty';
+    // Use length + first/last IDs + first/last times for quick content fingerprint
+    final first = earthquakes.first;
+    final last = earthquakes.last;
+    return '${earthquakes.length}_${first.id}_${last.id}_${first.time.millisecondsSinceEpoch}_${last.time.millisecondsSinceEpoch}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,12 +60,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             );
           }
 
-          // Only recalculate if data changed
-          if (_lastDataSnapshot != provider.listEarthquakes) {
+          // Use content-based cache key to detect actual data changes
+          final currentCacheKey = _generateCacheKey(provider.listEarthquakes);
+          if (_lastCacheKey != currentCacheKey) {
             _cachedStats = EarthquakeStatistics.calculate(
               provider.listEarthquakes,
             );
-            _lastDataSnapshot = provider.listEarthquakes;
+            _lastCacheKey = currentCacheKey;
           }
 
           final stats = _cachedStats!;
