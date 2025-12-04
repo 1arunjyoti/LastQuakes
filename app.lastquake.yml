@@ -1,0 +1,98 @@
+Categories:
+  - Science & Education
+  - Navigation
+License: GPL-3.0-or-later
+AuthorName: LastQuakes
+AuthorEmail: xyz@lastquakes.com
+
+SourceCode: https://github.com/1arunjyoti/LastQuakes
+IssueTracker: https://github.com/1arunjyoti/LastQuakes/issues
+
+AutoName: LastQuakes FOSS
+Summary: Real-time global earthquake monitor
+
+Description: |-
+  LastQuakes is a comprehensive application providing real-time global earthquake monitoring with multi-source data integration, interactive map visualization, and advanced filtering capabilities.
+
+  '''Core Features:'''
+
+  * '''Multi-Source Data Integration:'''
+    * USGS (U.S. Geological Survey): Comprehensive global earthquake data
+    * EMSC (European-Mediterranean Seismological Centre): Enhanced coverage for European and Mediterranean regions
+    * Intelligent deduplication: Automatic removal of duplicate events from multiple sources
+    * Optimized caching with offline access support
+
+  * '''Interactive Map Visualization:'''
+    * High-performance map rendering with smooth panning and zooming
+    * Multiple base layers: Street Map, Satellite Imagery, Terrain View, Dark Theme
+    * Magnitude-based markers with color-coding and size scaling
+    * Marker clustering for better visualization at different zoom levels
+    * Optional tectonic plate boundary visualization
+    * Real-time filtering by magnitude, time window, and distance
+
+  * '''Dynamic List View:'''
+    * Filter by magnitude threshold, country/region, and distance
+    * Distance calculation with unit preferences (km/mi)
+    * Sort by time, magnitude, or distance
+    * Modern card-based design with gradient headers
+    * Lazy loading with efficient list rendering
+
+  * '''Detailed Event Analysis:'''
+    * Comprehensive information including magnitude, depth, coordinates
+    * Tsunami warning status and distance from user's location
+    * Source attribution (USGS/EMSC)
+    * Interactive map pinpointing event location
+    * Share functionality for social media and messaging apps
+
+  * '''User Preferences:'''
+    * Theme settings: Light Mode, Dark Mode, System Default
+    * Unit preferences: Kilometers or Miles
+    * Time format: 12-hour or 24-hour display
+    * Data source selection: Enable/disable USGS and EMSC
+    * Persistent storage for settings
+
+  * '''Statistics & Analytics:'''
+    * Visual representation of seismic activity trends
+    * Magnitude and geographic distribution charts
+    * Time-based analysis: hourly, daily, and weekly patterns
+
+  * '''Privacy & Security:'''
+    * F-Droid version is completely open-source with NO proprietary dependencies
+    * No user tracking or data collection
+
+  '''Note:''' This is an independent project and is not officially affiliated with USGS, EMSC, or any government seismological organization.
+
+  '''FOSS Build:''' This F-Droid version excludes all proprietary Google services (Firebase, Play Services) and uses only open-source alternatives.
+
+RepoType: git
+Repo: https://github.com/1arunjyoti/LastQuakes.git
+Binaries: https://github.com/1arunjyoti/LastQuakes/releases/download/v%v/app-foss-release.apk
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: f-droid
+    tag: v1.0.0
+    subdir: .
+    submodules: true
+    output: build/app/outputs/flutter-apk/app-foss-release.apk
+    srclibs:
+      - flutter@stable
+    rm:
+      - ios
+      - macos
+      - windows
+      - linux
+      - web
+      - test
+    build:
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get
+      - $$flutter$$/bin/flutter build apk --flavor foss --dart-define=FLAVOR=foss --release
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+UpdateCheckData: pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+
+VercodeOperation: '%c'
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1

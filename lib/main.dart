@@ -1,5 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,9 +8,14 @@ import 'package:lastquakes/provider/theme_provider.dart';
 import 'package:lastquakes/screens/home_screen.dart';
 import 'package:lastquakes/screens/onboarding_screen.dart';
 import 'package:lastquakes/services/analytics_service.dart';
+import 'package:lastquakes/services/analytics_service_firebase.dart';
+import 'package:lastquakes/services/analytics_service_noop.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
 import 'package:lastquakes/services/multi_source_api_service.dart';
 import 'package:lastquakes/services/notification_service.dart';
+import 'package:lastquakes/services/push_notification_service.dart';
+import 'package:lastquakes/services/push_notification_service_firebase.dart';
+import 'package:lastquakes/services/push_notification_service_noop.dart';
 import 'package:lastquakes/services/secure_storage_service.dart';
 import 'package:lastquakes/services/secure_token_service.dart';
 import 'package:lastquakes/services/token_migration_service.dart';
@@ -26,31 +29,49 @@ import 'package:lastquakes/presentation/providers/settings_provider.dart';
 import 'package:lastquakes/presentation/providers/map_picker_provider.dart';
 import 'package:lastquakes/data/repositories/settings_repository_impl.dart';
 import 'package:lastquakes/data/repositories/device_repository_impl.dart';
+import 'package:lastquakes/data/repositories/device_repository_noop.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Handle Firebase background messages
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Ensure Firebase is initialized for background handling
-  await Firebase.initializeApp();
-  try {
-    await NotificationService.instance.showFCMNotification(message);
-  } catch (e) {
-    SecureLogger.error('Error showing background notification', e);
-  }
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Detect flavor
+  const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'prod');
+  final bool isFoss = flavor == 'foss';
+
+  SecureLogger.info("Starting app in $flavor mode (FOSS: $isFoss)");
+
+  // Initialize Services based on flavor
+  if (isFoss) {
+    AnalyticsService.instance = AnalyticsServiceNoop();
+    PushNotificationService.instance = PushNotificationServiceNoop();
+  } else {
+    AnalyticsService.instance = AnalyticsServiceFirebase();
+    PushNotificationService.instance = PushNotificationServiceFirebase();
+  }
+
+  // Initialize Hive first (requires platform channels to be ready)
+  await Hive.initFlutter();
+  Hive.registerAdapter(EarthquakeAdapter());
+  SecureLogger.success("Hive initialized with Earthquake adapter");
+
   // Parallelize independent Phase 1 initializations
   final phase1Results = await Future.wait<dynamic>([
-    dotenv.load(fileName: ".env"),
-    Hive.initFlutter(),
-    // Initialize Firebase if supported or configured (Mobile only)
+    // Safely load .env file (optional for FOSS)
+    dotenv.load(fileName: ".env").catchError((e) {
+      SecureLogger.info(
+        "Note: .env file not found or failed to load. This is expected for FOSS builds.",
+      );
+      return null;
+    }),
+    // Initialize Firebase/Push services (Mobile only)
     !kIsWeb
-        ? (Firebase.initializeApp() as Future<dynamic>).catchError((e) {
-          SecureLogger.error("Firebase initialization failed", e);
+        ? PushNotificationService.instance.initialize().catchError((e) {
+          SecureLogger.error(
+            "Push notification service initialization failed",
+            e,
+          );
           return null;
         })
         : Future.value(null),
@@ -64,21 +85,12 @@ void main() async {
   ]);
 
   // Extract results from parallel operations
-  final prefs = phase1Results[3] as SharedPreferences;
+  final prefs = phase1Results[2] as SharedPreferences;
 
-  // Register Hive adapters (must happen after Hive init)
-  Hive.registerAdapter(EarthquakeAdapter());
-  SecureLogger.success("Hive initialized with Earthquake adapter");
-
-  // Initialize Analytics and Crashlytics (after Firebase init)
+  // Initialize Analytics (after Firebase init if applicable)
   if (!kIsWeb) {
     await AnalyticsService.instance.initialize();
     await AnalyticsService.instance.logAppOpen();
-  }
-
-  // Set up Firebase background message handler
-  if (!kIsWeb) {
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 
   // Parallelize Phase 2: Secure storage and local notifications initialization
@@ -124,7 +136,8 @@ void main() async {
           create:
               (context) => SettingsProvider(
                 settingsRepository: SettingsRepositoryImpl(apiService),
-                deviceRepository: DeviceRepositoryImpl(),
+                deviceRepository:
+                    isFoss ? DeviceRepositoryNoop() : DeviceRepositoryImpl(),
               )..loadSettings(),
         ),
         ChangeNotifierProvider(create: (_) => MapPickerProvider()),
@@ -138,54 +151,17 @@ void main() async {
 Future<void> _runBackgroundInitializations() async {
   if (kIsWeb) return;
 
-  // Store initial FCM token securely
-  String? fcmToken = await FirebaseMessaging.instance.getToken();
+  // Get initial token
+  String? fcmToken = await PushNotificationService.instance.getToken();
   if (fcmToken != null) {
     SecureLogger.token("Initial FCM Token obtained", token: fcmToken);
     await SecureTokenService.instance.storeFCMToken(fcmToken);
     await NotificationRegistrationCoordinator.requestSync();
   }
 
-  // Request permissions and perform initial backend registration
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-    provisional: false,
-  );
-  SecureLogger.permission(
-    "FCM Notification",
-    settings.authorizationStatus.toString(),
-  );
-
-  if (settings.authorizationStatus == AuthorizationStatus.authorized ||
-      settings.authorizationStatus == AuthorizationStatus.provisional) {
-    SecureLogger.init("Notification permission granted");
-  } else {
-    SecureLogger.warning(
-      "FCM permission denied. Registration will be attempted, but notifications may not be received",
-    );
-  }
-
+  // Request permissions
+  await PushNotificationService.instance.requestPermission();
   await NotificationRegistrationCoordinator.requestSync();
-
-  // Set up foreground message listener
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    SecureLogger.firebase("Foreground message received");
-    NotificationService.instance.showFCMNotification(message);
-  });
-
-  // Set up token refresh listener
-  FirebaseMessaging.instance.onTokenRefresh.listen((String token) async {
-    SecureLogger.token("FCM Token refreshed", token: token);
-    try {
-      await SecureTokenService.instance.storeFCMToken(token);
-      await NotificationRegistrationCoordinator.requestSync();
-    } catch (e) {
-      SecureLogger.error("Error handling token refresh", e);
-    }
-  });
 }
 
 class MyApp extends StatefulWidget {
@@ -215,10 +191,11 @@ class _MyAppState extends State<MyApp> {
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
           home:
-              widget.seenOnboarding
+              widget.seenOnboarding || kIsWeb
                   ? const NavigationHandler()
                   : OnboardingScreen(prefs: widget.prefs),
           debugShowCheckedModeBanner: false,
+          navigatorObservers: [AnalyticsService.instance.observer],
         );
       },
     );

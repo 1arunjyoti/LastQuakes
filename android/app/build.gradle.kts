@@ -3,16 +3,9 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    
     id("kotlin-android")
-
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    
-    // Add the Google services Gradle plugin
     id("com.google.gms.google-services")
-    
-    // Add the Crashlytics Gradle plugin
     id("com.google.firebase.crashlytics")
 }
 
@@ -39,12 +32,25 @@ android {
 
     defaultConfig {
         applicationId = "app.lastquakes"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "mode"
+    productFlavors {
+        create("prod") {
+            dimension = "mode"
+            resValue("string", "app_name", "LastQuakes")
+        }
+        create("foss") {
+            dimension = "mode"
+            resValue("string", "app_name", "LastQuakes FOSS")
+            applicationIdSuffix = ".foss"
+            // Add FOSS-specific ProGuard rules to ignore missing Firebase classes
+            proguardFiles("proguard-rules-foss.pro")
+        }
     }
 
     signingConfigs {
@@ -65,29 +71,17 @@ android {
 
     buildTypes {
         release {
-            applicationVariants.all(closureOf<com.android.build.gradle.api.ApplicationVariant> {
-                outputs.all {
-                    if (this is com.android.build.gradle.internal.api.ApkVariantOutputImpl) {
-                        this.outputFileName = "lastquake-${versionName}-${versionCode}.apk"
-                    }
-                }
-            })
             // Signing with the debug keys for now, so `flutter run --release` works.
-            //signingConfig = signingConfigs.getByName("debug")
-
+            // signingConfig = signingConfigs.getByName("debug")
             signingConfig = signingConfigs.getByName("release")
 
-            // Enables code-related app optimization.
             isMinifyEnabled = true
-            
-            // Enables resource shrinking.
             isShrinkResources = true
 
             proguardFiles(
-                // Default file with automatically generated optimization rules.
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
             )
-
         }
     }
 }
@@ -95,15 +89,20 @@ android {
 flutter {
     source = "../.."
 }
+
 dependencies {
     implementation("androidx.window:window:1.0.0")
     implementation("androidx.window:window-java:1.0.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
-    // Import the Firebase BoM
-
-    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
-
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-crashlytics")
+    
+    // Firebase dependencies - only for prod
+    // Note: The quotes are required for dynamic configuration names in Kotlin DSL
+    "prodImplementation"(platform("com.google.firebase:firebase-bom:34.6.0"))
+    "prodImplementation"("com.google.firebase:firebase-analytics")
+    "prodImplementation"("com.google.firebase:firebase-crashlytics")
 }
+
+// Don't exclude dependencies - let gradle resolve them
+// Firebase will not be used in FOSS builds at the Dart level
+// This avoids breaking method channels for other plugins like path_provider_android

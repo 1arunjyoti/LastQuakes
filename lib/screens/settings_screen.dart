@@ -111,7 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _buildMemoizedItems();
-    
+
     // Log screen view
     AnalyticsService.instance.logScreenView('settings');
   }
@@ -250,10 +250,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // and display content.
                   }
 
+                  final bool isFoss =
+                      const String.fromEnvironment('FLAVOR') == 'foss';
+
                   return ListView(
                     padding: const EdgeInsets.all(12.0),
                     children: [
-                      if (!kIsWeb) ...[
+                      if (!kIsWeb && !isFoss) ...[
                         _buildNotificationSettingsCard(settingsProvider),
                         const SizedBox(height: 12),
                       ],

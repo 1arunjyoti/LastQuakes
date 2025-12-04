@@ -1,4 +1,3 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:lastquakes/services/location_service.dart';
@@ -37,9 +36,6 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
   final LocationService locationService =
       LocationService(); // For getting user location
-
-  // Get server URL from environment variables
-  static String? get serverUrl => dotenv.env['SERVER_URL'];
 
   Future<void> initNotifications() async {
     const AndroidInitializationSettings androidSettings =

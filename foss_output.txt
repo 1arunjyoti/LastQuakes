@@ -1,0 +1,9 @@
+Launching lib\main.dart on sdk gphone64 x86 64 in debug mode...
+12-05 01:22:40.828 20560  5284 W zipro   : Error opening archive D:\Projects\LastQuake_Project\lastquakes\build\app\outputs\flutter-apk\app-foss-debug.apk: Invalid file
+ERROR: dump failed because resource AndroidManifest.xml not found
+Failed to extract manifest from APK: ProcessException: The command failed with exit code 1
+  Command: C:\Users\arunj\AppData\Local\Android\sdk\build-tools\36.1.0\aapt dump xmltree D:\Projects\LastQuake_Project\lastquakes\build\app\outputs\flutter-apk\app-foss-debug.apk AndroidManifest.xml.
+No application found for TargetPlatform.android_x64.
+Is your project missing an android\app\src\main\AndroidManifest.xml?
+Consider running "flutter create ." to create one.
+^C

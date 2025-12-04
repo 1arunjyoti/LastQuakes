@@ -271,7 +271,7 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                     size: const Size(40, 40),
                     alignment: Alignment.center,
                     padding: const EdgeInsets.all(50),
-                    maxZoom: 15,
+                    maxZoom: _zoomLevel >= 3 ? _zoomLevel - 1 : 3,
                     markers: _currentMarkers,
                     builder: (context, markers) {
                       return Container(
