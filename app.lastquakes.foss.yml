@@ -66,16 +66,15 @@ Description: |-
 
 RepoType: git
 Repo: https://github.com/1arunjyoti/LastQuakes.git
-Binaries: https://github.com/1arunjyoti/LastQuakes/releases/download/v%v/app-foss-release.apk
+
+AllowedAPKSigningKeys: f0c24320044ec486e09983e5943d3c17fb8f0bdf4d7428b28362566fccbca4c6
 
 Builds:
   - versionName: 1.0.0
     versionCode: 1
-    commit: f-droid
-    tag: v1.0.0
+    commit: v1.0.0
     subdir: .
-    submodules: true
-    output: build/app/outputs/flutter-apk/app-foss-release.apk
+    output: build/app/outputs/apk/foss/release/LastQuakes-FOSS-1.0.0+1-release.apk
     srclibs:
       - flutter@stable
     rm:
@@ -85,6 +84,14 @@ Builds:
       - linux
       - web
       - test
+    scandelete:
+      - lib/services/analytics_service_firebase.dart
+      - lib/services/push_notification_service_firebase.dart
+    prebuild:
+      - sed -i '/firebase_core:/d' pubspec.yaml
+      - sed -i '/firebase_messaging:/d' pubspec.yaml
+      - sed -i '/firebase_crashlytics:/d' pubspec.yaml
+      - sed -i '/firebase_analytics:/d' pubspec.yaml
     build:
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
@@ -92,7 +99,8 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$
+VercodeOperation:
+  - "%c"
 UpdateCheckData: pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+
-VercodeOperation: '%c'
 CurrentVersion: 1.0.0
 CurrentVersionCode: 1
