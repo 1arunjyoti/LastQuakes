@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:fl_location/fl_location.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/services/analytics_service.dart';
@@ -485,13 +485,13 @@ class EarthquakeProvider extends ChangeNotifier {
       return;
     }
 
-    LocationPermission permission = await _locationService.checkPermission();
-    if (permission == LocationPermission.denied) {
+    PermissionStatus permission = await _locationService.checkPermission();
+    if (permission == PermissionStatus.denied) {
       permission = await _locationService.requestPermission();
     }
 
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == PermissionStatus.denied ||
+        permission == PermissionStatus.permanentlyDenied) {
       _locationError =
           'Location permission is required. Grant access from system settings.';
       notifyListeners();

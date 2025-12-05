@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:fl_location/fl_location.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:lastquakes/domain/models/notification_settings_model.dart';
 import 'package:lastquakes/domain/repositories/device_repository.dart';
 import 'package:lastquakes/domain/repositories/settings_repository.dart';
@@ -9,7 +9,6 @@ import 'package:lastquakes/services/location_service.dart';
 import 'package:lastquakes/services/secure_token_service.dart';
 import 'package:lastquakes/utils/enums.dart';
 import 'package:lastquakes/utils/notification_registration_coordinator.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final SettingsRepository _settingsRepository;

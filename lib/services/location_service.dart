@@ -1,28 +1,70 @@
 import 'dart:async';
 import 'dart:math' show sin, cos, sqrt, atan2, pi;
 
-import 'package:fl_location/fl_location.dart';
+import 'package:flutter/services.dart';
 import 'package:lastquakes/utils/secure_logger.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:meta/meta.dart';
 
+/// Custom Location class to replace fl_location dependency
+class Location {
+  final double latitude;
+  final double longitude;
+  final double accuracy;
+  final double altitude;
+  final double speed;
+  final double heading;
+  final DateTime timestamp;
+
+  Location({
+    required this.latitude,
+    required this.longitude,
+    this.accuracy = 0.0,
+    this.altitude = 0.0,
+    this.speed = 0.0,
+    this.heading = 0.0,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  factory Location.fromJson(Map<dynamic, dynamic> json) {
+    return Location(
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
+      altitude: (json['altitude'] as num?)?.toDouble() ?? 0.0,
+      speed: (json['speed'] as num?)?.toDouble() ?? 0.0,
+      heading: (json['heading'] as num?)?.toDouble() ?? 0.0,
+      timestamp:
+          json['timestamp'] != null
+              ? DateTime.fromMillisecondsSinceEpoch(
+                (json['timestamp'] as num).toInt(),
+              )
+              : null,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Location(latitude: $latitude, longitude: $longitude)';
+  }
+}
+
 class LocationService {
-  // Singleton pattern for location service
+  // Singleton pattern
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
   LocationService._internal();
+
+  static const MethodChannel _channel = MethodChannel(
+    'app.lastquakes.foss/location',
+  );
 
   Location? _cachedLocation;
   DateTime? _lastLocationFetchTime;
   static const Duration _cacheDuration = Duration(minutes: 10);
 
   Future<Location?> getCurrentLocation({bool forceRefresh = false}) async {
-    // Check if location services are enabled
-    bool serviceEnabled = await FlLocation.isLocationServicesEnabled;
-    if (!serviceEnabled) {
-      return null;
-    }
-
-    // Check if cached location is still valid and not forcing refresh
+    // Check if cached location is valid
     if (!forceRefresh &&
         _cachedLocation != null &&
         _lastLocationFetchTime != null &&
@@ -30,86 +72,45 @@ class LocationService {
       return _cachedLocation;
     }
 
-    // Handle permissions with early returns
-    LocationPermission permission = await _checkAndRequestPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    // Check permission using permission_handler (standard Android permission)
+    final status = await Permission.location.status;
+    if (!status.isGranted) {
       return null;
     }
 
-    // Get current location
     try {
-      _cachedLocation = await FlLocation.getLocation(
-        accuracy: LocationAccuracy.balanced,
-        timeLimit: const Duration(seconds: 10),
-      );
-      _lastLocationFetchTime = DateTime.now();
-      return _cachedLocation;
-    } on TimeoutException {
-      SecureLogger.warning(
-        'Location fetch timed out, attempting retry with lower accuracy',
-      );
+      // Invoke native method
+      final result = await _channel.invokeMethod('getCurrentLocation');
 
-      // Retry with lower accuracy
-      try {
-        SecureLogger.info("Retrying with lower accuracy");
-        _cachedLocation = await FlLocation.getLocation(
-          accuracy: LocationAccuracy.powerSave,
-          timeLimit: const Duration(seconds: 5),
-        );
+      if (result != null) {
+        final location = Location.fromJson(result);
+        _cachedLocation = location;
         _lastLocationFetchTime = DateTime.now();
-        return _cachedLocation;
-      } catch (e) {
-        SecureLogger.error('Retry failed', e);
+        return location;
       }
-
-      // Return cached location if available
-      if (_cachedLocation != null) {
-        SecureLogger.info("Using cached location after timeout");
-        return _cachedLocation;
-      }
-
-      return null;
+    } on PlatformException catch (e) {
+      SecureLogger.error('Error fetching native location', e);
     } catch (e) {
-      SecureLogger.error('Error getting location', e);
-
-      // Return cached location as fallback
-      if (_cachedLocation != null) {
-        SecureLogger.info("Using cached location as fallback");
-        return _cachedLocation;
-      }
-
-      return null;
-    }
-  }
-
-  Future<LocationPermission> _checkAndRequestPermission() async {
-    LocationPermission permission = await FlLocation.checkLocationPermission();
-
-    if (permission == LocationPermission.denied) {
-      permission = await FlLocation.requestLocationPermission();
+      SecureLogger.error('Unknown location error', e);
     }
 
-    return permission;
+    return null;
   }
 
-  /// Check if location services are enabled
   Future<bool> isLocationServiceEnabled() async {
-    return await FlLocation.isLocationServicesEnabled;
+    final status = await Permission.location.serviceStatus;
+    return status.isEnabled;
   }
 
-  /// Check current permission status
-  Future<LocationPermission> checkPermission() async {
-    return await FlLocation.checkLocationPermission();
+  Future<PermissionStatus> checkPermission() async {
+    return await Permission.location.status;
   }
 
-  /// Request location permission
-  Future<LocationPermission> requestPermission() async {
-    return await FlLocation.requestLocationPermission();
+  Future<PermissionStatus> requestPermission() async {
+    return await Permission.location.request();
   }
 
   // Calculate distance between two coordinates using Haversine formula
-  // Returns distance in kilometers
   double calculateDistance(
     double startLatitude,
     double startLongitude,

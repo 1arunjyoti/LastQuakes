@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:fl_location/fl_location.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lastquakes/services/location_service.dart';
 
