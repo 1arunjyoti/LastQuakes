@@ -124,8 +124,7 @@ void main() async {
           create:
               (context) => SettingsProvider(
                 settingsRepository: SettingsRepositoryImpl(apiService),
-                deviceRepository:
-                    isFoss ? DeviceRepositoryNoop() : DeviceRepositoryImpl(),
+                deviceRepository: DeviceRepositoryNoop(),
               )..loadSettings(),
         ),
         ChangeNotifierProvider(create: (_) => MapPickerProvider()),
