@@ -5,8 +5,6 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
 }
 
 val keystoreProperties = Properties()
@@ -113,14 +111,5 @@ dependencies {
     implementation("androidx.window:window-java:1.0.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
-    
-    // Firebase dependencies - only for prod
-    // Note: The quotes are required for dynamic configuration names in Kotlin DSL
-    "prodImplementation"(platform("com.google.firebase:firebase-bom:34.6.0"))
-    "prodImplementation"("com.google.firebase:firebase-analytics")
-    "prodImplementation"("com.google.firebase:firebase-crashlytics")
 }
 
-// Don't exclude dependencies - let gradle resolve them
-// Firebase will not be used in FOSS builds at the Dart level
-// This avoids breaking method channels for other plugins like path_provider_android

@@ -8,13 +8,11 @@ import 'package:lastquakes/provider/theme_provider.dart';
 import 'package:lastquakes/screens/home_screen.dart';
 import 'package:lastquakes/screens/onboarding_screen.dart';
 import 'package:lastquakes/services/analytics_service.dart';
-import 'package:lastquakes/services/analytics_service_firebase.dart';
 import 'package:lastquakes/services/analytics_service_noop.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
 import 'package:lastquakes/services/multi_source_api_service.dart';
 import 'package:lastquakes/services/notification_service.dart';
 import 'package:lastquakes/services/push_notification_service.dart';
-import 'package:lastquakes/services/push_notification_service_firebase.dart';
 import 'package:lastquakes/services/push_notification_service_noop.dart';
 import 'package:lastquakes/services/secure_storage_service.dart';
 import 'package:lastquakes/services/secure_token_service.dart';
@@ -28,7 +26,6 @@ import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
 import 'package:lastquakes/presentation/providers/settings_provider.dart';
 import 'package:lastquakes/presentation/providers/map_picker_provider.dart';
 import 'package:lastquakes/data/repositories/settings_repository_impl.dart';
-import 'package:lastquakes/data/repositories/device_repository_impl.dart';
 import 'package:lastquakes/data/repositories/device_repository_noop.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,20 +33,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Detect flavor
-  const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'prod');
-  final bool isFoss = flavor == 'foss';
+  SecureLogger.info("Starting app in FOSS mode");
 
-  SecureLogger.info("Starting app in $flavor mode (FOSS: $isFoss)");
-
-  // Initialize Services based on flavor
-  if (isFoss) {
-    AnalyticsService.instance = AnalyticsServiceNoop();
-    PushNotificationService.instance = PushNotificationServiceNoop();
-  } else {
-    AnalyticsService.instance = AnalyticsServiceFirebase();
-    PushNotificationService.instance = PushNotificationServiceFirebase();
-  }
+  // FOSS build - always use NoOp services
+  AnalyticsService.instance = AnalyticsServiceNoop();
+  PushNotificationService.instance = PushNotificationServiceNoop();
 
   // Initialize Hive first (requires platform channels to be ready)
   await Hive.initFlutter();
