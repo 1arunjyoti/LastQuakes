@@ -113,3 +113,14 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
 }
 
+// Exclude Google Play Core libraries from FOSS builds to pass F-Droid scanner
+configurations.all {
+    if (name.lowercase().contains("foss")) {
+        exclude(group = "com.google.android.play", module = "core")
+        exclude(group = "com.google.android.play", module = "core-common")
+        exclude(group = "com.google.android.play", module = "core-ktx")
+        exclude(group = "com.google.android.play", module = "feature-delivery")
+        exclude(group = "com.google.android.play", module = "feature-delivery-ktx")
+    }
+}
+
