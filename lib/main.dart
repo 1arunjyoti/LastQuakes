@@ -65,9 +65,15 @@ void main() async {
         : Future.value(null),
     SharedPreferences.getInstance(),
     !kIsWeb
-        ? SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown,
+        ? Future.wait([
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+          ]),
+          SystemChrome.setEnabledSystemUIMode(
+            SystemUiMode.manual,
+            overlays: SystemUiOverlay.values,
+          ),
         ])
         : Future.value(null),
   ]);
