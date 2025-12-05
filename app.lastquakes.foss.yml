@@ -8,7 +8,6 @@ SourceCode: https://github.com/1arunjyoti/LastQuakes
 IssueTracker: https://github.com/1arunjyoti/LastQuakes/issues
 
 AutoName: LastQuakes FOSS
-Summary: Real-time global earthquake monitor
 Description: |-
   LastQuakes is a comprehensive application providing real-time global earthquake monitoring with multi-source data integration, interactive map visualization, and advanced filtering capabilities.
 

@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:math' show sin, cos, sqrt, atan2, pi;
 
-import 'package:geolocator/geolocator.dart';
+import 'package:fl_location/fl_location.dart';
 import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:meta/meta.dart';
 
@@ -10,24 +11,23 @@ class LocationService {
   factory LocationService() => _instance;
   LocationService._internal();
 
-  Position? _cachedPosition;
+  Location? _cachedLocation;
   DateTime? _lastLocationFetchTime;
   static const Duration _cacheDuration = Duration(minutes: 10);
 
-  Future<Position?> getCurrentLocation({bool forceRefresh = false}) async {
+  Future<Location?> getCurrentLocation({bool forceRefresh = false}) async {
     // Check if location services are enabled
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await FlLocation.isLocationServicesEnabled;
     if (!serviceEnabled) {
-      //debugPrint('Location services are disabled.');
       return null;
     }
 
     // Check if cached location is still valid and not forcing refresh
     if (!forceRefresh &&
-        _cachedPosition != null &&
+        _cachedLocation != null &&
         _lastLocationFetchTime != null &&
         DateTime.now().difference(_lastLocationFetchTime!) < _cacheDuration) {
-      return _cachedPosition;
+      return _cachedLocation;
     }
 
     // Handle permissions with early returns
@@ -37,86 +37,46 @@ class LocationService {
       return null;
     }
 
-    // OPTIMIZATION: Check last known position first
-    // This is much faster than waiting for a fresh GPS fix
+    // Get current location
     try {
-      final lastKnown = await Geolocator.getLastKnownPosition();
-      if (lastKnown != null) {
-        // If last known location is recent (e.g., within 1 hour), use it
-        // Note: Geolocator doesn't provide timestamp for lastKnownPosition on all platforms easily,
-        // but if it's available, it's usually "recent enough" for earthquake proximity.
-        // For stricter freshness, we'd need to check the timestamp if available in Position object.
-        // Position object has a timestamp.
-        final now = DateTime.now();
-        // timestamp is non-nullable in newer geolocator versions
-        if (now.difference(lastKnown.timestamp) < const Duration(hours: 1)) {
-          SecureLogger.info("Using fresh last known position");
-          _cachedPosition = lastKnown;
-          _lastLocationFetchTime = now;
-          return lastKnown;
-        }
-      }
-    } catch (e) {
-      SecureLogger.error("Failed to get last known position", e);
-    }
-
-    // Get current position with lower accuracy for faster retrieval
-    try {
-      _cachedPosition = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 10), // Reduced from 20s to 10s
-        ),
+      _cachedLocation = await FlLocation.getLocation(
+        accuracy: LocationAccuracy.balanced,
+        timeLimit: const Duration(seconds: 10),
       );
       _lastLocationFetchTime = DateTime.now();
-      return _cachedPosition;
+      return _cachedLocation;
     } on TimeoutException {
       SecureLogger.warning(
-        'Location fetch timed out, attempting fallback/retry',
+        'Location fetch timed out, attempting retry with lower accuracy',
       );
 
-      // 1. Try last known position as fallback (even if slightly old)
-      try {
-        final lastKnown = await Geolocator.getLastKnownPosition();
-        if (lastKnown != null) {
-          SecureLogger.info("Using last known position after timeout");
-          _cachedPosition = lastKnown;
-          return lastKnown;
-        }
-      } catch (e2) {
-        SecureLogger.error('Error getting last known location', e2);
-      }
-
-      // 2. Retry with lower accuracy if no last known position
+      // Retry with lower accuracy
       try {
         SecureLogger.info("Retrying with lower accuracy");
-        _cachedPosition = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          ),
+        _cachedLocation = await FlLocation.getLocation(
+          accuracy: LocationAccuracy.powerSave,
+          timeLimit: const Duration(seconds: 5),
         );
         _lastLocationFetchTime = DateTime.now();
-        return _cachedPosition;
-      } catch (e3) {
-        SecureLogger.error('Retry failed', e3);
+        return _cachedLocation;
+      } catch (e) {
+        SecureLogger.error('Retry failed', e);
+      }
+
+      // Return cached location if available
+      if (_cachedLocation != null) {
+        SecureLogger.info("Using cached location after timeout");
+        return _cachedLocation;
       }
 
       return null;
     } catch (e) {
       SecureLogger.error('Error getting location', e);
 
-      // Fallback to last known position
-      try {
-        final lastKnown = await Geolocator.getLastKnownPosition();
-        if (lastKnown != null) {
-          SecureLogger.info("Using last known position as fallback");
-          _cachedPosition = lastKnown;
-          // Don't update _lastLocationFetchTime so we try fresh next time
-          return lastKnown;
-        }
-      } catch (e2) {
-        SecureLogger.error('Error getting last known location', e2);
+      // Return cached location as fallback
+      if (_cachedLocation != null) {
+        SecureLogger.info("Using cached location as fallback");
+        return _cachedLocation;
       }
 
       return null;
@@ -124,34 +84,62 @@ class LocationService {
   }
 
   Future<LocationPermission> _checkAndRequestPermission() async {
-    LocationPermission permission = await Geolocator.checkPermission();
+    LocationPermission permission = await FlLocation.checkLocationPermission();
 
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await FlLocation.requestLocationPermission();
     }
 
     return permission;
   }
 
-  // Calculate distance between two coordinates
+  /// Check if location services are enabled
+  Future<bool> isLocationServiceEnabled() async {
+    return await FlLocation.isLocationServicesEnabled;
+  }
+
+  /// Check current permission status
+  Future<LocationPermission> checkPermission() async {
+    return await FlLocation.checkLocationPermission();
+  }
+
+  /// Request location permission
+  Future<LocationPermission> requestPermission() async {
+    return await FlLocation.requestLocationPermission();
+  }
+
+  // Calculate distance between two coordinates using Haversine formula
+  // Returns distance in kilometers
   double calculateDistance(
     double startLatitude,
     double startLongitude,
     double endLatitude,
     double endLongitude,
   ) {
-    return Geolocator.distanceBetween(
-          startLatitude,
-          startLongitude,
-          endLatitude,
-          endLongitude,
-        ) /
-        1000; // Convert to kilometers
+    const double earthRadius = 6371; // Earth's radius in kilometers
+
+    final double dLat = _toRadians(endLatitude - startLatitude);
+    final double dLon = _toRadians(endLongitude - startLongitude);
+
+    final double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(startLatitude)) *
+            cos(_toRadians(endLatitude)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degrees) {
+    return degrees * pi / 180;
   }
 
   @visibleForTesting
   void clearCache() {
-    _cachedPosition = null;
+    _cachedLocation = null;
     _lastLocationFetchTime = null;
   }
 }

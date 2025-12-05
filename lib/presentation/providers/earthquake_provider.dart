@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:fl_location/fl_location.dart';
 import 'package:http/http.dart' as http;
 import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
 import 'package:lastquakes/models/earthquake.dart';
@@ -209,7 +209,7 @@ class EarthquakeProvider extends ChangeNotifier {
   bool _listHasMoreData = true;
 
   // List Location
-  Position? _userPosition;
+  Location? _userPosition;
   bool _isLoadingLocation = false;
   final Map<String, double> _distanceCache = {};
   static const int _maxCacheSize = 500; // Prevent unbounded memory growth
@@ -254,7 +254,7 @@ class EarthquakeProvider extends ChangeNotifier {
   bool get listIsLoadingMore => _listIsLoadingMore;
   bool get listHasMoreData => _listHasMoreData;
   bool get isLoadingLocation => _isLoadingLocation;
-  Position? get userPosition => _userPosition;
+  Location? get userPosition => _userPosition;
   String? get locationError => _locationError;
 
   List<Earthquake> get listVisibleEarthquakes {
@@ -332,7 +332,7 @@ class EarthquakeProvider extends ChangeNotifier {
           }
           _isLoading = false;
           notifyListeners();
-          
+
           // Log cached data load
           AnalyticsService.instance.logDataRefresh(
             source: 'cache',
@@ -364,7 +364,7 @@ class EarthquakeProvider extends ChangeNotifier {
       if (_userPosition != null) {
         await _preCalculateDistances();
       }
-      
+
       stopwatch.stop();
       // Log successful data refresh
       AnalyticsService.instance.logDataRefresh(
@@ -376,7 +376,7 @@ class EarthquakeProvider extends ChangeNotifier {
     } catch (e) {
       _error = "Failed to load earthquakes: ${e.toString()}";
       stopwatch.stop();
-      
+
       // Log failed data refresh
       AnalyticsService.instance.logDataRefresh(
         source: forceRefresh ? 'manual' : 'auto',
@@ -477,7 +477,7 @@ class EarthquakeProvider extends ChangeNotifier {
 
     _locationError = null;
 
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final serviceEnabled = await _locationService.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _locationError =
           'Location services are disabled. Please enable GPS to see nearby distances.';
@@ -485,9 +485,9 @@ class EarthquakeProvider extends ChangeNotifier {
       return;
     }
 
-    LocationPermission permission = await Geolocator.checkPermission();
+    LocationPermission permission = await _locationService.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await _locationService.requestPermission();
     }
 
     if (permission == LocationPermission.denied ||

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:fl_location/fl_location.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lastquakes/services/location_service.dart';
 
@@ -74,7 +74,7 @@ class MapPickerProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      Position? userPos = await _locationService.getCurrentLocation();
+      Location? userPos = await _locationService.getCurrentLocation();
       if (userPos != null) {
         _currentCenter = LatLng(userPos.latitude, userPos.longitude);
         // If we are centering on user, we might want to update the map controller in UI

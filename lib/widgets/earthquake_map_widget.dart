@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:fl_location/fl_location.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
 import 'package:lastquakes/screens/earthquake_details.dart';
@@ -48,7 +48,7 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
   static const Duration _memoryCleanupInterval = Duration(minutes: 5);
 
   // Location
-  Position? _userPosition;
+  Location? _userPosition;
   final LocationService _locationService = LocationService();
 
   @override
