@@ -83,9 +83,15 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final PackageInfo info = await PackageInfo.fromPlatform();
       if (mounted) {
+        // Detect flavor from dart-define
+        const String flavor = String.fromEnvironment(
+          'FLAVOR',
+          defaultValue: 'prod',
+        );
+        final bool isFoss = flavor == 'foss';
+
         setState(() {
-          // Always use "LastQuakes" as the display name for consistency
-          _appName = 'LastQuakes';
+          _appName = isFoss ? 'LastQuakes FOSS' : 'LastQuakes';
           _version = info.version;
           _buildNumber = info.buildNumber;
         });

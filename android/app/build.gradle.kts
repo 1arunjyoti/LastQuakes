@@ -84,6 +84,23 @@ android {
             )
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val flavorName = variant.flavorName
+            val buildType = variant.buildType.name
+            val appName = "LastQuakes"
+            val versionName = variant.versionName
+            
+            output.outputFileName = when {
+                flavorName.contains("prod") -> "${appName}-${versionName}-${buildType}.apk"
+                flavorName.contains("foss") -> "${appName}-FOSS-${versionName}-${buildType}.apk"
+                else -> "app-${flavorName}-${buildType}.apk"
+            }
+        }
+    }
 }
 
 flutter {
