@@ -93,10 +93,11 @@ android {
             val buildType = variant.buildType.name
             val appName = "LastQuakes"
             val versionName = variant.versionName
+            val versionCode = variant.versionCode
             
             output.outputFileName = when {
-                flavorName.contains("prod") -> "${appName}-${versionName}-${buildType}.apk"
-                flavorName.contains("foss") -> "${appName}-FOSS-${versionName}-${buildType}.apk"
+                flavorName.contains("prod") -> "${appName}-${versionName}+${versionCode}-${buildType}.apk"
+                flavorName.contains("foss") -> "${appName}-FOSS-${versionName}+${versionCode}-${buildType}.apk"
                 else -> "app-${flavorName}-${buildType}.apk"
             }
         }
