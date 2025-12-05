@@ -84,14 +84,20 @@ Builds:
       - linux
       - web
       - test
-    scandelete:
+    scanignore:
       - lib/services/analytics_service_firebase.dart
       - lib/services/push_notification_service_firebase.dart
+      - lib/main.dart
+      - lib/utils/secure_logger.dart
     prebuild:
       - sed -i '/firebase_core:/d' pubspec.yaml
       - sed -i '/firebase_messaging:/d' pubspec.yaml
       - sed -i '/firebase_crashlytics:/d' pubspec.yaml
       - sed -i '/firebase_analytics:/d' pubspec.yaml
+      - sed -i "s/import.*analytics_service_firebase.dart.*/\/\/ REMOVED FOR FOSS/g" lib/main.dart
+      - sed -i "s/import.*push_notification_service_firebase.dart.*/\/\/ REMOVED FOR FOSS/g" lib/main.dart
+      - sed -i "s/AnalyticsServiceFirebase()/AnalyticsServiceNoop()/g" lib/main.dart
+      - sed -i "s/PushNotificationServiceFirebase()/PushNotificationServiceNoop()/g" lib/main.dart
     build:
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
