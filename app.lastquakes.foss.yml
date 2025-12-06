@@ -3,7 +3,7 @@ Categories:
   - Science & Education
 License: GPL-3.0-or-later
 AuthorName: LastQuakes
-AuthorEmail:
+AuthorEmail: xyz@lastquakes.com
 SourceCode: https://github.com/1arunjyoti/LastQuakes
 IssueTracker: https://github.com/1arunjyoti/LastQuakes/issues
 
@@ -19,7 +19,7 @@ Builds:
     commit: v1.0.1
     output: build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk
     srclibs:
-      - flutter@3.38.2
+      - flutter@stable
     rm:
       - ios
       - macos
@@ -31,9 +31,9 @@ Builds:
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
       - $$flutter$$/bin/flutter build apk --flavor foss --dart-define=FLAVOR=foss
-        --release
+        --release --split-debug-info=build/debug-info --obfuscate
 
-AllowedAPKSigningKeys: f0c24320044ec486e09983e5943d3c17fb8f0bdf4d7428b28362566fccbca4c6
+AllowedAPKSigningKeys: cbc3b038a8b0114460b25d0510eab9132ac120405107313a683d53b404ee9fd0
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$

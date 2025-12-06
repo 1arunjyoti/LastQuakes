@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: "3.38.2" # Match F-Droid srclibs flutter version
   JAVA_VERSION: "17"
 
 jobs:
@@ -27,7 +26,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
 
       - name: Disable Flutter analytics
@@ -52,7 +50,9 @@ jobs:
           flutter build apk \
             --flavor foss \
             --dart-define=FLAVOR=foss \
-            --release
+            --release \
+            --split-debug-info=build/debug-info \
+            --obfuscate
 
       - name: List APK output
         run: ls -la build/app/outputs/apk/foss/release/
