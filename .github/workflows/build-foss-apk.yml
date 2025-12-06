@@ -17,6 +17,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Print build path (for reproducibility verification)
+        run: |
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "Current directory: $(pwd)"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -51,8 +56,7 @@ jobs:
             --flavor foss \
             --dart-define=FLAVOR=foss \
             --release \
-            --split-debug-info=build/debug-info \
-            --obfuscate
+            --split-debug-info=build/debug-info
 
       - name: List APK output
         run: ls -la build/app/outputs/apk/foss/release/
