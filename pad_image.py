@@ -24,4 +24,4 @@ def add_padding(input_path, output_path, padding_ratio=0.5):
         print(f"Error processing image: {e}")
 
 if __name__ == "__main__":
-    add_padding('assets/icon/icon_foreground.png', 'assets/splash/icon_foreground_padded.png', 0.6)
+    add_padding('assets/icon/icon_full.png', 'assets/splash/icon_foreground_padded.png', 0.6)
