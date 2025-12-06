@@ -57,8 +57,7 @@ jobs:
           flutter build apk \
             --flavor foss \
             --dart-define=FLAVOR=foss \
-            --release \
-            --split-debug-info=build/debug-info
+            --release
 
       - name: List APK output
         run: ls -la build/app/outputs/apk/foss/release/
