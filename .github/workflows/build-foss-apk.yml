@@ -2,11 +2,8 @@ name: Build FOSS APK
 
 on:
   push:
-    branches: [main, f-droid]
     tags:
       - "v*"
-  pull_request:
-    branches: [main, f-droid]
   workflow_dispatch:
 
 env:
@@ -14,61 +11,8 @@ env:
   JAVA_VERSION: "17"
 
 jobs:
-  build-foss-apk:
+  build-and-release:
     runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: "stable"
-
-      - name: Disable Flutter analytics
-        run: flutter config --no-analytics
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Run Flutter analyzer
-        run: flutter analyze --no-fatal-infos
-        continue-on-error: true
-
-      - name: Run tests
-        run: flutter test
-        continue-on-error: true
-
-      - name: Build FOSS APK (unsigned)
-        run: |
-          flutter build apk \
-            --flavor foss \
-            --dart-define=FLAVOR=foss \
-            --release
-
-      - name: List APK output
-        run: ls -la build/app/outputs/apk/foss/release/
-
-      - name: Upload FOSS APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: foss-apk-unsigned
-          path: build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk
-          retention-days: 30
-
-  # Signed release job - only runs on tags
-  release:
-    needs: build-foss-apk
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout repository
@@ -110,7 +54,31 @@ jobs:
             --dart-define=FLAVOR=foss \
             --release
 
-      - name: Upload signed FOSS APK
+      - name: List APK output
+        run: ls -la build/app/outputs/apk/foss/release/
+
+      - name: Verify APK (no GMS/Firebase)
+        run: |
+          APK_FILE=$(ls build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk)
+          echo "::notice::APK file: $APK_FILE"
+
+          # Check for Google Play Services (should not be present in FOSS)
+          echo "Checking for Google Play Services classes..."
+          if unzip -l "$APK_FILE" | grep -i "com/google/android/gms"; then
+            echo "::warning::Found Google Play Services classes in APK"
+          else
+            echo "::notice::✅ No Google Play Services classes found"
+          fi
+
+          # Check for Firebase (should not be present in FOSS)
+          echo "Checking for Firebase classes..."
+          if unzip -l "$APK_FILE" | grep -i "com/google/firebase"; then
+            echo "::warning::Found Firebase classes in APK"
+          else
+            echo "::notice::✅ No Firebase classes found"
+          fi
+
+      - name: Upload FOSS APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: foss-apk-signed
@@ -119,54 +87,9 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           files: build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Verification job - compare with expected F-Droid output format
-  verify-apk:
-    needs: build-foss-apk
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: foss-apk-unsigned
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Install APK Analyzer tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y apksigner aapt
-
-      - name: Verify APK structure
-        run: |
-          APK_FILE=$(ls LastQuakes-FOSS-*.apk)
-          echo "::notice::APK file: $APK_FILE"
-
-          # Get APK info
-          aapt dump badging "$APK_FILE" | grep -E "(package:|application-label:|versionCode|versionName)"
-
-          # Check for Google Play Services (should not be present in FOSS)
-          echo "Checking for Google Play Services classes (should be empty)..."
-          if unzip -l "$APK_FILE" | grep -i "com/google/android/gms"; then
-            echo "::warning::Found Google Play Services classes in APK"
-          else
-            echo "::notice::No Google Play Services classes found"
-          fi
-
-          # Check for Firebase (should not be present in FOSS)
-          echo "Checking for Firebase classes (should be empty)..."
-          if unzip -l "$APK_FILE" | grep -i "com/google/firebase"; then
-            echo "::warning::Found Firebase classes in APK"
-          else
-            echo "::notice::No Firebase classes found"
-          fi
