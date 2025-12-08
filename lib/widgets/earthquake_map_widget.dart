@@ -15,6 +15,7 @@ import 'package:lastquakes/widgets/components/map_legend.dart';
 import 'package:lastquakes/widgets/components/zoom_controls.dart';
 import 'package:lastquakes/widgets/earthquake_globe_widget.dart';
 import 'package:lastquakes/utils/app_page_transitions.dart';
+import 'package:lastquakes/widgets/components/earthquake_bottom_sheet.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:lastquakes/services/tile_cache_service.dart';
@@ -57,6 +58,10 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
   // Heatmap reset stream
   final StreamController<void> _heatmapResetController =
       StreamController<void>.broadcast();
+
+  // Plate label markers cache
+  List<Marker> _plateLabelMarkers = [];
+  List<FaultLineLabel>? _lastFaultLineLabels;
 
   @override
   bool get wantKeepAlive => true;
@@ -263,7 +268,12 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
         // Schedule marker update after build completes (not during build)
         _scheduleMarkerUpdate(earthquakes);
 
+        // Update plate label markers cache if labels changed
+        _updatePlateLabelMarkers(provider.faultLineLabels);
+
         final attributionText = _getAttributionText(provider.mapLayerType);
+        final faultLineAttribution =
+            provider.showFaultLines ? 'Plate Boundaries: P. Bird, 2003' : null;
 
         return Stack(
           children: [
@@ -294,48 +304,7 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                   PolylineLayer(polylines: provider.faultLines),
                   // Plate boundary labels (only show when enabled and zoomed in)
                   if (provider.showPlateLabels && _zoomLevel >= 4.0)
-                    MarkerLayer(
-                      markers:
-                          provider.faultLineLabels
-                              .map(
-                                (label) => Marker(
-                                  point: label.position,
-                                  width: 140,
-                                  height: 20,
-                                  child: Transform.rotate(
-                                    angle:
-                                        -label
-                                            .angle, // Negative because map Y is inverted
-                                    child: Text(
-                                      label.displayName,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color:
-                                            label.boundaryType == 'subduction'
-                                                ? const Color(0xFFB71C1C)
-                                                : const Color(0xFF1B5E20),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.5,
-                                        shadows: const [
-                                          Shadow(
-                                            color: Colors.white,
-                                            blurRadius: 3,
-                                          ),
-                                          Shadow(
-                                            color: Colors.white,
-                                            blurRadius: 6,
-                                          ),
-                                        ],
-                                      ),
-                                      overflow: TextOverflow.visible,
-                                      softWrap: false,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                    ),
+                    MarkerLayer(markers: _plateLabelMarkers),
                 ],
                 if (provider.showHeatmap && earthquakes.isNotEmpty)
                   HeatMapLayer(
@@ -390,11 +359,15 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                   MarkerLayer(markers: [_buildUserLocationMarker()]),
               ],
             ),
-            if (attributionText.isNotEmpty)
+            if (attributionText.isNotEmpty || faultLineAttribution != null)
               Positioned(
                 left: 16,
                 bottom: 16,
-                child: _buildAttributionBadge(context, attributionText),
+                child: _buildAttributionBadge(
+                  context,
+                  attributionText,
+                  faultLineAttribution: faultLineAttribution,
+                ),
               ),
             Positioned(
               left: 16,
@@ -420,6 +393,53 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
     }
   }
 
+  /// Update plate label markers cache - only rebuilds when labels change
+  void _updatePlateLabelMarkers(List<FaultLineLabel> labels) {
+    // Skip if labels haven't changed
+    if (identical(_lastFaultLineLabels, labels)) return;
+    if (_lastFaultLineLabels != null &&
+        _lastFaultLineLabels!.length == labels.length &&
+        labels.isNotEmpty &&
+        _lastFaultLineLabels!.isNotEmpty) {
+      // Quick check if it's the same data
+      return;
+    }
+
+    _lastFaultLineLabels = labels;
+
+    // Build cached markers with simplified styling for performance
+    _plateLabelMarkers =
+        labels.map((label) {
+          final color =
+              label.boundaryType == 'subduction'
+                  ? const Color(0xFFB71C1C)
+                  : const Color(0xFF1B5E20);
+
+          return Marker(
+            point: label.position,
+            width: 140,
+            height: 20,
+            child: Transform.rotate(
+              angle: -label.angle,
+              child: Text(
+                label.displayName,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  // Simplified shadow for better performance (single shadow instead of 2)
+                  shadows: const [Shadow(color: Colors.white, blurRadius: 4)],
+                ),
+                overflow: TextOverflow.visible,
+                softWrap: false,
+              ),
+            ),
+          );
+        }).toList();
+  }
+
   String _getAttributionText(MapLayerType type) {
     switch (type) {
       case MapLayerType.osm:
@@ -433,8 +453,17 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
     }
   }
 
-  Widget _buildAttributionBadge(BuildContext context, String attribution) {
+  Widget _buildAttributionBadge(
+    BuildContext context,
+    String attribution, {
+    String? faultLineAttribution,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: colorScheme.onSurface,
+      fontSize: 10,
+    );
+
     return Semantics(
       label: 'Map attribution',
       child: Container(
@@ -450,12 +479,14 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
             ),
           ],
         ),
-        child: Text(
-          attribution,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurface,
-            fontSize: 10,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (attribution.isNotEmpty) Text(attribution, style: textStyle),
+            if (faultLineAttribution != null)
+              Text(faultLineAttribution, style: textStyle),
+          ],
         ),
       ),
     );
@@ -666,302 +697,14 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        final colorScheme = Theme.of(context).colorScheme;
-        final textTheme = Theme.of(context).textTheme;
-        final magColor = _getMarkerColorOptimized(quake.magnitude);
-
-        return Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 20,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Drag Handle
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.4,
-                      ),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: Column(
-                    children: [
-                      // Header: Location & Close
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  quake.place,
-                                  style: textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.access_time_rounded,
-                                      size: 14,
-                                      color: textTheme.bodySmall?.color,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _formatDateTime(quake.time),
-                                      style: textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Metrics Row (Magnitude, Depth, Tsunami)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStyledMetricBox(
-                              context,
-                              label: "Magnitude",
-                              value: quake.magnitude.toStringAsFixed(1),
-                              color: magColor,
-                              isAlert: true,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStyledMetricBox(
-                              context,
-                              label: "Depth",
-                              value:
-                                  "${quake.depth?.toStringAsFixed(1) ?? '--'} km",
-                              icon: Icons.layers_outlined,
-                              color: colorScheme.primary,
-                              isAlert: false,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStyledMetricBox(
-                              context,
-                              label: "Tsunami",
-                              value: quake.tsunami == 1 ? "Alert" : "None",
-                              icon:
-                                  quake.tsunami == 1
-                                      ? Icons.tsunami
-                                      : Icons.waves_outlined,
-                              color:
-                                  quake.tsunami == 1
-                                      ? Colors.blue
-                                      : colorScheme.onSurface,
-                              isAlert: quake.tsunami == 1,
-                              borderColor:
-                                  quake.tsunami == 1
-                                      ? Colors.blue
-                                      : colorScheme.outline,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Secondary Details (Coordinates & Source)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(
-                            alpha: 0.3,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildDetailRow(
-                              context,
-                              Icons.map_outlined,
-                              "${quake.latitude.toStringAsFixed(2)}, ${quake.longitude.toStringAsFixed(2)}",
-                            ),
-                            Container(
-                              width: 1,
-                              height: 20,
-                              color: colorScheme.outlineVariant,
-                            ),
-                            _buildDetailRow(
-                              context,
-                              Icons.source_outlined,
-                              "Source: ${quake.source.toUpperCase()}",
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Action Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showEarthquakeDetails(quake);
-                          },
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text("View Full Details"),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return EarthquakeBottomSheet(
+          earthquake: quake,
+          onViewDetails: () {
+            _showEarthquakeDetails(quake);
+          },
         );
       },
     );
-  }
-
-  Widget _buildStyledMetricBox(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required Color color,
-    IconData? icon,
-    bool isAlert = false,
-    Color? borderColor,
-  }) {
-    final theme = Theme.of(context);
-    final effectiveBorderColor = borderColor ?? color;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color:
-            isAlert
-                ? color.withValues(alpha: 0.1)
-                : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.3,
-                ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color:
-              isAlert
-                  ? effectiveBorderColor.withValues(alpha: 0.5)
-                  : Colors.transparent,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: isAlert ? color : theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 16,
-                  color: isAlert ? color : theme.colorScheme.onSurface,
-                ),
-                const SizedBox(width: 4),
-              ],
-              Flexible(
-                child: Text(
-                  value,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: isAlert ? color : theme.colorScheme.onSurface,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(BuildContext context, IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-        ),
-      ],
-    );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inSeconds < 60) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    } else {
-      return '${dateTime.month}/${dateTime.day}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
   }
 
   void _showFilterBottomSheet() {

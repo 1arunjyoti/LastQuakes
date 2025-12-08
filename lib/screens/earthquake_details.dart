@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:lastquakes/screens/earthquake_comparison_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:lastquakes/widgets/components/tsunami_risk_card.dart';
 
 class EarthquakeDetailsScreen extends StatefulWidget {
   final Earthquake earthquake;
@@ -335,6 +336,9 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                       ),
                       const SizedBox(height: 8),
                       if (earthquake.alert != null) _buildPagerCard(context),
+                      const SizedBox(height: 8),
+                      _buildSectionHeader(context, "TSUNAMI ASSESSMENT"),
+                      TsunamiRiskCard(earthquake: earthquake),
                     ],
                   ),
                 ),

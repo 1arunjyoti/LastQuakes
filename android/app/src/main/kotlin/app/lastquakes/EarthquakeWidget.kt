@@ -375,7 +375,7 @@ class EarthquakeWidget : AppWidgetProvider() {
             
             // Update last updated time (compact format)
             if (lastUpdate > 0) {
-                val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val dateFormat = android.text.format.DateFormat.getTimeFormat(context)
                 views.setTextViewText(R.id.last_updated, dateFormat.format(Date(lastUpdate)))
             } else {
                 views.setTextViewText(R.id.last_updated, "--:--")

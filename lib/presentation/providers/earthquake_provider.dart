@@ -17,6 +17,18 @@ import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Converts a string to title case (first letter of each word capitalized).
+String _toTitleCase(String text) {
+  if (text.isEmpty) return text;
+  return text
+      .split(' ')
+      .map((word) {
+        if (word.isEmpty) return word;
+        return word[0].toUpperCase() + word.substring(1).toLowerCase();
+      })
+      .join(' ');
+}
+
 // --- Isolate Logic for List Filtering ---
 Map<String, dynamic> _filterListEarthquakesIsolate(Map<String, dynamic> args) {
   final List<Earthquake> inputList = args['list'];
@@ -27,15 +39,20 @@ Map<String, dynamic> _filterListEarthquakesIsolate(Map<String, dynamic> args) {
   final List<Earthquake> filteredList = [];
 
   for (final quake in inputList) {
-    final String country =
+    final String rawCountry =
         quake.place.contains(", ") ? quake.place.split(", ").last.trim() : "";
+    // Normalize to title case to prevent duplicates from case differences
+    // (e.g., "Greece" from USGS vs "GREECE" from EMSC)
+    final String country = _toTitleCase(rawCountry);
     if (country.isNotEmpty) {
       uniqueCountries.add(country);
     }
 
     final bool passesMagnitude = quake.magnitude >= minMagnitude;
+    // Compare normalized country for filtering
+    final String normalizedFilter = _toTitleCase(countryFilter);
     final bool passesCountry =
-        countryFilter == "All" || country == countryFilter;
+        countryFilter == "All" || country == normalizedFilter;
 
     if (passesMagnitude && passesCountry) {
       filteredList.add(quake);
@@ -410,6 +427,7 @@ class EarthquakeProvider extends ChangeNotifier {
   // Preferences Keys
   static const String _mapTypePrefKey = 'map_layer_type_preference_v2';
   static const String _showFaultLinesPrefKey = 'show_fault_lines_preference';
+  static const String _showPlateLabelsPrefKey = 'show_plate_labels_preference';
   static const String _faultLineDataUrl =
       'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json';
   static const String _faultLinesCacheKey = 'fault_lines_geojson_cache_v1';
@@ -487,6 +505,10 @@ class EarthquakeProvider extends ChangeNotifier {
 
     // Fault Lines
     _showFaultLines = prefs.getBool(_showFaultLinesPrefKey) ?? false;
+
+    // Plate Labels (defaults to true when fault lines are visible)
+    _showPlateLabels = prefs.getBool(_showPlateLabelsPrefKey) ?? true;
+
     if (_showFaultLines) {
       _loadFaultLines();
     }
@@ -828,10 +850,13 @@ class EarthquakeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void togglePlateLabels(bool show) {
+  Future<void> togglePlateLabels(bool show) async {
     if (_showPlateLabels == show) return;
     _showPlateLabels = show;
     notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_showPlateLabelsPrefKey, show);
   }
 
   Future<void> toggleFaultLines(bool show) async {

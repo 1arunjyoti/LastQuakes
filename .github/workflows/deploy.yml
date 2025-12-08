@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]  # or your default branch
+    branches: [main] # or your default branch
   workflow_dispatch:
 
 jobs:
@@ -10,23 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.2'  # or your Flutter version
-          channel: 'stable'
-      
+          channel: "stable"
+
       - name: Create .env file
         run: |
           echo "# Server Configuration" >> .env
           echo "SERVER_URL=${{ secrets.SERVER_URL }}" >> .env
-      
+
       - name: Get dependencies
         run: flutter pub get
-      
+
       - name: Build web
         run: flutter build web --base-href "/LastQuakes/"
-      
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:

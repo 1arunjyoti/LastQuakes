@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_earth_globe/flutter_earth_globe.dart';
 import 'package:flutter_earth_globe/flutter_earth_globe_controller.dart';
-import 'package:flutter_earth_globe/globe_coordinates.dart';
-import 'package:flutter_earth_globe/point.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/screens/earthquake_details.dart';
 import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:lastquakes/widgets/components/map_legend.dart';
+import 'package:lastquakes/services/globe_cluster_service.dart';
+import 'package:lastquakes/widgets/components/earthquake_bottom_sheet.dart';
+import 'dart:async';
 
 class EarthquakeGlobeWidget extends StatefulWidget {
   final List<Earthquake> earthquakes;
@@ -24,12 +25,16 @@ class _EarthquakeGlobeWidgetState extends State<EarthquakeGlobeWidget> {
   static const double _minZoom = 0.5;
   static const double _maxZoom = 3.0;
 
+  // Auto-rotation
+  Timer? _idleTimer;
+  bool _isInteracting = false;
+
   @override
   void initState() {
     super.initState();
     _controller = FlutterEarthGlobeController(
-      rotationSpeed: 0.02,
-      isRotating: false,
+      rotationSpeed: 0.002, // Slower rotation
+      isRotating: true, // Start rotating by default
       isBackgroundFollowingSphereRotation: true,
       background: const AssetImage('assets/globe/stars.png'),
       surface: const AssetImage('assets/globe/earth.jpg'),
@@ -38,12 +43,16 @@ class _EarthquakeGlobeWidgetState extends State<EarthquakeGlobeWidget> {
       minZoom: _minZoom,
       maxZoom: _maxZoom,
     );
+
+    // Start idle timer logic
+    _startIdleTimer();
   }
 
   @override
   void dispose() {
-    // Note: FlutterEarthGlobeController is disposed internally by the widget
     // Do NOT call _controller.dispose() here to prevent double-dispose error
+    _debounceTimer?.cancel();
+    _idleTimer?.cancel();
     super.dispose();
   }
 
@@ -73,43 +82,86 @@ class _EarthquakeGlobeWidgetState extends State<EarthquakeGlobeWidget> {
 
   // Track which point IDs have been added
   final Set<String> _addedPointIds = {};
+  Timer? _debounceTimer;
+  final GlobeClusterService _clusterService = GlobeClusterService();
 
   void _addEarthquakePoints() {
-    if (_pointsAdded) return;
     _pointsAdded = true;
 
-    for (final quake in widget.earthquakes) {
-      if (_addedPointIds.contains(quake.id)) continue;
+    // Clear existing points first to handle re-clustering
+    for (final id in _addedPointIds) {
+      _controller.removePoint(id);
+    }
+    _addedPointIds.clear();
 
-      _controller.addPoint(
-        Point(
-          id: quake.id,
-          coordinates: GlobeCoordinates(quake.latitude, quake.longitude),
-          label: 'M ${quake.magnitude.toStringAsFixed(1)}',
-          isLabelVisible: quake.magnitude >= 5.0,
-          style: PointStyle(
-            color: _getMarkerColor(quake.magnitude),
-            size: _getMarkerSize(quake.magnitude),
-          ),
-          onTap: () => _showEarthquakePopup(quake),
-        ),
-      );
-      _addedPointIds.add(quake.id);
+    final points = _clusterService.clusterEarthquakes(
+      earthquakes: widget.earthquakes,
+      zoom: _currentZoom,
+      updateInfoPanel: _showEarthquakePopup,
+      onZoomToCluster: (coordinates, newZoom) {
+        setState(() {
+          _currentZoom = newZoom.clamp(_minZoom, _maxZoom);
+        });
+        _controller.setZoom(_currentZoom);
+        _controller.focusOnCoordinates(coordinates);
+        // Reset idle timer on interaction
+        _resetIdleTimer();
+      },
+    );
+
+    for (final point in points) {
+      _controller.addPoint(point);
+      _addedPointIds.add(point.id);
     }
   }
 
-  Color _getMarkerColor(double magnitude) {
-    if (magnitude >= 7.0) {
-      return Colors.red.shade900;
-    } else if (magnitude >= 5.0) {
-      return Colors.orange;
-    } else {
-      return Colors.green;
-    }
+  void _onZoomChanged(double zoom) {
+    _currentZoom = zoom;
+
+    // Debounce the clustering update
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          // Trigger rebuild of points with new zoom level
+          _addEarthquakePoints();
+        });
+      }
+    });
+
+    // Reset idle timer on zoom interaction
+    _resetIdleTimer();
   }
 
-  double _getMarkerSize(double magnitude) {
-    return (0.5 + (magnitude * 0.4)).clamp(1.0, 4.0);
+  void _onUserInteractionStart() {
+    _isInteracting = true;
+    _idleTimer?.cancel();
+    _setRotation(false);
+  }
+
+  void _onUserInteractionEnd() {
+    _isInteracting = false;
+    _resetIdleTimer();
+  }
+
+  void _startIdleTimer() {
+    _resetIdleTimer();
+  }
+
+  void _resetIdleTimer() {
+    _idleTimer?.cancel();
+    // Resume rotation after 3 seconds of inactivity
+    _idleTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && !_isInteracting) {
+        _setRotation(true);
+      }
+    });
+  }
+
+  void _setRotation(bool rotate) {
+    if (_controller.isRotating != rotate) {
+      _controller.isRotating = rotate;
+    }
   }
 
   void _zoomIn() {
@@ -117,6 +169,7 @@ class _EarthquakeGlobeWidgetState extends State<EarthquakeGlobeWidget> {
       _currentZoom = (_currentZoom + 0.3).clamp(_minZoom, _maxZoom);
     });
     _controller.setZoom(_currentZoom);
+    _resetIdleTimer();
   }
 
   void _zoomOut() {
@@ -124,209 +177,41 @@ class _EarthquakeGlobeWidgetState extends State<EarthquakeGlobeWidget> {
       _currentZoom = (_currentZoom - 0.3).clamp(_minZoom, _maxZoom);
     });
     _controller.setZoom(_currentZoom);
+    _resetIdleTimer();
   }
 
   void _showEarthquakeDetails(Earthquake quake) {
+    _onUserInteractionStart(); // Pause rotation when nav away
     Navigator.push(
       context,
       AppPageTransitions.scaleRoute(
         page: EarthquakeDetailsScreen(earthquake: quake),
       ),
-    );
+    ).then((_) => _onUserInteractionEnd()); // Resume when back
   }
 
   void _showEarthquakePopup(Earthquake quake) {
+    _onUserInteractionStart(); // Pause rotation when interacting with popup
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return Container(
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header with magnitude and close button
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: _getMarkerColor(quake.magnitude),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          'M ${quake.magnitude.toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                        constraints: const BoxConstraints(),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Location
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          quake.place,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Time
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _formatDateTime(quake.time),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Coordinates
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.map,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${quake.latitude.toStringAsFixed(2)}°, ${quake.longitude.toStringAsFixed(2)}°',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Depth if available
-                  if (quake.depth != null) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.arrow_downward,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Depth: ${quake.depth!.toStringAsFixed(1)} km',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-
-                  const SizedBox(height: 20),
-
-                  // View More button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showEarthquakeDetails(quake);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
-                      ),
-                      child: const Text(
-                        'View More Details',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        return EarthquakeBottomSheet(
+          earthquake: quake,
+          onViewDetails: () {
+            _showEarthquakeDetails(quake);
+          },
         );
       },
-    );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inSeconds < 60) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    } else {
-      return '${dateTime.month}/${dateTime.day}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
+    ).then((_) => _onUserInteractionEnd()); // Resume when popup closes
   }
 
   @override
   Widget build(BuildContext context) {
     // Add points after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.earthquakes.isNotEmpty) {
+      if (widget.earthquakes.isNotEmpty && !_pointsAdded) {
         _addEarthquakePoints();
       }
     });
@@ -334,12 +219,20 @@ class _EarthquakeGlobeWidgetState extends State<EarthquakeGlobeWidget> {
     return Stack(
       children: [
         Center(
-          child: FlutterEarthGlobe(
-            controller: _controller,
-            radius: MediaQuery.of(context).size.width * 0.4,
-            onZoomChanged: (zoom) {
-              _currentZoom = zoom;
-            },
+          child: Listener(
+            onPointerDown: (_) => _onUserInteractionStart(),
+            onPointerUp: (_) => _onUserInteractionEnd(),
+            onPointerCancel: (_) => _onUserInteractionEnd(),
+            // Using HitTestBehavior to ensure we catch events
+            behavior: HitTestBehavior.translucent,
+            child: FlutterEarthGlobe(
+              controller: _controller,
+              radius: MediaQuery.of(context).size.width * 0.4,
+              onZoomChanged: _onZoomChanged,
+              onTap: (point) {
+                _resetIdleTimer();
+              },
+            ),
           ),
         ),
         // Zoom controls - matching flat map button style
