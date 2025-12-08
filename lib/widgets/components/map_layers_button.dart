@@ -8,9 +8,11 @@ class MapLayersButton extends StatelessWidget {
   final bool showFaultLines;
   final bool isLoadingFaultLines;
   final bool showHeatmap;
+  final bool showPlateLabels;
   final ValueChanged<MapLayerType> onMapTypeChanged;
   final ValueChanged<bool> onFaultLinesToggled;
   final ValueChanged<bool> onHeatmapToggled;
+  final ValueChanged<bool> onPlateLabelsToggled;
 
   const MapLayersButton({
     super.key,
@@ -18,9 +20,11 @@ class MapLayersButton extends StatelessWidget {
     required this.showFaultLines,
     required this.isLoadingFaultLines,
     required this.showHeatmap,
+    required this.showPlateLabels,
     required this.onMapTypeChanged,
     required this.onFaultLinesToggled,
     required this.onHeatmapToggled,
+    required this.onPlateLabelsToggled,
   });
 
   void _showMapLayersBottomSheet(BuildContext context) {
@@ -38,6 +42,7 @@ class MapLayersButton extends StatelessWidget {
             MapLayerType currentMapType = selectedMapType;
             bool currentShowFaultLines = showFaultLines;
             bool currentShowHeatmap = showHeatmap;
+            bool currentShowPlateLabels = showPlateLabels;
 
             return Container(
               decoration: BoxDecoration(
@@ -62,7 +67,9 @@ class MapLayersButton extends StatelessWidget {
                         height: 4,
                         margin: const EdgeInsets.symmetric(vertical: 2),
                         decoration: BoxDecoration(
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.4,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -226,6 +233,62 @@ class MapLayersButton extends StatelessWidget {
                               )
                               : null,
                     ),
+
+                    // Plate Labels toggle (only visible when fault lines are on)
+                    if (currentShowFaultLines)
+                      Container(
+                        margin: const EdgeInsets.only(left: 24.0, right: 12.0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: colorScheme.primary.withValues(alpha: 0.5),
+                              width: 2,
+                            ),
+                          ),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.label_outline,
+                              size: 18,
+                              color:
+                                  currentShowPlateLabels
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Plate Labels',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: currentShowPlateLabels,
+                              onChanged: (_) {
+                                final newValue = !currentShowPlateLabels;
+                                setSheetState(() {
+                                  currentShowPlateLabels = newValue;
+                                });
+                                onPlateLabelsToggled(newValue);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
 
                     // Heatmap toggle
                     ListTile(

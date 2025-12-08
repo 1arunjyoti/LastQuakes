@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:lastquakes/presentation/providers/map_picker_provider.dart';
+import 'package:lastquakes/services/tile_cache_service.dart';
 import 'package:lastquakes/widgets/appbar.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 // Define min/max zoom levels for button enabling/disabling
@@ -132,6 +133,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     urlTemplate:
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'app.lastquakes',
+                    tileProvider:
+                        TileCacheService.instance.createCachedProvider(),
                   ),
                   if (provider.selectedLocation != null)
                     MarkerLayer(

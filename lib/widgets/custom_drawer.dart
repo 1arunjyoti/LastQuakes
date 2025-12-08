@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lastquakes/provider/theme_provider.dart';
+import 'package:lastquakes/screens/bookmarks_screen.dart';
 import 'package:lastquakes/screens/settings_screen.dart';
 import 'package:lastquakes/screens/subscreens/about_screen.dart';
 import 'package:lastquakes/screens/subscreens/emergency_contacts_screen.dart';
@@ -40,6 +41,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
       EmergencyContactsScreen(),
     ),
     const NavigationItem(Icons.quiz, "Test Your Knowledge", QuizScreen()),
+    const NavigationItem(
+      Icons.bookmark_rounded,
+      "Saved Earthquakes",
+      BookmarksScreen(),
+    ),
     const NavigationItem(Icons.settings_outlined, "Settings", SettingsScreen()),
     const NavigationItem(Icons.info_outline, "About", AboutScreen()),
   ];
@@ -84,7 +90,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
 
           // Main destinations
           ..._destinations
-              .take(3)
+              .take(4)
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),
@@ -103,7 +109,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
           Divider(),
           // Footer destinations
           ..._destinations
-              .skip(3)
+              .skip(4)
               .map(
                 (item) => NavigationDrawerDestination(
                   icon: Icon(item.icon),

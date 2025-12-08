@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
+import 'package:lastquakes/services/home_widget_service.dart';
 import 'package:lastquakes/services/location_service.dart';
 import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
@@ -399,6 +401,8 @@ class EarthquakeProvider extends ChangeNotifier {
   MapViewMode _mapViewMode = MapViewMode.flat;
   bool _showFaultLines = false;
   bool _showHeatmap = false;
+  bool _showPlateLabels =
+      true; // Show plate labels when fault lines are visible
   List<Polyline> _faultLines = [];
   List<FaultLineLabel> _faultLineLabels = [];
   bool _isLoadingFaultLines = false;
@@ -448,6 +452,7 @@ class EarthquakeProvider extends ChangeNotifier {
   MapViewMode get mapViewMode => _mapViewMode;
   bool get showFaultLines => _showFaultLines;
   bool get showHeatmap => _showHeatmap;
+  bool get showPlateLabels => _showPlateLabels;
   List<Polyline> get faultLines => _faultLines;
   List<FaultLineLabel> get faultLineLabels => _faultLineLabels;
   bool get isLoadingFaultLines => _isLoadingFaultLines;
@@ -484,6 +489,14 @@ class EarthquakeProvider extends ChangeNotifier {
     _showFaultLines = prefs.getBool(_showFaultLinesPrefKey) ?? false;
     if (_showFaultLines) {
       _loadFaultLines();
+    }
+  }
+
+  /// Update home screen widget with current earthquake data (Android only).
+  /// This is non-blocking and debounced by the HomeWidgetService.
+  void _updateHomeWidget() {
+    if (!kIsWeb && Platform.isAndroid && _allEarthquakes.isNotEmpty) {
+      HomeWidgetService().updateWidgetData(_allEarthquakes);
     }
   }
 
@@ -550,6 +563,9 @@ class EarthquakeProvider extends ChangeNotifier {
         earthquakeCount: _allEarthquakes.length,
         loadTimeMs: stopwatch.elapsedMilliseconds,
       );
+
+      // Update home screen widget (Android only, non-blocking)
+      _updateHomeWidget();
     } catch (e) {
       _error = "Failed to load earthquakes: ${e.toString()}";
       stopwatch.stop();
@@ -588,6 +604,10 @@ class EarthquakeProvider extends ChangeNotifier {
       if (_userPosition != null) {
         await _preCalculateDistances();
       }
+
+      // Update home screen widget (Android only, non-blocking)
+      _updateHomeWidget();
+
       notifyListeners();
     } catch (e) {
       debugPrint('Background refresh failed: $e');
@@ -805,6 +825,12 @@ class EarthquakeProvider extends ChangeNotifier {
   void toggleHeatmap(bool show) {
     if (_showHeatmap == show) return;
     _showHeatmap = show;
+    notifyListeners();
+  }
+
+  void togglePlateLabels(bool show) {
+    if (_showPlateLabels == show) return;
+    _showPlateLabels = show;
     notifyListeners();
   }
 

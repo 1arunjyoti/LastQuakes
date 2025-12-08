@@ -17,6 +17,7 @@ import 'package:lastquakes/widgets/earthquake_globe_widget.dart';
 import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:lastquakes/services/tile_cache_service.dart';
 
 class EarthquakeMapWidget extends StatefulWidget {
   final MapController? mapController;
@@ -213,6 +214,8 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                       onFaultLinesToggled: provider.toggleFaultLines,
                       showHeatmap: provider.showHeatmap,
                       onHeatmapToggled: provider.toggleHeatmap,
+                      showPlateLabels: provider.showPlateLabels,
+                      onPlateLabelsToggled: provider.togglePlateLabels,
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -284,11 +287,13 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                 TileLayer(
                   urlTemplate: _getTileUrl(provider.mapLayerType),
                   userAgentPackageName: 'app.lastquakes',
+                  tileProvider:
+                      TileCacheService.instance.createCachedProvider(),
                 ),
                 if (provider.showFaultLines) ...[
                   PolylineLayer(polylines: provider.faultLines),
-                  // Plate boundary labels (only show when zoomed in enough)
-                  if (_zoomLevel >= 4.0)
+                  // Plate boundary labels (only show when enabled and zoomed in)
+                  if (provider.showPlateLabels && _zoomLevel >= 4.0)
                     MarkerLayer(
                       markers:
                           provider.faultLineLabels
@@ -688,7 +693,9 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                     height: 4,
                     margin: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.4,
+                      ),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -793,8 +800,9 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest
-                              .withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -813,7 +821,7 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                             _buildDetailRow(
                               context,
                               Icons.source_outlined,
-                              "Source: ${quake.source?.toUpperCase() ?? 'USGS'}",
+                              "Source: ${quake.source.toUpperCase()}",
                             ),
                           ],
                         ),
@@ -866,13 +874,15 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
       decoration: BoxDecoration(
         color:
             isAlert
-                ? color.withOpacity(0.1)
-                : theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                ? color.withValues(alpha: 0.1)
+                : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color:
               isAlert
-                  ? effectiveBorderColor.withOpacity(0.5)
+                  ? effectiveBorderColor.withValues(alpha: 0.5)
                   : Colors.transparent,
         ),
       ),
@@ -992,7 +1002,9 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                         height: 4,
                         margin: const EdgeInsets.symmetric(vertical: 2),
                         decoration: BoxDecoration(
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.4,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1075,10 +1087,10 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest
-                                .withOpacity(0.5),
+                                .withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: colorScheme.outline.withOpacity(0.2),
+                              color: colorScheme.outline.withValues(alpha: 0.2),
                             ),
                           ),
                           child: DropdownButtonHideUnderline(

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget theme colors (Dark mode) -->
+    <color name="widget_background">#121212</color>
+    <color name="widget_background_alpha">#E6121212</color>
+    <color name="widget_card_background">#1E1E1E</color>
+    <color name="widget_text_primary">#FFFFFF</color>
+    <color name="widget_text_secondary">#B0B0B0</color>
+    <color name="widget_accent">#64B5F6</color>
+    <color name="widget_border">#333333</color>
+</resources>

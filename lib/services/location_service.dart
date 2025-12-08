@@ -4,7 +4,6 @@ import 'dart:math' show sin, cos, sqrt, atan2, pi;
 import 'package:flutter/services.dart';
 import 'package:lastquakes/utils/secure_logger.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:meta/meta.dart';
 
 /// Custom Location class to replace fl_location dependency
 class Location {
@@ -138,7 +137,6 @@ class LocationService {
     return degrees * pi / 180;
   }
 
-  @visibleForTesting
   void clearCache() {
     _cachedLocation = null;
     _lastLocationFetchTime = null;

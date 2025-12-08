@@ -13,6 +13,7 @@ import 'package:lastquakes/widgets/appbar.dart';
 import 'package:lastquakes/widgets/settings/clock_settings_card.dart';
 import 'package:lastquakes/widgets/settings/theme_settings_card.dart';
 import 'package:lastquakes/widgets/settings/units_settings_card.dart';
+import 'package:lastquakes/widgets/settings/cache_settings_card.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:latlong2/latlong.dart';
@@ -279,6 +280,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // expanded: _clockExpanded,
                         // onExpand: (val) => setState(() => _clockExpanded = val),
                       ),
+                      const SizedBox(height: 12),
+                      const CacheSettingsCard(),
                       const SizedBox(height: 12),
                     ],
                   );

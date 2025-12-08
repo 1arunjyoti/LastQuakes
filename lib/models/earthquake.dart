@@ -135,4 +135,11 @@ class Earthquake {
       rawData: json['rawData'],
     );
   }
+
+  /// Returns the USGS PAGER alert level ('green', 'yellow', 'orange', 'red')
+  /// Returns null if not present or not a USGS earthquake
+  String? get alert {
+    if (source != 'USGS') return null;
+    return rawData['properties']?['alert'] as String?;
+  }
 }

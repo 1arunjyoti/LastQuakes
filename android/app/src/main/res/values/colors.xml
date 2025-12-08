@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#ffffff</color>
+    
+    <!-- Widget theme colors (Light mode) -->
+    <color name="widget_background">#F2F2F2</color>
+    <color name="widget_background_alpha">#E6F2F2F2</color>
+    <color name="widget_card_background">#FFFFFF</color>
+    <color name="widget_text_primary">#212121</color>
+    <color name="widget_text_secondary">#757575</color>
+    <color name="widget_accent">#2196F3</color>
+    <color name="widget_border">#E0E0E0</color>
+    
+    <!-- Magnitude colors (same for both modes) -->
+    <color name="magnitude_low">#4CAF50</color>
+    <color name="magnitude_medium">#FF9800</color>
+    <color name="magnitude_high">#B71C1C</color>
 </resources>

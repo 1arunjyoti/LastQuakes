@@ -1,14 +1,17 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lastquakes/models/earthquake_adapter.dart';
+import 'package:lastquakes/presentation/providers/bookmark_provider.dart';
 import 'package:lastquakes/provider/theme_provider.dart';
 import 'package:lastquakes/screens/home_screen.dart';
 import 'package:lastquakes/screens/onboarding_screen.dart';
 import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/services/analytics_service_noop.dart';
+import 'package:lastquakes/services/bookmark_service.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
 import 'package:lastquakes/services/multi_source_api_service.dart';
 import 'package:lastquakes/services/notification_service.dart';
@@ -16,6 +19,7 @@ import 'package:lastquakes/services/push_notification_service.dart';
 import 'package:lastquakes/services/push_notification_service_noop.dart';
 import 'package:lastquakes/services/secure_storage_service.dart';
 import 'package:lastquakes/services/secure_token_service.dart';
+import 'package:lastquakes/services/tile_cache_service.dart';
 import 'package:lastquakes/services/token_migration_service.dart';
 import 'package:lastquakes/theme/app_theme.dart';
 import 'package:lastquakes/utils/notification_registration_coordinator.dart';
@@ -27,6 +31,7 @@ import 'package:lastquakes/presentation/providers/settings_provider.dart';
 import 'package:lastquakes/presentation/providers/map_picker_provider.dart';
 import 'package:lastquakes/data/repositories/settings_repository_impl.dart';
 import 'package:lastquakes/data/repositories/device_repository_noop.dart';
+import 'package:lastquakes/services/home_widget_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -92,6 +97,12 @@ void main() async {
     SecureStorageService.initialize().catchError((e) {
       SecureLogger.error("Secure storage initialization failed", e);
     }),
+    TileCacheService.instance.init().catchError((e) {
+      SecureLogger.error("Tile cache initialization failed", e);
+    }),
+    BookmarkService.instance.init().catchError((e) {
+      SecureLogger.error("Bookmark service initialization failed", e);
+    }),
     if (!kIsWeb)
       NotificationService.instance.initNotifications().catchError((e) {
         SecureLogger.error("Notification initialization failed", e);
@@ -105,6 +116,11 @@ void main() async {
   // Start background initializations (non-blocking)
   if (!kIsWeb) {
     _runBackgroundInitializations();
+
+    // Initialize home screen widget (Android only, non-blocking)
+    if (Platform.isAndroid) {
+      HomeWidgetService().initialize();
+    }
   }
 
   final bool seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
@@ -134,6 +150,9 @@ void main() async {
               )..loadSettings(),
         ),
         ChangeNotifierProvider(create: (_) => MapPickerProvider()),
+        ChangeNotifierProvider(
+          create: (_) => BookmarkProvider()..loadBookmarks(),
+        ),
       ],
       child: MyApp(seenOnboarding: seenOnboarding, prefs: prefs),
     ),
