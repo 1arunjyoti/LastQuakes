@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -88,23 +89,114 @@ List<Earthquake> _filterMapEarthquakesIsolate(MapFilterParameters params) {
   }
 }
 
+// --- Fault Line Data Class ---
+class FaultLineLabel {
+  final LatLng position;
+  final String plateA;
+  final String plateB;
+  final String boundaryType;
+  final double angle; // Rotation angle in radians to follow the line
+
+  const FaultLineLabel({
+    required this.position,
+    required this.plateA,
+    required this.plateB,
+    required this.boundaryType,
+    required this.angle,
+  });
+
+  String get displayName => '$plateA - $plateB';
+}
+
+class FaultLineData {
+  final List<Polyline> polylines;
+  final List<FaultLineLabel> labels;
+
+  const FaultLineData({required this.polylines, required this.labels});
+
+  static const empty = FaultLineData(polylines: [], labels: []);
+}
+
+// Plate code to full name mapping
+const Map<String, String> _plateNames = {
+  'AF': 'African',
+  'AN': 'Antarctic',
+  'AP': 'Altiplano',
+  'AR': 'Arabian',
+  'AS': 'Aegean Sea',
+  'AT': 'Anatolia',
+  'AU': 'Australian',
+  'BH': 'Birds Head',
+  'BR': 'Balmoral Reef',
+  'BS': 'Banda Sea',
+  'BU': 'Burma',
+  'CA': 'Caribbean',
+  'CL': 'Caroline',
+  'CO': 'Cocos',
+  'CR': 'Conway Reef',
+  'EA': 'Easter',
+  'EU': 'Eurasian',
+  'FT': 'Futuna',
+  'GP': 'Galapagos',
+  'IN': 'Indian',
+  'JF': 'Juan de Fuca',
+  'JZ': 'Juan Fernandez',
+  'KE': 'Kermadec',
+  'MA': 'Mariana',
+  'MN': 'Manus',
+  'MO': 'Maoke',
+  'MS': 'Molucca Sea',
+  'NA': 'North American',
+  'NB': 'North Bismarck',
+  'ND': 'North Andes',
+  'NH': 'New Hebrides',
+  'NI': 'Niuafo\'ou',
+  'NZ': 'Nazca',
+  'OK': 'Okhotsk',
+  'ON': 'Okinawa',
+  'PA': 'Pacific',
+  'PM': 'Panama',
+  'PS': 'Philippine Sea',
+  'RI': 'Rivera',
+  'SA': 'South American',
+  'SB': 'South Bismarck',
+  'SC': 'Scotia',
+  'SL': 'Shetland',
+  'SO': 'Somali',
+  'SS': 'Solomon Sea',
+  'SU': 'Sunda',
+  'SW': 'Sandwich',
+  'TI': 'Timor',
+  'TO': 'Tonga',
+  'WL': 'Woodlark',
+  'YA': 'Yangtze',
+};
+
+String _getPlateName(String code) {
+  return _plateNames[code] ?? code;
+}
+
 // --- Isolate Logic for Fault Lines ---
-List<Polyline> _parseGeoJsonFaultLinesIsolate(String geoJsonString) {
+FaultLineData _parseGeoJsonFaultLinesIsolate(String geoJsonString) {
   try {
-    if (geoJsonString.length > 100 * 1024 * 1024) return [];
+    if (geoJsonString.length > 100 * 1024 * 1024) return FaultLineData.empty;
 
     final decodedJson = json.decode(geoJsonString);
-    if (decodedJson is! Map || !decodedJson.containsKey('features')) return [];
+    if (decodedJson is! Map || !decodedJson.containsKey('features')) {
+      return FaultLineData.empty;
+    }
 
     final features = decodedJson['features'];
-    if (features is! List) return [];
+    if (features is! List) return FaultLineData.empty;
 
     final List<Polyline> polylines = [];
+    final Map<String, FaultLineLabel> uniqueLabels = {};
     const int maxPolylines = 1000;
     const int maxPointsPerLine = 500;
 
-    const Color lineStringColor = Color(0xCCFF0000);
-    const Color multiLineStringColor = Color(0xB3FF9800);
+    // Colors for different boundary types
+    const Color subductionColor = Color(0xFFE53935);
+    const Color spreadingColor = Color(0xFF43A047);
 
     int processedCount = 0;
     for (final feature in features) {
@@ -118,6 +210,28 @@ List<Polyline> _parseGeoJsonFaultLinesIsolate(String geoJsonString) {
       final coordinates = geometry['coordinates'];
       if (coordinates is! List) continue;
 
+      // Extract properties
+      final properties = feature['properties'];
+      Color lineColor = spreadingColor;
+      String plateA = '';
+      String plateB = '';
+      String boundaryType = 'spreading';
+
+      if (properties is Map) {
+        plateA = properties['PlateA']?.toString() ?? '';
+        plateB = properties['PlateB']?.toString() ?? '';
+        final typeStr = properties['Type']?.toString() ?? '';
+        final name = properties['Name']?.toString() ?? '';
+
+        if (typeStr.toLowerCase().contains('subduction')) {
+          lineColor = subductionColor;
+          boundaryType = 'subduction';
+        } else if (name.contains('\\\\') || name.contains('\\/')) {
+          lineColor = subductionColor;
+          boundaryType = 'subduction';
+        }
+      }
+
       try {
         if (type == 'LineString') {
           final points = _parseLineStringCoordinates(
@@ -126,13 +240,40 @@ List<Polyline> _parseGeoJsonFaultLinesIsolate(String geoJsonString) {
           );
           if (points.isNotEmpty) {
             polylines.add(
-              Polyline(
-                points: points,
-                color: lineStringColor,
-                strokeWidth: 1.5,
-              ),
+              Polyline(points: points, color: lineColor, strokeWidth: 2.0),
             );
             processedCount++;
+
+            // Create label at midpoint (only one per unique plate pair)
+            if (plateA.isNotEmpty && plateB.isNotEmpty) {
+              final labelKey = '${plateA}_$plateB';
+              if (!uniqueLabels.containsKey(labelKey)) {
+                final midIndex = points.length ~/ 2;
+                // Calculate angle from adjacent points
+                double angle = 0.0;
+                if (points.length >= 2) {
+                  final prevIdx = midIndex > 0 ? midIndex - 1 : 0;
+                  final nextIdx =
+                      midIndex < points.length - 1 ? midIndex + 1 : midIndex;
+                  final dx =
+                      points[nextIdx].longitude - points[prevIdx].longitude;
+                  final dy =
+                      points[nextIdx].latitude - points[prevIdx].latitude;
+                  angle = math.atan2(dy, dx);
+                  // Flip if text would be upside down
+                  if (angle > math.pi / 2 || angle < -math.pi / 2) {
+                    angle += math.pi;
+                  }
+                }
+                uniqueLabels[labelKey] = FaultLineLabel(
+                  position: points[midIndex],
+                  plateA: _getPlateName(plateA),
+                  plateB: _getPlateName(plateB),
+                  boundaryType: boundaryType,
+                  angle: angle,
+                );
+              }
+            }
           }
         } else if (type == 'MultiLineString') {
           for (final line in coordinates) {
@@ -141,13 +282,40 @@ List<Polyline> _parseGeoJsonFaultLinesIsolate(String geoJsonString) {
             final points = _parseLineStringCoordinates(line, maxPointsPerLine);
             if (points.isNotEmpty) {
               polylines.add(
-                Polyline(
-                  points: points,
-                  color: multiLineStringColor,
-                  strokeWidth: 1.5,
-                ),
+                Polyline(points: points, color: lineColor, strokeWidth: 2.0),
               );
               processedCount++;
+
+              // Create label at midpoint (only one per unique plate pair)
+              if (plateA.isNotEmpty && plateB.isNotEmpty) {
+                final labelKey = '${plateA}_$plateB';
+                if (!uniqueLabels.containsKey(labelKey)) {
+                  final midIndex = points.length ~/ 2;
+                  // Calculate angle from adjacent points
+                  double angle = 0.0;
+                  if (points.length >= 2) {
+                    final prevIdx = midIndex > 0 ? midIndex - 1 : 0;
+                    final nextIdx =
+                        midIndex < points.length - 1 ? midIndex + 1 : midIndex;
+                    final dx =
+                        points[nextIdx].longitude - points[prevIdx].longitude;
+                    final dy =
+                        points[nextIdx].latitude - points[prevIdx].latitude;
+                    angle = math.atan2(dy, dx);
+                    // Flip if text would be upside down
+                    if (angle > math.pi / 2 || angle < -math.pi / 2) {
+                      angle += math.pi;
+                    }
+                  }
+                  uniqueLabels[labelKey] = FaultLineLabel(
+                    position: points[midIndex],
+                    plateA: _getPlateName(plateA),
+                    plateB: _getPlateName(plateB),
+                    boundaryType: boundaryType,
+                    angle: angle,
+                  );
+                }
+              }
             }
           }
         }
@@ -155,9 +323,12 @@ List<Polyline> _parseGeoJsonFaultLinesIsolate(String geoJsonString) {
         continue;
       }
     }
-    return polylines;
+    return FaultLineData(
+      polylines: polylines,
+      labels: uniqueLabels.values.toList(),
+    );
   } catch (e) {
-    return [];
+    return FaultLineData.empty;
   }
 }
 
@@ -224,9 +395,12 @@ class EarthquakeProvider extends ChangeNotifier {
   TimeWindow _mapTimeWindow = TimeWindow.last24Hours;
 
   // Map Settings
-  MapLayerType _mapLayerType = MapLayerType.osm;
+  MapLayerType _mapLayerType = MapLayerType.terrain;
+  MapViewMode _mapViewMode = MapViewMode.flat;
   bool _showFaultLines = false;
+  bool _showHeatmap = false;
   List<Polyline> _faultLines = [];
+  List<FaultLineLabel> _faultLineLabels = [];
   bool _isLoadingFaultLines = false;
 
   // Preferences Keys
@@ -271,8 +445,11 @@ class EarthquakeProvider extends ChangeNotifier {
   double get mapMinMagnitude => _mapMinMagnitude;
   TimeWindow get mapTimeWindow => _mapTimeWindow;
   MapLayerType get mapLayerType => _mapLayerType;
+  MapViewMode get mapViewMode => _mapViewMode;
   bool get showFaultLines => _showFaultLines;
+  bool get showHeatmap => _showHeatmap;
   List<Polyline> get faultLines => _faultLines;
+  List<FaultLineLabel> get faultLineLabels => _faultLineLabels;
   bool get isLoadingFaultLines => _isLoadingFaultLines;
 
   EarthquakeProvider({required this.getEarthquakesUseCase});
@@ -619,6 +796,18 @@ class EarthquakeProvider extends ChangeNotifier {
     await prefs.setString(_mapTypePrefKey, type.name);
   }
 
+  void toggleMapViewMode() {
+    _mapViewMode =
+        _mapViewMode == MapViewMode.flat ? MapViewMode.globe : MapViewMode.flat;
+    notifyListeners();
+  }
+
+  void toggleHeatmap(bool show) {
+    if (_showHeatmap == show) return;
+    _showHeatmap = show;
+    notifyListeners();
+  }
+
   Future<void> toggleFaultLines(bool show) async {
     if (_showFaultLines == show) return;
     _showFaultLines = show;
@@ -657,12 +846,13 @@ class EarthquakeProvider extends ChangeNotifier {
       final bool hasCacheData = cachedData != null;
 
       if (_faultLines.isEmpty && cachedData != null) {
-        final cachedPolylines = await compute(
+        final cachedResult = await compute(
           _parseGeoJsonFaultLinesIsolate,
           cachedData,
         );
-        if (cachedPolylines.isNotEmpty) {
-          _faultLines = cachedPolylines;
+        if (cachedResult.polylines.isNotEmpty) {
+          _faultLines = cachedResult.polylines;
+          _faultLineLabels = cachedResult.labels;
           notifyListeners();
         }
       }
@@ -673,12 +863,13 @@ class EarthquakeProvider extends ChangeNotifier {
       if (shouldFetchRemote) {
         final response = await http.get(Uri.parse(_faultLineDataUrl));
         if (response.statusCode == 200) {
-          final parsedPolylines = await compute(
+          final parsedResult = await compute(
             _parseGeoJsonFaultLinesIsolate,
             response.body,
           );
-          if (parsedPolylines.isNotEmpty) {
-            _faultLines = parsedPolylines;
+          if (parsedResult.polylines.isNotEmpty) {
+            _faultLines = parsedResult.polylines;
+            _faultLineLabels = parsedResult.labels;
             final nowMillis = DateTime.now().millisecondsSinceEpoch;
             await prefs.setString(_faultLinesCacheKey, response.body);
             await prefs.setInt(_faultLinesCacheTimestampKey, nowMillis);

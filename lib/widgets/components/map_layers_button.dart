@@ -7,16 +7,20 @@ class MapLayersButton extends StatelessWidget {
   final MapLayerType selectedMapType;
   final bool showFaultLines;
   final bool isLoadingFaultLines;
+  final bool showHeatmap;
   final ValueChanged<MapLayerType> onMapTypeChanged;
   final ValueChanged<bool> onFaultLinesToggled;
+  final ValueChanged<bool> onHeatmapToggled;
 
   const MapLayersButton({
     super.key,
     required this.selectedMapType,
     required this.showFaultLines,
     required this.isLoadingFaultLines,
+    required this.showHeatmap,
     required this.onMapTypeChanged,
     required this.onFaultLinesToggled,
+    required this.onHeatmapToggled,
   });
 
   void _showMapLayersBottomSheet(BuildContext context) {
@@ -33,6 +37,7 @@ class MapLayersButton extends StatelessWidget {
             // Local state for immediate UI updates
             MapLayerType currentMapType = selectedMapType;
             bool currentShowFaultLines = showFaultLines;
+            bool currentShowHeatmap = showHeatmap;
 
             return Container(
               decoration: BoxDecoration(
@@ -42,11 +47,26 @@ class MapLayersButton extends StatelessWidget {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20.0,
+                  vertical: 16.0,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
                     // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -117,8 +137,7 @@ class MapLayersButton extends StatelessWidget {
                             // Update parent state
                             onMapTypeChanged(type);
                             // Save preference
-                            final prefs =
-                                await SharedPreferences.getInstance();
+                            final prefs = await SharedPreferences.getInstance();
                             await prefs.setString(
                               'map_layer_type_preference_v2',
                               type.name,
@@ -208,6 +227,45 @@ class MapLayersButton extends StatelessWidget {
                               : null,
                     ),
 
+                    // Heatmap toggle
+                    ListTile(
+                      leading: Icon(
+                        Icons.blur_on,
+                        color:
+                            currentShowHeatmap
+                                ? colorScheme.primary
+                                : colorScheme.onSurface,
+                      ),
+                      title: const Text('Heatmap'),
+                      subtitle: const Text('Show activity hotspots'),
+                      trailing: Switch(
+                        value: currentShowHeatmap,
+                        onChanged: (_) {
+                          final newValue = !currentShowHeatmap;
+                          setSheetState(() {
+                            currentShowHeatmap = newValue;
+                          });
+                          onHeatmapToggled(newValue);
+                        },
+                      ),
+                      onTap: () {
+                        final newValue = !currentShowHeatmap;
+                        setSheetState(() {
+                          currentShowHeatmap = newValue;
+                        });
+                        onHeatmapToggled(newValue);
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor:
+                          currentShowHeatmap
+                              ? colorScheme.primaryContainer.withValues(
+                                alpha: 0.3,
+                              )
+                              : null,
+                    ),
+
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -228,7 +286,7 @@ class MapLayersButton extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),

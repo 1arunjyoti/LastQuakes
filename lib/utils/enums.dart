@@ -16,6 +16,11 @@ enum MapLayerType {
   dark, // Dark Mode Map
 }
 
+enum MapViewMode {
+  flat, // Traditional 2D flat map
+  globe, // Interactive 3D globe
+}
+
 enum DataSource {
   usgs, // United States Geological Survey
   emsc, // European-Mediterranean Seismological Centre

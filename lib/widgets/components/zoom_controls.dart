@@ -21,11 +21,11 @@ class ZoomControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -40,20 +40,29 @@ class ZoomControls extends StatelessWidget {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              onTap: zoomLevel < maxZoom ? () {
-                final newZoom = (zoomLevel + 1).clamp(minZoom, maxZoom);
-                mapController.move(mapController.camera.center, newZoom);
-                onZoomChanged(newZoom);
-              } : null,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              onTap:
+                  zoomLevel < maxZoom
+                      ? () {
+                        final newZoom = (zoomLevel + 1).clamp(minZoom, maxZoom);
+                        mapController.move(
+                          mapController.camera.center,
+                          newZoom,
+                        );
+                        onZoomChanged(newZoom);
+                      }
+                      : null,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 child: Icon(
                   Icons.add,
                   size: 24,
-                  color: zoomLevel < maxZoom 
-                      ? colorScheme.onSurface 
-                      : colorScheme.onSurface.withValues(alpha: 0.4),
+                  color:
+                      zoomLevel < maxZoom
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
               ),
             ),
@@ -65,20 +74,29 @@ class ZoomControls extends StatelessWidget {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-              onTap: zoomLevel > minZoom ? () {
-                final newZoom = (zoomLevel - 1).clamp(minZoom, maxZoom);
-                mapController.move(mapController.camera.center, newZoom);
-                onZoomChanged(newZoom);
-              } : null,
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
+              onTap:
+                  zoomLevel > minZoom
+                      ? () {
+                        final newZoom = (zoomLevel - 1).clamp(minZoom, maxZoom);
+                        mapController.move(
+                          mapController.camera.center,
+                          newZoom,
+                        );
+                        onZoomChanged(newZoom);
+                      }
+                      : null,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 child: Icon(
                   Icons.remove,
                   size: 24,
-                  color: zoomLevel > minZoom 
-                      ? colorScheme.onSurface 
-                      : colorScheme.onSurface.withValues(alpha: 0.4),
+                  color:
+                      zoomLevel > minZoom
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
               ),
             ),
