@@ -14,7 +14,7 @@ class OnboardingScreen extends StatelessWidget {
 
   Future<void> _onIntroEnd(BuildContext context) async {
     await prefs.setBool('seenOnboarding', true);
-    
+
     // Log onboarding completion
     AnalyticsService.instance.logOnboardingComplete();
     AnalyticsService.instance.logScreenView('onboarding_complete');

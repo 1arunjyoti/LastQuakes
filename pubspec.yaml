@@ -1,17 +1,7 @@
 name: lastquakes
 description: "An application providing near real-time global earthquake monitoring."
-# The following line prevents the package from being accidentally published to
+publish_to: "none"
 
-publish_to: "none" # Remove this line if you wish to publish to pub.dev
-
-# The following defines the version and build number for your application.
-# A version number is three numbers separated by dots, like 1.2.43
-# followed by an optional build number separated by a +.
-
-# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
-
-# In Windows, build-name is used as the major, minor, and patch parts
-# of the product and file versions while build-number is used as the build suffix.
 version: 1.0.0+1
 
 environment:
@@ -29,9 +19,11 @@ dependencies:
   url_launcher: ^6.3.1
   provider: ^6.1.2
   shared_preferences: ^2.5.2
-  geolocator: ^14.0.0
   font_awesome_flutter: ^10.8.0
   flutter_map_marker_cluster: ^8.2.2
+  flutter_map_heatmap_plus: ^0.1.0
+  flutter_map_cache: ^2.0.0
+  http_cache_hive_store: ^5.0.0
   flutter_local_notifications: ^19.0.0
   firebase_core: ^4.2.1
   firebase_messaging: ^16.0.4
@@ -47,10 +39,11 @@ dependencies:
   screenshot: ^3.0.0
   introduction_screen: ^4.0.0
   meta: ^1.17.0
-  geolocator_platform_interface: ^4.2.6
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   yaml: ^3.1.3
+  flutter_earth_globe: ^2.1.2
+  home_widget: ^0.7.0
 
 dev_dependencies:
   flutter_test:
@@ -69,9 +62,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # To add assets to your application, add an assets section, like this:
   assets:
     - .env
     - LICENSE
     - assets/splash/
+    - assets/globe/

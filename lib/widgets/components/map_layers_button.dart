@@ -7,16 +7,24 @@ class MapLayersButton extends StatelessWidget {
   final MapLayerType selectedMapType;
   final bool showFaultLines;
   final bool isLoadingFaultLines;
+  final bool showHeatmap;
+  final bool showPlateLabels;
   final ValueChanged<MapLayerType> onMapTypeChanged;
   final ValueChanged<bool> onFaultLinesToggled;
+  final ValueChanged<bool> onHeatmapToggled;
+  final ValueChanged<bool> onPlateLabelsToggled;
 
   const MapLayersButton({
     super.key,
     required this.selectedMapType,
     required this.showFaultLines,
     required this.isLoadingFaultLines,
+    required this.showHeatmap,
+    required this.showPlateLabels,
     required this.onMapTypeChanged,
     required this.onFaultLinesToggled,
+    required this.onHeatmapToggled,
+    required this.onPlateLabelsToggled,
   });
 
   void _showMapLayersBottomSheet(BuildContext context) {
@@ -33,6 +41,8 @@ class MapLayersButton extends StatelessWidget {
             // Local state for immediate UI updates
             MapLayerType currentMapType = selectedMapType;
             bool currentShowFaultLines = showFaultLines;
+            bool currentShowHeatmap = showHeatmap;
+            bool currentShowPlateLabels = showPlateLabels;
 
             return Container(
               decoration: BoxDecoration(
@@ -42,11 +52,28 @@ class MapLayersButton extends StatelessWidget {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20.0,
+                  vertical: 16.0,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.4,
+                          ),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
                     // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -117,8 +144,7 @@ class MapLayersButton extends StatelessWidget {
                             // Update parent state
                             onMapTypeChanged(type);
                             // Save preference
-                            final prefs =
-                                await SharedPreferences.getInstance();
+                            final prefs = await SharedPreferences.getInstance();
                             await prefs.setString(
                               'map_layer_type_preference_v2',
                               type.name,
@@ -208,6 +234,101 @@ class MapLayersButton extends StatelessWidget {
                               : null,
                     ),
 
+                    // Plate Labels toggle (only visible when fault lines are on)
+                    if (currentShowFaultLines)
+                      Container(
+                        margin: const EdgeInsets.only(left: 24.0, right: 12.0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: colorScheme.primary.withValues(alpha: 0.5),
+                              width: 2,
+                            ),
+                          ),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.label_outline,
+                              size: 18,
+                              color:
+                                  currentShowPlateLabels
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Plate Labels',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: currentShowPlateLabels,
+                              onChanged: (_) {
+                                final newValue = !currentShowPlateLabels;
+                                setSheetState(() {
+                                  currentShowPlateLabels = newValue;
+                                });
+                                onPlateLabelsToggled(newValue);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Heatmap toggle
+                    ListTile(
+                      leading: Icon(
+                        Icons.blur_on,
+                        color:
+                            currentShowHeatmap
+                                ? colorScheme.primary
+                                : colorScheme.onSurface,
+                      ),
+                      title: const Text('Heatmap'),
+                      subtitle: const Text('Show activity hotspots'),
+                      trailing: Switch(
+                        value: currentShowHeatmap,
+                        onChanged: (_) {
+                          final newValue = !currentShowHeatmap;
+                          setSheetState(() {
+                            currentShowHeatmap = newValue;
+                          });
+                          onHeatmapToggled(newValue);
+                        },
+                      ),
+                      onTap: () {
+                        final newValue = !currentShowHeatmap;
+                        setSheetState(() {
+                          currentShowHeatmap = newValue;
+                        });
+                        onHeatmapToggled(newValue);
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor:
+                          currentShowHeatmap
+                              ? colorScheme.primaryContainer.withValues(
+                                alpha: 0.3,
+                              )
+                              : null,
+                    ),
+
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -228,7 +349,7 @@ class MapLayersButton extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),

@@ -1,0 +1,34 @@
+LastQuakes is a comprehensive application providing real-time global earthquake monitoring with multi-source data integration, customizable push notifications, interactive map visualization, and advanced filtering capabilities.
+
+**Core Features:**
+
+*   **Multi-Source Data Integration**:
+    *   **USGS (U.S. Geological Survey)**: Comprehensive global earthquake data.
+    *   **EMSC (European-Mediterranean Seismological Centre)**: Enhanced coverage for European and Mediterranean regions.
+    *   **Intelligent Deduplication**: Automatic removal of duplicate events from multiple sources.
+
+*   **Interactive Map Visualization**:
+    *   High-performance map rendering with smooth panning and zooming.
+    *   Multiple Base Layers: Street Map, Satellite Imagery, Terrain View, Dark Theme.
+    *   Magnitude-Based Markers: Color-coded markers with size scaling.
+    *   Fault Line Overlays: Optional tectonic plate boundary visualization.
+
+*   **Dynamic List View**:
+    *   Filter by magnitude, country/region, and distance.
+    *   Sort by time, magnitude, or distance.
+    *   Modern card-based design with gradient headers.
+
+*   **Detailed Event Analysis**:
+    *   Magnitude, depth, location coordinates, and tsunami warning status.
+    *   Distance from user's location.
+    *   Interactive map pinpointing event location.
+
+*   **Statistics & Analytics**:
+    *   Visual representation of seismic activity trends.
+    *   Magnitude and geographic distribution charts.
+
+*   **Privacy & Security**:
+    *   **F-Droid Version**: Completely open-source with NO proprietary dependencies (Firebase Analytics/Crashlytics removed).
+    *   **Secure Storage**: Encrypted storage for sensitive data.
+
+**Note**: This is an independent project and is not officially affiliated with USGS, EMSC, or any government seismological organization.

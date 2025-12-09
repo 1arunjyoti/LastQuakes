@@ -1,6 +1,5 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:lastquakes/models/push_message.dart';
 import 'package:lastquakes/services/location_service.dart';
 import 'package:flutter/foundation.dart';
 
@@ -38,12 +37,9 @@ class NotificationService {
   final LocationService locationService =
       LocationService(); // For getting user location
 
-  // Get server URL from environment variables
-  static String? get serverUrl => dotenv.env['SERVER_URL'];
-
   Future<void> initNotifications() async {
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/launcher_icon');
 
     // Add iOS/macOS initialization settings if needed
     // const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(...);
@@ -57,43 +53,42 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(settings);
   }
 
-  // Show notification when receiving FCM messages
-  Future<void> showFCMNotification(RemoteMessage message) async {
-    const AndroidNotificationDetails
-    androidDetails = AndroidNotificationDetails(
-      'earthquake_channel', // Channel ID
-      'Earthquake Alerts', // Channel Name
-      channelDescription:
-          'Notifications about earthquakes based on your settings', // Channel Description
-      importance: Importance.high,
-      priority: Priority.high,
-      ticker: 'ticker',
-    );
-
-    // Add iOS/macOS details if needed
-    // const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(...);
+  /// Show notification from a push message.
+  /// Uses platform-agnostic [PushMessage] to avoid Firebase dependency in shared code.
+  Future<void> showPushNotification(PushMessage message) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'earthquake_channel', // Channel ID
+          'Earthquake Alerts', // Channel Name
+          channelDescription:
+              'Notifications about earthquakes based on your settings',
+          importance: Importance.high,
+          priority: Priority.high,
+          ticker: 'ticker',
+        );
 
     const NotificationDetails notificationDetails = NotificationDetails(
       android: androidDetails,
-      // iOS: iosDetails,
     );
 
-    final Map<String, dynamic> data = message.data;
     String title =
-        data['title'] ?? message.notification?.title ?? "Earthquake Alert";
+        message.data['title']?.toString() ??
+        message.title ??
+        "Earthquake Alert";
     String body =
-        data['body'] ?? message.notification?.body ?? "An earthquake occurred!";
-    // Use a stable ID from the backend if possible, otherwise use hash of content or time
+        message.data['body']?.toString() ??
+        message.body ??
+        "An earthquake occurred!";
     String id =
-        data['earthquakeId']?.toString() ?? (title + body).hashCode.toString();
+        message.data['earthquakeId']?.toString() ??
+        (title + body).hashCode.toString();
 
     await flutterLocalNotificationsPlugin.show(
-      id.hashCode, // Use the stable ID's hash code for the notification ID
+      id.hashCode,
       title,
       body,
       notificationDetails,
-      // Payload for notification tap handling (e.g., earthquake ID)
-      payload: data['earthquakeId']?.toString(),
+      payload: message.data['earthquakeId']?.toString(),
     );
   }
 }

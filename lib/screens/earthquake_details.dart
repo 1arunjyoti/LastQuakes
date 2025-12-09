@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:lastquakes/presentation/providers/bookmark_provider.dart';
+import 'package:lastquakes/services/tile_cache_service.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/utils/formatting.dart';
@@ -12,8 +14,11 @@ import 'package:lastquakes/widgets/appbar.dart';
 import 'package:lastquakes/widgets/components/zoom_controls.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:lastquakes/screens/earthquake_comparison_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:lastquakes/widgets/components/tsunami_risk_card.dart';
 
 class EarthquakeDetailsScreen extends StatefulWidget {
   final Earthquake earthquake;
@@ -78,6 +83,42 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
       appBar: LastQuakesAppBar(
         title: "Earthquake Details",
         actions: [
+          Consumer<BookmarkProvider>(
+            builder: (context, bookmarkProvider, _) {
+              final isBookmarked = bookmarkProvider.isBookmarked(earthquake.id);
+              return IconButton(
+                icon: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder:
+                      (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                  child: Icon(
+                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                    key: ValueKey(isBookmarked),
+                    color:
+                        isBookmarked
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                  ),
+                ),
+                tooltip: isBookmarked ? 'Remove Bookmark' : 'Save Earthquake',
+                onPressed: () {
+                  bookmarkProvider.toggleBookmark(earthquake);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isBookmarked
+                            ? 'Removed from saved earthquakes'
+                            : 'Saved to bookmarks',
+                      ),
+                      duration: const Duration(milliseconds: 1500),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
             tooltip: 'Share Earthquake Details',
@@ -148,6 +189,9 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                                       urlTemplate:
                                           "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
                                       userAgentPackageName: 'app.lastquakes',
+                                      tileProvider:
+                                          TileCacheService.instance
+                                              .createCachedProvider(),
                                     ),
                                     MarkerLayer(
                                       markers: [
@@ -291,6 +335,10 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                         value: formattedTime,
                       ),
                       const SizedBox(height: 8),
+                      if (earthquake.alert != null) _buildPagerCard(context),
+                      const SizedBox(height: 8),
+                      _buildSectionHeader(context, "TSUNAMI ASSESSMENT"),
+                      TsunamiRiskCard(earthquake: earthquake),
                     ],
                   ),
                 ),
@@ -306,6 +354,85 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
               context: context,
               hasValidUsgsUrl: hasValidUsgsUrl,
               hasCoordinates: hasCoordinates,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- PAGER Impact Estimate Card ---
+  Widget _buildPagerCard(BuildContext context) {
+    final alert = widget.earthquake.alert!.toLowerCase();
+    Color color;
+    String description;
+    IconData icon;
+
+    switch (alert) {
+      case 'green':
+        color = Colors.green;
+        description = "Little to no economic loss or casualties expected.";
+        icon = Icons.check_circle_outline;
+        break;
+      case 'yellow':
+        color = Colors.yellow.shade700;
+        description = "Some casualties and damage are possible.";
+        icon = Icons.warning_amber_rounded;
+        break;
+      case 'orange':
+        color = Colors.orange.shade800;
+        description =
+            "Significant casualties and damage are likely. Disaster potentially widespread.";
+        icon = Icons.warning_rounded;
+        break;
+      case 'red':
+        color = Colors.red.shade900;
+        description =
+            "Severe casualties and extensive damage are probable. Disaster likely widespread.";
+        icon = Icons.dangerous_outlined;
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                "IMPACT ESTIMATE (PAGER)",
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Alert Level: ${alert.toUpperCase()}",
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            description,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -508,33 +635,52 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
-      child: Wrap(
-        spacing: 12.0,
-        runSpacing: 8.0,
-        alignment: WrapAlignment.center,
+      child: Column(
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.public),
+                label: Text(
+                  (() {
+                    final url = widget.earthquake.url ?? '';
+                    final host = Uri.tryParse(url)?.host ?? '';
+                    if (host.contains('emsc')) return 'View on EMSC';
+                    if (host.contains('usgs')) return 'View on USGS';
+                    return 'View on Web';
+                  })(),
+                ),
+                style: ElevatedButton.styleFrom(elevation: 1),
+                onPressed:
+                    hasValidUsgsUrl
+                        ? () => _launchURL(widget.earthquake.url!)
+                        : null,
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.map_outlined),
+                label: const Text("Open Map"),
+                style: ElevatedButton.styleFrom(elevation: 1),
+                onPressed: hasCoordinates ? _openMap : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           ElevatedButton.icon(
-            icon: const Icon(Icons.public),
-            label: Text(
-              (() {
-                final url = widget.earthquake.url ?? '';
-                final host = Uri.tryParse(url)?.host ?? '';
-                if (host.contains('emsc')) return 'View on EMSC';
-                if (host.contains('usgs')) return 'View on USGS';
-                return 'View on Web';
-              })(),
-            ),
+            icon: const Icon(Icons.compare_arrows),
+            label: const Text("Compare"),
             style: ElevatedButton.styleFrom(elevation: 1),
             onPressed:
-                hasValidUsgsUrl
-                    ? () => _launchURL(widget.earthquake.url!)
-                    : null,
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.map_outlined),
-            label: const Text("Open Map"),
-            style: ElevatedButton.styleFrom(elevation: 1),
-            onPressed: hasCoordinates ? _openMap : null,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => EarthquakeComparisonScreen(
+                          earthquake: widget.earthquake,
+                        ),
+                  ),
+                ),
           ),
         ],
       ),
@@ -701,6 +847,8 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                         "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", // USGS Topo Alt
                     userAgentPackageName:
                         'app.lastquakes', // Use your package name
+                    tileProvider:
+                        TileCacheService.instance.createCachedProvider(),
                   ),
                   MarkerLayer(
                     markers: [

@@ -102,11 +102,32 @@ A comprehensive Flutter application providing real-time global earthquake monito
 ### 🌐 Cross-Platform Support
 
 - **Android**: Full feature support with native optimizations
-- **iOS**: Full feature support with iOS-specific UI adaptations
 - **Web**: Responsive web application with desktop-optimized layouts
-- **Linux**: Desktop application support
-- **macOS**: Desktop application support
-- **Windows**: Desktop application support
+- **Desktop (Planned)**: Future support for Windows, macOS, and Linux
+
+## 🔄 Build Variants
+
+The application supports two build variants: FOSS (Free and Open Source Software) and Production (Prod), with the following key differences:
+
+### App Identity
+- **FOSS**: App name is "LastQuakes FOSS", package ID has `.foss` suffix
+- **Prod**: App name is "LastQuakes", standard package ID
+
+### Firebase Integration
+- **FOSS**: Excludes Google Play Services and Firebase classes entirely from the APK (verified in CI/CD)
+- **Prod**: Includes Firebase dependencies for analytics, crash reporting, and push notifications
+
+### Features
+- **FOSS**: Push notifications and analytics are disabled (UI hides notification settings)
+- **Prod**: Full Firebase-powered push notifications and analytics (Requires Firebase credentials and backend service deployment for push notifications)
+
+### Build Configuration
+- **FOSS**: Uses `android/app/proguard-rules-foss.pro` to strip Firebase/GMS classes and ignore missing dependencies
+- **Prod**: Standard ProGuard rules that preserve Firebase functionality
+
+### Distribution
+- **FOSS**: Designed for F-Droid and other open-source app stores
+- **Prod**: For Google Play Store with full Google services integration
 
 ---
 
@@ -263,7 +284,9 @@ SERVER_URL=https://your-backend-url.com
 
 Replace `https://your-backend-url.com` with your deployed backend URL. This is required for push notifications to function.
 
-### 4. Firebase Setup
+### 4. Firebase Setup (Production Flavor Only)
+
+**Note:** This step is only required if you plan to build the production flavor with Firebase integration. Skip this section if you're only building the FOSS flavor.
 
 #### 4.1 Create Firebase Project
 
@@ -274,15 +297,31 @@ Replace `https://your-backend-url.com` with your deployed backend URL. This is r
 #### 4.2 Configure Android
 
 1. In Firebase Console, add an Android app
-2. Register package name: `com.yourcompany.lastquakes` (or your custom package)
+2. Register package name: `app.lastquakes` (production) or `app.lastquakes.foss` (FOSS)
 3. Download `google-services.json`
-4. Place it in `android/app/` directory
+4. Place it in `android/app/src/prod/` directory (for production flavor)
 
-#### 4.3 Configure Web (Optional)
+**Important:** The production flavor expects the Firebase configuration in `android/app/src/prod/google-services.json`
+
+#### 4.3 Configure iOS (Optional)
+
+1. In Firebase Console, add an iOS app
+2. Register bundle ID: `app.lastquakes`
+3. Download `GoogleService-Info.plist`
+4. Place it in the iOS project
+
+#### 4.4 Configure Web (Optional)
 
 1. In Firebase Console, add a Web app
 2. Copy the Firebase configuration
 3. Update `web/index.html` with Firebase config
+
+#### 4.5 Update VAPID Key for Web Notifications
+
+If building for web with push notifications, update the VAPID key in `lib/services/push_notification_service_firebase.dart`:
+
+1. Get your VAPID key from Firebase Console > Project Settings > Cloud Messaging
+2. Replace `YOUR_VAPID_KEY_HERE` with your actual VAPID key
 
 ### 5. Backend Service Setup
 
@@ -314,33 +353,80 @@ flutter pub run flutter_launcher_icons
 flutter pub run flutter_native_splash:create
 ```
 
-### 7. Run the Application
+### 7. Choose Your Build Flavor
 
-#### For Development (Mobile)
+The application supports two build flavors:
+
+#### Production Flavor (with Firebase)
+- Full Firebase integration (Analytics, Crashlytics, Push Notifications)
+- Requires Firebase configuration (google-services.json)
+- For Google Play Store distribution
+- Entry point: `lib/main_prod.dart`
+
+#### FOSS Flavor (without Firebase)
+- No proprietary services
+- No Firebase or Google Play Services
+- For F-Droid and open-source distribution
+- Entry point: `lib/main.dart`
+
+### 8. Run the Application
+
+#### Development Mode
 
 ```bash
-# Android
-flutter run
+# Run FOSS flavor (default)
+flutter run --flavor foss -t lib/main.dart
 
-# Web
+# Run Production flavor
+flutter run --flavor prod -t lib/main_prod.dart
+
+# Web (uses FOSS by default)
 flutter run -d chrome
-
 ```
 
-#### For Production Build
+#### Production Builds
+
+##### Using Build Scripts (Recommended)
+
+```powershell
+# Build Production APK with Firebase
+.\scripts\build_prod.ps1 -BuildType apk
+
+# Build Production App Bundle for Play Store
+.\scripts\build_prod.ps1 -BuildType appbundle
+
+# Build FOSS APK without Firebase
+.\scripts\build_foss.ps1 -BuildType apk
+
+# Build both APK and App Bundle
+.\scripts\build_prod.ps1 -BuildType both
+
+# Increment build number automatically
+.\scripts\build_prod.ps1 -IncrementBuild -BuildType apk
+```
+
+##### Manual Build Commands
 
 ```bash
-# Android APK
-flutter build apk --release
+# Production flavor (with Firebase)
+flutter build apk --release --flavor prod -t lib/main_prod.dart
+flutter build appbundle --release --flavor prod -t lib/main_prod.dart
 
-# Android App Bundle (for Google Play)
-flutter build appbundle --release
+# FOSS flavor (without Firebase)
+flutter build apk --release --flavor foss -t lib/main.dart
+flutter build appbundle --release --flavor foss -t lib/main.dart
 
-# Web
+# Web (FOSS by default)
 flutter build web --release
 ```
 
-### 8. Certificate Pinning Configuration (Production)
+**Build Outputs:**
+- Production APK: `build/app/outputs/flutter-apk/LastQuakes-*.apk`
+- Production AAB: `build/app/outputs/bundle/prodRelease/app-prod-release.aab`
+- FOSS APK: `build/app/outputs/flutter-apk/LastQuakes-FOSS-*.apk`
+- FOSS AAB: `build/app/outputs/bundle/fossRelease/app-foss-release.aab`
+
+### 9. Certificate Pinning Configuration (Production)
 
 For production environments, update the SSL certificate pins:
 
@@ -354,7 +440,7 @@ dart run scripts/get_certificate_pins.dart
 
 **Important**: Update the certificate pins according to your backend's SSL certificate.
 
-### 9. Platform-Specific Permissions
+### 10. Platform-Specific Permissions
 
 #### Android
 
@@ -365,7 +451,23 @@ Ensure the following permissions are in `android/app/src/main/AndroidManifest.xm
 - `INTERNET`
 - `POST_NOTIFICATIONS` (Android 13+)
 
-### 10. Testing
+### 12. Verifying Your Build Flavor
+
+After building, you can verify which flavor was built:
+
+#### Production Flavor Verification
+- App name shows as "LastQuakes"
+- Settings screen shows notification configuration options
+- Firebase services are active (check logs for "Firebase Analytics initialized")
+- Package ID: `app.lastquakes`
+
+#### FOSS Flavor Verification
+- App name shows as "LastQuakes FOSS"
+- Settings screen hides notification configuration (not available in FOSS)
+- No Firebase services (check logs for "FOSS mode")
+- Package ID: `app.lastquakes.foss`
+
+### 13. Testing
 
 ```bash
 # Run all tests

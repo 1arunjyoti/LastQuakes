@@ -161,6 +161,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.9.0"
+  dio_cache_interceptor:
+    dependency: transitive
+    description:
+      name: dio_cache_interceptor
+      sha256: ac9f312e5a81d79cbccb15f56b78aeae7343a981c1d7c169b11194fae806ec0b
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.5"
   dio_web_adapter:
     dependency: transitive
     description:
@@ -315,6 +323,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_earth_globe:
+    dependency: "direct main"
+    description:
+      name: flutter_earth_globe
+      sha256: "17e907590c8f0bf8c253ef160590dae805de50cb0e3bba4cd6b4c077875cf948"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.2"
   flutter_keyboard_visibility_linux:
     dependency: transitive
     description:
@@ -411,6 +427,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "8.2.2"
+  flutter_map_cache:
+    dependency: "direct main"
+    description:
+      name: flutter_map_cache
+      sha256: fc9697760dc95b6adf75110a23a800ace5d95a735a58ec43f05183bc675c7246
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0+1"
+  flutter_map_heatmap_plus:
+    dependency: "direct main"
+    description:
+      name: flutter_map_heatmap_plus
+      sha256: f7b2b61f4ca6c7e9c723e7bd5146401127e2b75fab3db063fdd6d5546d05df6f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
   flutter_map_marker_cluster:
     dependency: "direct main"
     description:
@@ -506,54 +538,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  geolocator:
-    dependency: "direct main"
-    description:
-      name: geolocator
-      sha256: ee2212a3df8292ec4c90b91183b8001d3f5a800823c974b570c5f9344ca320dc
-      url: "https://pub.dev"
-    source: hosted
-    version: "14.0.1"
-  geolocator_android:
-    dependency: transitive
-    description:
-      name: geolocator_android
-      sha256: "179c3cb66dfa674fc9ccbf2be872a02658724d1c067634e2c427cf6df7df901a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "5.0.2"
-  geolocator_apple:
-    dependency: transitive
-    description:
-      name: geolocator_apple
-      sha256: dbdd8789d5aaf14cf69f74d4925ad1336b4433a6efdf2fce91e8955dc921bf22
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.3.13"
-  geolocator_platform_interface:
-    dependency: "direct main"
-    description:
-      name: geolocator_platform_interface
-      sha256: "30cb64f0b9adcc0fb36f628b4ebf4f731a2961a0ebd849f4b56200205056fe67"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2.6"
-  geolocator_web:
-    dependency: transitive
-    description:
-      name: geolocator_web
-      sha256: b1ae9bdfd90f861fde8fd4f209c37b953d65e92823cb73c7dee1fa021b06f172
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.1.3"
-  geolocator_windows:
-    dependency: transitive
-    description:
-      name: geolocator_windows
-      sha256: "175435404d20278ffd220de83c2ca293b73db95eafbdc8131fe8609be1421eb6"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.5"
   golden_toolkit:
     dependency: "direct dev"
     description:
@@ -570,6 +554,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.3"
+  hive_ce:
+    dependency: transitive
+    description:
+      name: hive_ce
+      sha256: "81d39a03c4c0ba5938260a8c3547d2e71af59defecea21793d57fc3551f0d230"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.15.1"
   hive_flutter:
     dependency: "direct main"
     description:
@@ -578,6 +570,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  home_widget:
+    dependency: "direct main"
+    description:
+      name: home_widget
+      sha256: "7430f7549d42cef2e729bd3c779de748b93f1eb78b1abfe6bca8fffd1cfce3e9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.0+1"
   html:
     dependency: transitive
     description:
@@ -594,6 +594,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.6.0"
+  http_cache_core:
+    dependency: transitive
+    description:
+      name: http_cache_core
+      sha256: ff0b6e6c3766d774d59b806f928b39e6a48f7b2c47ae1fe27410bfd792bee511
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.3"
+  http_cache_hive_store:
+    dependency: "direct main"
+    description:
+      name: http_cache_hive_store
+      sha256: "85847efdb18094961a66b74d3b856da093ddcbaf7739adecdc28149e871fb8fe"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.1"
   http_mock_adapter:
     dependency: "direct dev"
     description:
@@ -639,6 +655,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
+  isolate_channel:
+    dependency: transitive
+    description:
+      name: isolate_channel
+      sha256: f3d36f783b301e6b312c3450eeb2656b0e7d1db81331af2a151d9083a3f6b18d
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2+1"
   js:
     dependency: transitive
     description:
