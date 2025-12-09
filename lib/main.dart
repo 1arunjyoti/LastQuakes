@@ -140,6 +140,7 @@ void main() async {
                 getEarthquakesUseCase: GetEarthquakesUseCase(
                   EarthquakeRepositoryImpl(apiService),
                 ),
+                apiService: apiService,
               )..init(), // Only loads preferences, not data
         ),
         ChangeNotifierProvider(

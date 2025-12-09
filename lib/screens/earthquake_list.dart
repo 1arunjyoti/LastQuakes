@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
 import 'package:lastquakes/widgets/appbar.dart';
 import 'package:lastquakes/widgets/custom_drawer.dart';
+import 'package:lastquakes/widgets/data_source_status_widget.dart';
 import 'package:lastquakes/widgets/earthquake_list_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -50,14 +51,21 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
         ],
       ),
       drawer: const CustomDrawer(),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: EarthquakeListWidget(
-            key: _listKey,
-            showAppBar: true, // We are providing the AppBar via Scaffold
+      body: Column(
+        children: [
+          const DataSourceBanner(),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: EarthquakeListWidget(
+                  key: _listKey,
+                  showAppBar: true, // We are providing the AppBar via Scaffold
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

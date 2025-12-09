@@ -30,7 +30,7 @@ if ($IncrementBuild) {
 # Build APK if requested
 if ($BuildType -eq "apk" -or $BuildType -eq "both") {
     Write-Host "📦 Building FOSS APK..." -ForegroundColor Green
-    flutter build apk --release --flavor foss -t lib/main.dart
+    flutter build apk --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ FOSS APK built successfully!" -ForegroundColor Green
@@ -44,7 +44,7 @@ if ($BuildType -eq "apk" -or $BuildType -eq "both") {
 # Build App Bundle if requested
 if ($BuildType -eq "appbundle" -or $BuildType -eq "both") {
     Write-Host "📦 Building FOSS App Bundle..." -ForegroundColor Green
-    flutter build appbundle --release --flavor foss -t lib/main.dart
+    flutter build appbundle --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ FOSS App Bundle built successfully!" -ForegroundColor Green

@@ -1,1 +1,1 @@
-Real-time global earthquake monitor
+Near real-time global earthquake monitoring application

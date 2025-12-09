@@ -26,99 +26,191 @@ class OnboardingScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildImage(IconData icon, Color color) {
+  Widget _buildImage(BuildContext context, IconData icon, Color iconColor) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      width: 160,
-      height: 160,
+      width: 180,
+      height: 180,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        gradient: RadialGradient(
+          colors: [
+            iconColor.withValues(alpha: isDark ? 0.3 : 0.2),
+            iconColor.withValues(alpha: isDark ? 0.1 : 0.05),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.6, 1.0],
+        ),
         shape: BoxShape.circle,
       ),
-      child: Center(child: Icon(icon, size: 80, color: color)),
+      child: Center(
+        child: Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: isDark ? 0.25 : 0.15),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: iconColor.withValues(alpha: 0.3),
+                blurRadius: 30,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
+          child: Center(child: FaIcon(icon, size: 56, color: iconColor)),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    const bodyStyle = TextStyle(fontSize: 18.0, color: Colors.black54);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    const pageDecoration = PageDecoration(
-      titleTextStyle: TextStyle(
-        fontSize: 26.0,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
-      ),
-      bodyTextStyle: bodyStyle,
-      bodyPadding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
-      pageColor: Colors.white,
-      imagePadding: EdgeInsets.only(top: 40),
-      imageFlex: 2,
-      bodyFlex: 3,
+    final bodyStyle = TextStyle(
+      fontSize: 17.0,
+      color: colorScheme.onSurface.withValues(alpha: 0.8),
+      height: 1.5,
     );
 
-    return IntroductionScreen(
-      globalBackgroundColor: Colors.white,
-      allowImplicitScrolling: true,
+    final pageDecoration = PageDecoration(
+      titleTextStyle: TextStyle(
+        fontSize: 28.0,
+        fontWeight: FontWeight.bold,
+        color: colorScheme.onSurface,
+        letterSpacing: -0.5,
+      ),
+      bodyTextStyle: bodyStyle,
+      bodyPadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 24.0),
+      pageColor: theme.scaffoldBackgroundColor,
+      imagePadding: const EdgeInsets.only(top: 60),
+      imageFlex: 2,
+      bodyFlex: 3,
+      bodyAlignment: Alignment.topCenter,
+      imageAlignment: Alignment.bottomCenter,
+    );
 
-      pages: [
-        PageViewModel(
-          title: "Global Monitoring",
-          body:
-              "Track seismic activity worldwide in real-time from reliable sources.",
-          image: _buildImage(FontAwesomeIcons.earthAmericas, Colors.blue),
-          decoration: pageDecoration,
+    final pages = [
+      // Page 1: Welcome
+      PageViewModel(
+        title: "Welcome to LastQuakes",
+        body:
+            "Your comprehensive earthquake monitoring companion. Stay informed about seismic activity worldwide with real-time data and powerful insights.",
+        image: _buildImage(
+          context,
+          FontAwesomeIcons.houseTsunami,
+          colorScheme.primary,
         ),
-        PageViewModel(
-          title: "Interactive Maps",
-          body:
-              "Visualize earthquake locations and magnitudes on detailed interactive maps.",
-          image: _buildImage(FontAwesomeIcons.mapLocationDot, Colors.teal),
-          decoration: pageDecoration,
+        decoration: pageDecoration,
+      ),
+      // Page 2: Global Monitoring
+      PageViewModel(
+        title: "Global Monitoring",
+        body:
+            "Track earthquakes in real-time from trusted sources including USGS and EMSC. Get comprehensive coverage of seismic events around the world.",
+        image: _buildImage(
+          context,
+          FontAwesomeIcons.earthAmericas,
+          Colors.blue.shade600,
         ),
-        PageViewModel(
-          title: "Smart Alerts",
-          body:
-              "Create Safe Zones and receive instant notifications for earthquakes near you.",
-          image: _buildImage(FontAwesomeIcons.bell, Colors.orange),
-          decoration: pageDecoration,
+        decoration: pageDecoration,
+      ),
+      // Page 3: Interactive Maps
+      PageViewModel(
+        title: "Interactive Maps",
+        body:
+            "Explore earthquakes on beautiful interactive maps. Switch between 2D maps and a stunning 3D globe view to visualize seismic activity.",
+        image: _buildImage(
+          context,
+          FontAwesomeIcons.mapLocationDot,
+          Colors.teal.shade600,
         ),
-        PageViewModel(
-          title: "Detailed Insights",
-          body:
-              "Analyze historical data and trends with comprehensive statistics.",
-          image: _buildImage(FontAwesomeIcons.chartLine, Colors.purple),
-          decoration: pageDecoration,
+        decoration: pageDecoration,
+      ),
+      // Page 4: Detailed Insights
+      PageViewModel(
+        title: "Detailed Insights",
+        body:
+            "Dive deep into earthquake data with comprehensive statistics, historical trends, and magnitude distribution charts.",
+        image: _buildImage(
+          context,
+          FontAwesomeIcons.chartLine,
+          Colors.purple.shade600,
         ),
-      ],
+        decoration: pageDecoration,
+      ),
+    ];
+
+    return IntroductionScreen(
+      globalBackgroundColor: theme.scaffoldBackgroundColor,
+      allowImplicitScrolling: true,
+      pages: pages,
       onDone: () => _onIntroEnd(context),
       onSkip: () => _onIntroEnd(context),
       showSkipButton: true,
       skipOrBackFlex: 0,
       nextFlex: 0,
       showBackButton: false,
-      back: const Icon(Icons.arrow_back),
-      skip: const Text(
+      back: Icon(Icons.arrow_back, color: colorScheme.primary),
+      skip: Text(
         'Skip',
-        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
       ),
-      next: const Icon(Icons.arrow_forward, color: Colors.blue),
-      done: const Text(
-        'Get Started',
-        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue),
+      next: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(Icons.arrow_forward, color: colorScheme.primary),
+      ),
+      done: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primary,
+              colorScheme.primary.withValues(alpha: 0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withValues(alpha: 0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Text(
+          'Get Started',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 16,
+          ),
+        ),
       ),
       curve: Curves.fastLinearToSlowEaseIn,
-      controlsMargin: const EdgeInsets.all(16),
+      controlsMargin: const EdgeInsets.all(20),
       controlsPadding:
           kIsWeb
               ? const EdgeInsets.all(12.0)
               : const EdgeInsets.fromLTRB(8.0, 4.0, 8.0, 4.0),
-      dotsDecorator: const DotsDecorator(
-        size: Size(10.0, 10.0),
-        color: Color(0xFFBDBDBD),
-        activeSize: Size(22.0, 10.0),
-        activeColor: Colors.blue,
+      dotsDecorator: DotsDecorator(
+        size: const Size(8.0, 8.0),
+        color: colorScheme.onSurface.withValues(alpha: 0.2),
+        activeSize: const Size(24.0, 8.0),
+        activeColor: colorScheme.primary,
         activeShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(25.0)),
+          borderRadius: BorderRadius.circular(8.0),
         ),
       ),
     );

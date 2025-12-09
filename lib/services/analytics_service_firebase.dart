@@ -6,15 +6,24 @@ import 'package:lastquakes/utils/secure_logger.dart';
 
 /// Firebase implementation of AnalyticsService for production builds.
 class AnalyticsServiceFirebase implements AnalyticsService {
-  late final FirebaseAnalytics _analytics;
-  late final FirebaseCrashlytics _crashlytics;
+  FirebaseAnalytics? _analytics;
+  FirebaseCrashlytics? _crashlytics;
   bool _isInitialized = false;
+  
+  /// Fallback navigator observer when Firebase is not initialized
+  final NavigatorObserver _fallbackObserver = NavigatorObserver();
 
   @override
   bool get isInitialized => _isInitialized;
 
   @override
-  NavigatorObserver get observer => FirebaseAnalyticsObserver(analytics: _analytics);
+  NavigatorObserver get observer {
+    if (_isInitialized && _analytics != null) {
+      return FirebaseAnalyticsObserver(analytics: _analytics!);
+    }
+    // Return a no-op observer if Firebase isn't initialized
+    return _fallbackObserver;
+  }
 
   @override
   Future<void> initialize() async {
@@ -23,25 +32,27 @@ class AnalyticsServiceFirebase implements AnalyticsService {
       _crashlytics = FirebaseCrashlytics.instance;
       
       // Enable analytics collection
-      await _analytics.setAnalyticsCollectionEnabled(true);
+      await _analytics!.setAnalyticsCollectionEnabled(true);
       
       // Enable crashlytics collection
-      await _crashlytics.setCrashlyticsCollectionEnabled(true);
+      await _crashlytics!.setCrashlyticsCollectionEnabled(true);
       
       _isInitialized = true;
       SecureLogger.success("Firebase Analytics and Crashlytics initialized");
     } catch (e) {
       SecureLogger.error("Failed to initialize Firebase Analytics", e);
       _isInitialized = false;
+      _analytics = null;
+      _crashlytics = null;
     }
   }
 
   @override
   Future<void> logScreenView(String screenName, {String? screenClass}) async {
-    if (!_isInitialized) return;
+    if (!_isInitialized || _analytics == null) return;
     
     try {
-      await _analytics.logScreenView(
+      await _analytics!.logScreenView(
         screenName: screenName,
         screenClass: screenClass ?? screenName,
       );
@@ -59,7 +70,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'earthquake_list_view',
         parameters: {
           'earthquake_count': earthquakeCount,
@@ -82,7 +93,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'earthquake_detail_view',
         parameters: {
           'earthquake_id': earthquakeId,
@@ -106,7 +117,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'map_interaction',
         parameters: {
           'action': action,
@@ -130,11 +141,11 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'data_refresh',
         parameters: {
           'source': source,
-          'success': success,
+          'success': success.toString(),
           if (earthquakeCount != null) 'earthquake_count': earthquakeCount,
           if (loadTimeMs != null) 'load_time_ms': loadTimeMs,
         },
@@ -149,9 +160,9 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'notification_permission',
-        parameters: {'granted': granted},
+        parameters: {'granted': granted.toString()},
       );
     } catch (e) {
       SecureLogger.error("Failed to log notification permission", e);
@@ -167,10 +178,10 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'notification_settings_change',
         parameters: {
-          'enabled': enabled,
+          'enabled': enabled.toString(),
           if (minMagnitude != null) 'min_magnitude': minMagnitude,
           if (radiusKm != null) 'radius_km': radiusKm,
         },
@@ -188,7 +199,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'notification_received',
         parameters: {
           'type': type,
@@ -205,7 +216,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'theme_change',
         parameters: {'theme': theme},
       );
@@ -222,7 +233,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'filter_change',
         parameters: {
           'filter_name': filterName,
@@ -243,7 +254,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logShare(
+      await _analytics!.logShare(
         contentType: contentType,
         itemId: earthquakeId ?? '',
         method: method,
@@ -258,7 +269,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logAppOpen();
+      await _analytics!.logAppOpen();
     } catch (e) {
       SecureLogger.error("Failed to log app open", e);
     }
@@ -269,7 +280,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'onboarding_complete',
         parameters: {},
       );
@@ -286,10 +297,10 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'location_permission',
         parameters: {
-          'granted': granted,
+          'granted': granted.toString(),
           'precision_level': precisionLevel,
         },
       );
@@ -311,7 +322,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     try {
       // Log to Crashlytics
       if (fatal) {
-        await _crashlytics.recordFlutterFatalError(
+        await _crashlytics!.recordFlutterFatalError(
           FlutterErrorDetails(
             exception: error,
             stack: stackTrace,
@@ -320,7 +331,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
           ),
         );
       } else {
-        await _crashlytics.recordError(
+        await _crashlytics!.recordError(
           error,
           stackTrace,
           reason: reason,
@@ -331,17 +342,17 @@ class AnalyticsServiceFirebase implements AnalyticsService {
       // Add custom keys if provided
       if (additionalContext != null) {
         for (var entry in additionalContext.entries) {
-          await _crashlytics.setCustomKey(entry.key, entry.value);
+          await _crashlytics!.setCustomKey(entry.key, entry.value);
         }
       }
       
       // Also log to Analytics
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'error_occurred',
         parameters: {
           'error_type': error.runtimeType.toString(),
           if (reason != null) 'reason': reason,
-          'fatal': fatal,
+          'fatal': fatal.toString(),
         },
       );
     } catch (e) {
@@ -354,7 +365,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _crashlytics.log(message);
+      await _crashlytics!.log(message);
     } catch (e) {
       SecureLogger.error("Failed to log message to Crashlytics", e);
     }
@@ -368,7 +379,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.setUserProperty(name: name, value: value);
+      await _analytics!.setUserProperty(name: name, value: value);
     } catch (e) {
       SecureLogger.error("Failed to set user property", e);
     }
@@ -379,9 +390,9 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.setUserId(id: userId);
+      await _analytics!.setUserId(id: userId);
       if (userId != null) {
-        await _crashlytics.setUserIdentifier(userId);
+        await _crashlytics!.setUserIdentifier(userId);
       }
     } catch (e) {
       SecureLogger.error("Failed to set user ID", e);
@@ -399,13 +410,13 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'api_call',
         parameters: {
           'endpoint': endpoint,
           'response_time_ms': responseTimeMs,
           'status_code': statusCode,
-          'success': success,
+          'success': success.toString(),
           if (errorMessage != null) 'error_message': errorMessage,
         },
       );
@@ -423,7 +434,7 @@ class AnalyticsServiceFirebase implements AnalyticsService {
     if (!_isInitialized) return;
     
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'data_source_switch',
         parameters: {
           'from_source': fromSource,

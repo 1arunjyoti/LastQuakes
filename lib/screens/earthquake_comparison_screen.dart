@@ -38,7 +38,7 @@ class _EarthquakeComparisonScreenState
           .fetchHistoricalComparison(
             earthquake: widget.earthquake,
             radiusKm: 200,
-            magnitudeRange: 1.0,
+            minMagnitude: 4.0, // Fetch all significant earthquakes (M4+)
             yearsBack: 50,
           );
 

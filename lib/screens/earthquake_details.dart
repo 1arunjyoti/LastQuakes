@@ -187,7 +187,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                                   children: [
                                     TileLayer(
                                       urlTemplate:
-                                          "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+                                          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
                                       userAgentPackageName: 'app.lastquakes',
                                       tileProvider:
                                           TileCacheService.instance
@@ -841,12 +841,9 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                 ),
                 children: [
                   TileLayer(
-                    /* urlTemplate:
-                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png", */
                     urlTemplate:
-                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", // USGS Topo Alt
-                    userAgentPackageName:
-                        'app.lastquakes', // Use your package name
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
+                    userAgentPackageName: 'app.lastquakes',
                     tileProvider:
                         TileCacheService.instance.createCachedProvider(),
                   ),

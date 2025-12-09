@@ -12,6 +12,7 @@ import 'package:lastquakes/screens/onboarding_screen.dart';
 import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/services/analytics_service_firebase.dart';
 import 'package:lastquakes/services/bookmark_service.dart';
+import 'package:firebase_performance/firebase_performance.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
 import 'package:lastquakes/services/multi_source_api_service.dart';
 import 'package:lastquakes/services/notification_service.dart';
@@ -30,7 +31,7 @@ import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
 import 'package:lastquakes/presentation/providers/settings_provider.dart';
 import 'package:lastquakes/presentation/providers/map_picker_provider.dart';
 import 'package:lastquakes/data/repositories/settings_repository_impl.dart';
-import 'package:lastquakes/data/repositories/device_repository_noop.dart';
+import 'package:lastquakes/data/repositories/device_repository_impl.dart';
 import 'package:lastquakes/services/home_widget_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -90,6 +91,11 @@ void main() async {
   if (!kIsWeb) {
     await AnalyticsService.instance.initialize();
     await AnalyticsService.instance.logAppOpen();
+    
+    // Enable Firebase Performance Monitoring
+    final performance = FirebasePerformance.instance;
+    await performance.setPerformanceCollectionEnabled(true);
+    SecureLogger.success("Firebase Performance Monitoring enabled");
   }
 
   // Parallelize Phase 2: Secure storage and local notifications initialization
@@ -140,13 +146,14 @@ void main() async {
                 getEarthquakesUseCase: GetEarthquakesUseCase(
                   EarthquakeRepositoryImpl(apiService),
                 ),
+                apiService: apiService,
               )..init(), // Only loads preferences, not data
         ),
         ChangeNotifierProvider(
           create:
               (context) => SettingsProvider(
                 settingsRepository: SettingsRepositoryImpl(apiService),
-                deviceRepository: DeviceRepositoryNoop(),
+                deviceRepository: DeviceRepositoryImpl(),
               )..loadSettings(),
         ),
         ChangeNotifierProvider(create: (_) => MapPickerProvider()),

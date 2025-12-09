@@ -57,7 +57,7 @@ A comprehensive Flutter application providing real-time global earthquake monito
 - **Share Functionality**: Share event details via social media or messaging apps
 - **Screenshot Capability**: Capture and share event information
 
-### 🔔 Customizable Push Notifications
+### 🔔 Customizable Push Notifications (Production Flavor Only)
 
 - **Firebase Cloud Messaging (FCM)**: Reliable push notification delivery
 - **Backend Integration**: Dedicated Node.js backend service for notification processing
@@ -91,6 +91,10 @@ A comprehensive Flutter application providing real-time global earthquake monito
 - **Geographic Distribution**: Breakdown by region and country
 - **Time-Based Analysis**: Hourly, daily, and weekly activity patterns
 
+### Home Screen Widget
+
+- **Home Screen Widget**: Add widget to home screen to display latest earthquakes
+
 ### 🔒 Security Features
 
 - **Certificate Pinning**: Secure HTTPS communication with SSL/TLS pinning
@@ -110,22 +114,27 @@ A comprehensive Flutter application providing real-time global earthquake monito
 The application supports two build variants: FOSS (Free and Open Source Software) and Production (Prod), with the following key differences:
 
 ### App Identity
+
 - **FOSS**: App name is "LastQuakes FOSS", package ID has `.foss` suffix
 - **Prod**: App name is "LastQuakes", standard package ID
 
 ### Firebase Integration
+
 - **FOSS**: Excludes Google Play Services and Firebase classes entirely from the APK (verified in CI/CD)
 - **Prod**: Includes Firebase dependencies for analytics, crash reporting, and push notifications
 
 ### Features
+
 - **FOSS**: Push notifications and analytics are disabled (UI hides notification settings)
 - **Prod**: Full Firebase-powered push notifications and analytics (Requires Firebase credentials and backend service deployment for push notifications)
 
 ### Build Configuration
+
 - **FOSS**: Uses `android/app/proguard-rules-foss.pro` to strip Firebase/GMS classes and ignore missing dependencies
 - **Prod**: Standard ProGuard rules that preserve Firebase functionality
 
 ### Distribution
+
 - **FOSS**: Designed for F-Droid and other open-source app stores
 - **Prod**: For Google Play Store with full Google services integration
 
@@ -137,33 +146,40 @@ The application follows **Clean Architecture** principles with clear separation 
 
 ```
 lib/
-├── main.dart                          # Application entry point & initialization
-├── app_bootstrap.dart                 # Bootstrap configuration and setup
+├── main.dart                          # FOSS flavor entry point & initialization
+├── main_prod.dart                     # Production flavor entry point (with Firebase)
 │
 ├── data/                              # Data Layer
 │   └── repositories/                  # Repository implementations
 │       ├── earthquake_repository_impl.dart
 │       ├── settings_repository_impl.dart
-│       └── device_repository_impl.dart
+│       ├── device_repository_impl.dart
+│       └── device_repository_noop.dart  # No-op implementation for FOSS
 │
 ├── domain/                            # Domain Layer (Business Logic)
 │   ├── models/                        # Domain models
+│   │   └── notification_settings_model.dart
 │   ├── repositories/                  # Repository interfaces
-│   ├── usecases/                      # Use cases
-│   │   └── get_earthquakes_usecase.dart
-│   └── services/                      # Domain services
+│   │   ├── device_repository.dart
+│   │   ├── earthquake_repository.dart
+│   │   └── settings_repository.dart
+│   └── usecases/                      # Use cases
+│       └── get_earthquakes_usecase.dart
 │
 ├── presentation/                      # Presentation Layer
 │   └── providers/                     # State management (Provider pattern)
 │       ├── earthquake_provider.dart   # Earthquake data state management
 │       ├── settings_provider.dart     # Settings & notification state
-│       └── map_picker_provider.dart   # Map interaction state
+│       ├── map_picker_provider.dart   # Map interaction state
+│       └── bookmark_provider.dart     # Bookmark state management
 │
 ├── screens/                           # UI Screens
 │   ├── home_screen.dart              # Main navigation hub
 │   ├── earthquake_list.dart          # List view of earthquakes
 │   ├── earthquake_map_screen.dart    # Map view screen
 │   ├── earthquake_details.dart       # Detailed event information
+│   ├── earthquake_comparison_screen.dart  # Historical comparison view
+│   ├── bookmarks_screen.dart         # Saved earthquakes view
 │   ├── settings_screen.dart          # User preferences and configuration
 │   ├── statistics_screen.dart        # Data analytics and charts
 │   ├── map_picker_screen.dart        # Location picker for safe zones
@@ -172,49 +188,76 @@ lib/
 │   └── subscreens/                   # Sub-screens
 │       ├── about_screen.dart         # App information
 │       ├── emergency_contacts_screen.dart
-│       ├── privacy_policy_screen.dart
-│       └── terms_and_conditions_screen.dart
+│       ├── preparedness_screen.dart  # Earthquake preparedness tips
+│       └── quiz_screen.dart          # Preparedness quiz
 │
 ├── widgets/                           # Reusable UI Components
 │   ├── appbar.dart                   # Custom app bar
 │   ├── custom_drawer.dart            # Navigation drawer
 │   ├── earthquake_list_item.dart     # List item card
 │   ├── earthquake_list_widget.dart   # Complete list view widget
-│   ├── earthquake_map_widget.dart    # Complete map widget
-│   ├── components/                   # Shared components
+│   ├── earthquake_map_widget.dart    # Complete map widget (2D)
+│   ├── earthquake_globe_widget.dart  # 3D globe visualization
+│   ├── data_source_status_widget.dart  # Data source status display
+│   ├── components/                   # Map & shared components
+│   │   ├── earthquake_bottom_sheet.dart  # Map earthquake details popup
+│   │   ├── location_button.dart      # GPS location button
+│   │   ├── map_layers_button.dart    # Map layer selector
+│   │   ├── map_legend.dart           # Magnitude legend
+│   │   ├── tsunami_risk_card.dart    # Tsunami risk indicator
+│   │   └── zoom_controls.dart        # Map zoom controls
 │   ├── settings/                     # Settings screen widgets
 │   │   ├── theme_settings_card.dart
 │   │   ├── units_settings_card.dart
-│   │   └── clock_settings_card.dart
+│   │   ├── clock_settings_card.dart
+│   │   ├── cache_settings_card.dart  # Clear cache functionality
+│   │   ├── data_source_settings_card.dart
+│   │   └── notification_settings_card.dart
 │   └── statistics/                   # Statistics visualization widgets
+│       └── simple_line_chart.dart
 │
 ├── services/                          # Service Layer
-│   ├── api_service.dart              # USGS API integration
+│   ├── api_service.dart              # Base API integration
 │   ├── multi_source_api_service.dart # Multi-source data aggregation
-│   ├── notification_service.dart     # FCM & local notifications
+│   ├── notification_service.dart     # Local notifications
+│   ├── push_notification_service.dart  # Push notification interface
+│   ├── push_notification_service_firebase.dart  # Firebase FCM implementation
+│   ├── push_notification_service_noop.dart  # No-op for FOSS
 │   ├── location_service.dart         # GPS & geolocation
-│   ├── earthquake_cache_service.dart # Hive-based caching
+│   ├── earthquake_cache_service.dart # Hive-based earthquake caching
+│   ├── tile_cache_service.dart       # Map tile caching
+│   ├── bookmark_service.dart         # Earthquake bookmarks persistence
+│   ├── globe_cluster_service.dart    # 3D globe marker clustering
+│   ├── home_widget_service.dart      # Android home screen widget
+│   ├── historical_comparison_service.dart  # Historical data comparison
 │   ├── secure_http_client.dart       # HTTPS with certificate pinning
+│   ├── http_client_factory.dart      # Platform-agnostic HTTP client
+│   ├── http_client_factory_io.dart   # Mobile/desktop HTTP client
+│   ├── http_client_factory_web.dart  # Web HTTP client
 │   ├── encryption_service.dart       # AES-256 encryption utilities
 │   ├── secure_storage_service.dart   # Encrypted key-value storage
 │   ├── secure_token_service.dart     # FCM token management
 │   ├── token_migration_service.dart  # Legacy token migration
-│   ├── analytics_service.dart        # Firebase Analytics integration
+│   ├── analytics_service.dart        # Analytics interface
+│   ├── analytics_service_firebase.dart  # Firebase Analytics implementation
+│   ├── analytics_service_noop.dart   # No-op analytics for FOSS
 │   ├── preferences_service.dart      # User preferences management
 │   ├── earthquake_statistics.dart    # Statistical calculations
 │   ├── sources/                      # Data source implementations
-│   │   ├── usgs_data_source.dart
-│   │   ├── emsc_data_source.dart
-│   │   └── data_source_interface.dart
-│   └── cache_manager/                # Caching strategy implementations
-│       ├── cache_manager.dart
-│       ├── memory_cache.dart
-│       └── hive_cache.dart
+│   │   ├── earthquake_data_source.dart  # Data source interface
+│   │   ├── usgs_data_source.dart     # USGS API implementation
+│   │   └── emsc_data_source.dart     # EMSC API implementation
+│   └── cache_manager/                # Platform-specific caching
+│       ├── cache_manager.dart        # Cache manager interface
+│       ├── cache_manager_io.dart     # Mobile/desktop implementation
+│       └── cache_manager_web.dart    # Web implementation
 │
 ├── models/                            # Data Models
 │   ├── earthquake.dart               # Core earthquake model
 │   ├── earthquake_adapter.dart       # Hive type adapter
-│   └── safe_zone.dart                # Safe zone location model
+│   ├── safe_zone.dart                # Safe zone location model
+│   ├── push_message.dart             # Push notification message model
+│   └── data_source_status.dart       # Data source status model
 │
 ├── provider/                          # Legacy Providers (to be migrated)
 │   └── theme_provider.dart           # Theme state management
@@ -229,9 +272,6 @@ lib/
 ├── theme/                             # Application Theming
 │   ├── app_theme.dart                # Light & dark themes
 │   └── app_gradients.dart            # Gradient definitions
-│
-└── config/                            # Configuration Files
-    └── [Configuration files if any]
 ```
 
 ### Design Patterns Used
@@ -253,12 +293,18 @@ lib/
 
 Before you begin, ensure you have the following installed:
 
-- **Flutter SDK** (3.7.2 or higher)
-- **Dart SDK** (3.7.2 or higher) - Comes with Flutter
-- **Android Studio** or **VS Code** with Flutter extensions
+- **Flutter SDK** (3.7.2 or higher) - Latest stable recommended
+- **Dart SDK** (3.7.2 or higher) - Comes bundled with Flutter
+- **Java JDK 17** - Required for Android builds
+- **Android Studio** or **VS Code** with Flutter/Dart extensions
 - **Git** for version control
-- **Firebase Account** for push notifications
-- **Node.js** (for backend deployment) - Optional but required for notifications
+- **Firebase Account** - Only required for production flavor with push notifications
+- **Node.js** (for backend deployment) - Optional, required only for push notifications
+
+### Important Notes
+
+- To build only FOSS flavor, Remove these files (main_prod.dart, analytics_service_firebase.dart, push_notification_service_firebase.dart and other firebase related files), remove firebase dependencies from pubspec.yaml, build.gradle.kts and app/build.gradle.kts. This will ensure that the app builds without any firebase related code.
+- Prefer the f-droid branch for building the FOSS flavor app.
 
 ### 1. Clone the Repository
 
@@ -278,194 +324,216 @@ flutter pub get
 Create a `.env` file in the root directory:
 
 ```bash
-# Server Configuration
+# Server Configuration (required for push notifications)
 SERVER_URL=https://your-backend-url.com
 ```
 
-Replace `https://your-backend-url.com` with your deployed backend URL. This is required for push notifications to function.
+> **Note:** The `.env` file is required for the app to build. For FOSS builds without push notifications, you can use a placeholder URL.
 
-### 4. Firebase Setup (Production Flavor Only)
+### 4. Asset Files
 
-**Note:** This step is only required if you plan to build the production flavor with Firebase integration. Skip this section if you're only building the FOSS flavor.
+The application includes the following asset directories:
 
-#### 4.1 Create Firebase Project
+```
+assets/
+├── globe/      # 3D globe textures and resources
+├── icon/       # App icon source files
+└── splash/     # Splash screen images
+```
+
+These are already included in the repository. If you need to regenerate icons or splash screens, see Step 7.
+
+### 5. Firebase Setup (Production Flavor Only)
+
+> **Skip this section** if you're only building the FOSS flavor without Firebase.
+
+#### 5.1 Create Firebase Project
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Create a new project or select an existing one
-3. Enable **Cloud Messaging**, **Analytics**, and **Crashlytics**
+3. Enable the following services:
+   - **Cloud Messaging** (for push notifications)
+   - **Analytics** (for usage analytics)
+   - **Crashlytics** (for crash reporting)
+   - **Performance** (for performance monitoring)
 
-#### 4.2 Configure Android
+#### 5.2 Configure Android
 
 1. In Firebase Console, add an Android app
-2. Register package name: `app.lastquakes` (production) or `app.lastquakes.foss` (FOSS)
+2. Register package name: `app.lastquakes`
 3. Download `google-services.json`
-4. Place it in `android/app/src/prod/` directory (for production flavor)
+4. Place it in `android/app/src/prod/` directory
 
-**Important:** The production flavor expects the Firebase configuration in `android/app/src/prod/google-services.json`
+> **Important:** The production flavor expects Firebase configuration at `android/app/src/prod/google-services.json`
 
-#### 4.3 Configure iOS (Optional)
+#### 5.3 Configure iOS (Optional)
 
 1. In Firebase Console, add an iOS app
 2. Register bundle ID: `app.lastquakes`
 3. Download `GoogleService-Info.plist`
-4. Place it in the iOS project
+4. Place it in `ios/Runner/` directory
 
-#### 4.4 Configure Web (Optional)
+#### 5.4 Configure Web (Optional)
 
 1. In Firebase Console, add a Web app
-2. Copy the Firebase configuration
-3. Update `web/index.html` with Firebase config
+2. Copy the Firebase configuration object
+3. Update `web/index.html` with your Firebase config
 
-#### 4.5 Update VAPID Key for Web Notifications
+#### 5.5 Update VAPID Key for Web Notifications
 
-If building for web with push notifications, update the VAPID key in `lib/services/push_notification_service_firebase.dart`:
+For web push notifications, update the VAPID key in `lib/services/push_notification_service_firebase.dart`:
 
 1. Get your VAPID key from Firebase Console > Project Settings > Cloud Messaging
 2. Replace `YOUR_VAPID_KEY_HERE` with your actual VAPID key
 
-### 5. Backend Service Setup
+### 6. Backend Service Setup (Production Only)
 
 The backend service is required for push notifications to function.
 
-#### Deploy Your Own Backend
-
-1. Clone the backend repository (if available separately)
-2. Deploy to a hosting provider (Render, Heroku, AWS, etc.)
-3. Update `.env` file with your backend URL
-4. Ensure the backend has access to Firebase Admin SDK for FCM
-
 **Backend Requirements:**
 
-- Node.js server with Express
+- Node.js server (Express recommended)
 - Firebase Admin SDK integration
-- Endpoints for:
-  - `/register` - Register FCM tokens
-  - `/update-settings` - Update notification preferences
-  - Webhook for USGS earthquake feed
+- API Endpoints:
+  - `POST /register` - Register FCM tokens
+  - `POST /update-settings` - Update notification preferences
+  - Webhook integration for USGS/EMSC earthquake feeds
 
-### 6. Generate App Icons and Splash Screen
+**Deployment Options:**
+
+1. Clone the backend repository (if available separately) or build your own backend service
+2. Deploy to a hosting provider (Render, Railway, Heroku, AWS, etc.)
+3. Update `.env` file with your backend URL
+4. Configure Firebase Admin SDK credentials on your server
+
+### 7. Generate App Icons and Splash Screen
 
 ```bash
-# Generate app icons
-flutter pub run flutter_launcher_icons
+# Generate app icons for all platforms
+dart run flutter_launcher_icons
 
-# Generate splash screen
-flutter pub run flutter_native_splash:create
+# Generate native splash screen
+dart run flutter_native_splash:create
 ```
 
-### 7. Choose Your Build Flavor
+### 8. Build Flavors
 
 The application supports two build flavors:
 
-#### Production Flavor (with Firebase)
-- Full Firebase integration (Analytics, Crashlytics, Push Notifications)
-- Requires Firebase configuration (google-services.json)
-- For Google Play Store distribution
-- Entry point: `lib/main_prod.dart`
+| Feature                | Production            | FOSS                  |
+| ---------------------- | --------------------- | --------------------- |
+| **App Name**           | LastQuakes            | LastQuakes FOSS       |
+| **Package ID**         | `app.lastquakes`      | `app.lastquakes.foss` |
+| **Entry Point**        | `lib/main_prod.dart`  | `lib/main.dart`       |
+| **Firebase**           | ✅ Full integration   | ❌ Excluded           |
+| **Push Notifications** | ✅ Available          | ❌ Disabled           |
+| **Analytics**          | ✅ Firebase Analytics | ❌ No-op              |
+| **Distribution**       | Google Play Store     | F-Droid, GitHub       |
 
-#### FOSS Flavor (without Firebase)
-- No proprietary services
-- No Firebase or Google Play Services
-- For F-Droid and open-source distribution
-- Entry point: `lib/main.dart`
-
-### 8. Run the Application
+### 9. Run the Application
 
 #### Development Mode
 
 ```bash
-# Run FOSS flavor (default)
-flutter run --flavor foss -t lib/main.dart
+# Run FOSS flavor (default, no Firebase required)
+flutter run --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
-# Run Production flavor
-flutter run --flavor prod -t lib/main_prod.dart
+# Run Production flavor (requires Firebase setup)
+flutter run --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
-# Web (uses FOSS by default)
+# Run on Web (uses FOSS by default)
 flutter run -d chrome
+
+# Run on specific device
+flutter run --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart -d <device-id>
 ```
 
 #### Production Builds
 
-##### Using Build Scripts (Recommended)
+##### Using Build Scripts (Windows - Recommended)
 
 ```powershell
-# Build Production APK with Firebase
+# Build FOSS APK (no Firebase)
+.\scripts\build_foss.ps1 -BuildType apk
+
+# Build Production APK (with Firebase)
 .\scripts\build_prod.ps1 -BuildType apk
 
-# Build Production App Bundle for Play Store
+# Build App Bundle for Play Store
 .\scripts\build_prod.ps1 -BuildType appbundle
-
-# Build FOSS APK without Firebase
-.\scripts\build_foss.ps1 -BuildType apk
 
 # Build both APK and App Bundle
 .\scripts\build_prod.ps1 -BuildType both
 
-# Increment build number automatically
+# Auto-increment build number
 .\scripts\build_prod.ps1 -IncrementBuild -BuildType apk
 ```
 
 ##### Manual Build Commands
 
 ```bash
-# Production flavor (with Firebase)
-flutter build apk --release --flavor prod -t lib/main_prod.dart
-flutter build appbundle --release --flavor prod -t lib/main_prod.dart
-
 # FOSS flavor (without Firebase)
-flutter build apk --release --flavor foss -t lib/main.dart
-flutter build appbundle --release --flavor foss -t lib/main.dart
+flutter build apk --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
+flutter build appbundle --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
-# Web (FOSS by default)
+# Production flavor (with Firebase)
+flutter build apk --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
+flutter build appbundle --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
+
+# Web build
 flutter build web --release
 ```
 
-**Build Outputs:**
-- Production APK: `build/app/outputs/flutter-apk/LastQuakes-*.apk`
-- Production AAB: `build/app/outputs/bundle/prodRelease/app-prod-release.aab`
-- FOSS APK: `build/app/outputs/flutter-apk/LastQuakes-FOSS-*.apk`
-- FOSS AAB: `build/app/outputs/bundle/fossRelease/app-foss-release.aab`
+**Build Output Locations:**
 
-### 9. Certificate Pinning Configuration (Production)
+| Build Type     | Output Path                                                 |
+| -------------- | ----------------------------------------------------------- |
+| FOSS APK       | `build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk`  |
+| FOSS AAB       | `build/app/outputs/bundle/fossRelease/app-foss-release.aab` |
+| Production APK | `build/app/outputs/apk/prod/release/LastQuakes-*.apk`       |
+| Production AAB | `build/app/outputs/bundle/prodRelease/app-prod-release.aab` |
+| Web            | `build/web/`                                                |
 
-For production environments, update the SSL certificate pins:
+### 10. Certificate Pinning (Production)
+
+For enhanced security in production, configure SSL certificate pinning:
 
 ```bash
-# Extract current certificate pins
+# Extract certificate pins for your backend
 dart run scripts/get_certificate_pins.dart
 
-# Update pins in lib/services/secure_http_client.dart
-# Change development mode to production in certificate validation
+# Additional certificate utilities
+dart run scripts/extract_pins.dart
+dart run scripts/monitor_certificates.dart
 ```
 
-**Important**: Update the certificate pins according to your backend's SSL certificate.
+Update the pins in `lib/services/secure_http_client.dart` with your backend's certificate fingerprints.
 
-### 10. Platform-Specific Permissions
+### 11. Platform-Specific Permissions
 
-#### Android
+#### Android Permissions
 
-Ensure the following permissions are in `android/app/src/main/AndroidManifest.xml`:
+The following permissions are configured in `android/app/src/main/AndroidManifest.xml`:
 
-- `ACCESS_FINE_LOCATION`
-- `ACCESS_COARSE_LOCATION`
-- `INTERNET`
-- `POST_NOTIFICATIONS` (Android 13+)
+| Permission                   | Purpose                                    |
+| ---------------------------- | ------------------------------------------ |
+| `INTERNET`                   | Network access for API calls               |
+| `ACCESS_FINE_LOCATION`       | Precise location for distance calculations |
+| `ACCESS_COARSE_LOCATION`     | Approximate location                       |
+| `ACCESS_BACKGROUND_LOCATION` | Background location for notifications      |
+| `POST_NOTIFICATIONS`         | Push notifications (Android 13+)           |
+| `RECEIVE_BOOT_COMPLETED`     | Restart services after device boot         |
 
-### 12. Verifying Your Build Flavor
+### 12. Verify Build Flavor
 
-After building, you can verify which flavor was built:
+After building, verify the correct flavor was built:
 
-#### Production Flavor Verification
-- App name shows as "LastQuakes"
-- Settings screen shows notification configuration options
-- Firebase services are active (check logs for "Firebase Analytics initialized")
-- Package ID: `app.lastquakes`
-
-#### FOSS Flavor Verification
-- App name shows as "LastQuakes FOSS"
-- Settings screen hides notification configuration (not available in FOSS)
-- No Firebase services (check logs for "FOSS mode")
-- Package ID: `app.lastquakes.foss`
+| Check                     | Production                       | FOSS                            |
+| ------------------------- | -------------------------------- | ------------------------------- |
+| **App Name**              | "LastQuakes"                     | "LastQuakes FOSS"               |
+| **Notification Settings** | Visible in Settings              | Hidden                          |
+| **Logs**                  | "Firebase Analytics initialized" | "FOSS mode - Firebase disabled" |
+| **APK Contents**          | Contains `com/google/firebase`   | No Firebase classes             |
 
 ### 13. Testing
 
@@ -473,15 +541,39 @@ After building, you can verify which flavor was built:
 # Run all tests
 flutter test
 
-# Run unit tests
+# Run unit tests only
 flutter test test/unit/
 
-# Run widget tests
+# Run widget tests only
 flutter test test/widget/
+
+# Run with coverage
+flutter test --coverage
 
 # Run integration tests
 flutter test integration_test/
+
+# Run specific test file
+flutter test test/unit/services/multi_source_api_service_test.dart
 ```
+
+### 14. CI/CD Integration
+
+The project includes GitHub Actions workflows:
+
+- **`build-foss-apk.yml`** - Builds signed FOSS APK on tag push (v\*)
+  - Verifies no Firebase/GMS classes in APK
+  - Uploads artifacts and creates GitHub releases
+  - Uses GitHub Secrets for signing
+
+**Required GitHub Secrets for CI/CD:**
+
+| Secret              | Description                  |
+| ------------------- | ---------------------------- |
+| `KEYSTORE_BASE64`   | Base64-encoded keystore file |
+| `KEYSTORE_PASSWORD` | Keystore password            |
+| `KEY_PASSWORD`      | Key password                 |
+| `KEY_ALIAS`         | Key alias name               |
 
 ---
 
@@ -493,7 +585,7 @@ By default, both USGS and EMSC are enabled. Users can configure this in Settings
 
 **USGS Configuration:**
 
-- Endpoint: `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/`
+- Endpoint: configured in `usgs_data_source.dart`
 - Data format: GeoJSON
 - Update frequency: Every 5 minutes (from USGS)
 
@@ -503,7 +595,7 @@ By default, both USGS and EMSC are enabled. Users can configure this in Settings
 - Data format: JSON
 - Coverage: European-Mediterranean region
 
-### Notification System
+### Notification System (Production Flavor Only)
 
 Notifications use Firebase Cloud Messaging with a backend service for filtering:
 
@@ -543,7 +635,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 - **EMSC** for European-Mediterranean seismic information
 - **Firebase** for backend infrastructure
 - **Flutter Community** for excellent packages and support
-- **OpenStreetMap** for map tiles
+- **OpenStreetMap, ArcGIS** for map tiles
 
 ---
 
@@ -569,3 +661,7 @@ For issues, questions, or feature requests, please:
 ---
 
 **Note**: This is an independent project and is not officially affiliated with USGS, EMSC, or any government seismological organization.
+
+```
+
+```

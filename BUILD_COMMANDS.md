@@ -7,21 +7,23 @@ This guide provides all the commands needed to run and build the LastQuakes app 
 ## 📱 Development (Run on Device/Emulator)
 
 ### FOSS Flavor
+
 ```bash
 # Run in debug mode
-flutter run --flavor foss -t lib/main.dart
+flutter run --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Run in release mode
-flutter run --release --flavor foss -t lib/main.dart
+flutter run --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 ```
 
 ### Production Flavor
+
 ```bash
 # Run in debug mode
-flutter run --flavor prod -t lib/main_prod.dart
+flutter run --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
 # Run in release mode
-flutter run --release --flavor prod -t lib/main_prod.dart
+flutter run --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 ```
 
 ---
@@ -31,6 +33,7 @@ flutter run --release --flavor prod -t lib/main_prod.dart
 ### FOSS Flavor
 
 #### Using Build Script (Recommended)
+
 ```powershell
 # Build APK
 .\scripts\build_foss.ps1 -BuildType apk
@@ -46,20 +49,22 @@ flutter run --release --flavor prod -t lib/main_prod.dart
 ```
 
 #### Manual Commands
+
 ```bash
 # Build APK
-flutter build apk --release --flavor foss -t lib/main.dart
+flutter build apk --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Build App Bundle
-flutter build appbundle --release --flavor foss -t lib/main.dart
+flutter build appbundle --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Build split APKs per ABI (smaller files)
-flutter build apk --release --flavor foss -t lib/main.dart --split-per-abi
+flutter build apk --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart --split-per-abi
 ```
 
 ### Production Flavor
 
 #### Using Build Script (Recommended)
+
 ```powershell
 # Build APK
 .\scripts\build_prod.ps1 -BuildType apk
@@ -75,15 +80,16 @@ flutter build apk --release --flavor foss -t lib/main.dart --split-per-abi
 ```
 
 #### Manual Commands
+
 ```bash
 # Build APK
-flutter build apk --release --flavor prod -t lib/main_prod.dart
+flutter build apk --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
 # Build App Bundle (for Google Play Store)
-flutter build appbundle --release --flavor prod -t lib/main_prod.dart
+flutter build appbundle --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
 # Build split APKs per ABI
-flutter build apk --release --flavor prod -t lib/main_prod.dart --split-per-abi
+flutter build apk --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart --split-per-abi
 ```
 
 ---
@@ -91,11 +97,13 @@ flutter build apk --release --flavor prod -t lib/main_prod.dart --split-per-abi
 ## 📦 Output Locations
 
 ### FOSS Builds
+
 - **APK**: `build/app/outputs/flutter-apk/LastQuakes-FOSS-*.apk`
 - **Split APKs**: `build/app/outputs/flutter-apk/app-foss-release-*.apk`
 - **App Bundle**: `build/app/outputs/bundle/fossRelease/app-foss-release.aab`
 
 ### Production Builds
+
 - **APK**: `build/app/outputs/flutter-apk/LastQuakes-*.apk`
 - **Split APKs**: `build/app/outputs/flutter-apk/app-prod-release-*.apk`
 - **App Bundle**: `build/app/outputs/bundle/prodRelease/app-prod-release.aab`
@@ -105,6 +113,7 @@ flutter build apk --release --flavor prod -t lib/main_prod.dart --split-per-abi
 ## 🛠️ Utility Commands
 
 ### Project Setup
+
 ```bash
 # Get dependencies
 flutter pub get
@@ -123,6 +132,7 @@ flutter pub run flutter_native_splash:create
 ```
 
 ### Build Number Management
+
 ```bash
 # Increment build number
 dart run scripts/increment_build_number.dart
@@ -132,6 +142,7 @@ grep "version:" pubspec.yaml
 ```
 
 ### Code Quality
+
 ```bash
 # Analyze all code
 flutter analyze
@@ -150,6 +161,7 @@ flutter test test/unit/earthquake_test.dart
 ```
 
 ### Device Management
+
 ```bash
 # List connected devices
 flutter devices
@@ -174,6 +186,7 @@ adb logcat | grep -i lastquakes
 ```
 
 ### Certificate & Security
+
 ```bash
 # Extract certificate pins
 dart run scripts/get_certificate_pins.dart
@@ -189,18 +202,18 @@ dart run scripts/monitor_certificates.dart
 
 ## 🔄 Build Comparison
 
-| Aspect | FOSS | Production |
-|--------|------|------------|
-| **Entry Point** | `lib/main.dart` | `lib/main_prod.dart` |
-| **Flavor Flag** | `--flavor foss` | `--flavor prod` |
-| **Package ID** | `app.lastquakes.foss` | `app.lastquakes` |
-| **App Name** | "LastQuakes FOSS" | "LastQuakes" |
-| **Firebase** | ❌ Not included | ✅ Included |
-| **Analytics** | ❌ Disabled | ✅ Enabled |
-| **Push Notifications** | ❌ Disabled | ✅ Enabled |
-| **Crashlytics** | ❌ Disabled | ✅ Enabled |
-| **Distribution** | F-Droid | Google Play Store |
-| **ProGuard Rules** | `proguard-rules-foss.pro` | `proguard-rules.pro` |
+| Aspect                 | FOSS                      | Production           |
+| ---------------------- | ------------------------- | -------------------- |
+| **Entry Point**        | `lib/main.dart`           | `lib/main_prod.dart` |
+| **Flavor Flag**        | `--flavor foss`           | `--flavor prod`      |
+| **Package ID**         | `app.lastquakes.foss`     | `app.lastquakes`     |
+| **App Name**           | "LastQuakes FOSS"         | "LastQuakes"         |
+| **Firebase**           | ❌ Not included           | ✅ Included          |
+| **Analytics**          | ❌ Disabled               | ✅ Enabled           |
+| **Push Notifications** | ❌ Disabled               | ✅ Enabled           |
+| **Crashlytics**        | ❌ Disabled               | ✅ Enabled           |
+| **Distribution**       | F-Droid                   | Google Play Store    |
+| **ProGuard Rules**     | `proguard-rules-foss.pro` | `proguard-rules.pro` |
 
 ---
 
@@ -226,10 +239,10 @@ build/web/
 
 ```bash
 # Build iOS (Production flavor)
-flutter build ios --release --flavor prod -t lib/main_prod.dart
+flutter build ios --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
 # Build iOS (FOSS flavor)
-flutter build ios --release --flavor foss -t lib/main.dart
+flutter build ios --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 ```
 
 ---
@@ -255,26 +268,29 @@ flutter build windows --release
 ## 🔍 Debugging
 
 ### Run with Verbose Output
+
 ```bash
 # FOSS with verbose logging
-flutter run --flavor foss -t lib/main.dart -v
+flutter run --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart -v
 
 # Production with verbose logging
-flutter run --flavor prod -t lib/main_prod.dart -v
+flutter run --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart -v
 ```
 
 ### Profile Mode
+
 ```bash
 # FOSS profile build
-flutter run --profile --flavor foss -t lib/main.dart
+flutter run --profile --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Production profile build
-flutter run --profile --flavor prod -t lib/main_prod.dart
+flutter run --profile --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 ```
 
 ### Build with Verbose Output
+
 ```bash
-flutter build apk --release --flavor prod -t lib/main_prod.dart -v
+flutter build apk --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart -v
 ```
 
 ---
@@ -282,6 +298,7 @@ flutter build apk --release --flavor prod -t lib/main_prod.dart -v
 ## 📝 Common Workflows
 
 ### First Time Setup
+
 ```bash
 # Clone and setup
 git clone <repository-url>
@@ -292,16 +309,19 @@ flutter pub run flutter_native_splash:create
 ```
 
 ### Daily Development (FOSS)
+
 ```bash
-flutter run --flavor foss -t lib/main.dart
+flutter run --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 ```
 
 ### Daily Development (Production)
+
 ```bash
-flutter run --flavor prod -t lib/main_prod.dart
+flutter run --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 ```
 
 ### Pre-Release Build (FOSS for F-Droid)
+
 ```bash
 flutter clean
 flutter pub get
@@ -309,6 +329,7 @@ flutter pub get
 ```
 
 ### Pre-Release Build (Production for Play Store)
+
 ```bash
 flutter clean
 flutter pub get
@@ -316,12 +337,13 @@ flutter pub get
 ```
 
 ### Quick Test Build
+
 ```bash
 # FOSS
-flutter build apk --flavor foss -t lib/main.dart
+flutter build apk --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Production
-flutter build apk --flavor prod -t lib/main_prod.dart
+flutter build apk --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 ```
 
 ---
@@ -329,17 +351,20 @@ flutter build apk --flavor prod -t lib/main_prod.dart
 ## ⚠️ Important Notes
 
 ### Before Building Production
+
 1. Ensure `android/app/src/prod/google-services.json` exists
 2. Configure Firebase project (see `readme files/FIREBASE_SETUP.md`)
 3. Update `.env` file with `SERVER_URL` if using backend
 4. Verify certificate pinning configuration for production
 
 ### Before Building FOSS
+
 1. No Firebase configuration needed
 2. No backend configuration required
 3. All proprietary services are automatically excluded
 
 ### Signing Configuration
+
 - Signing configuration is in `android/key.properties`
 - Required for release builds
 - See `readme files/build.md` for signing setup
@@ -349,15 +374,17 @@ flutter build apk --flavor prod -t lib/main_prod.dart
 ## 🆘 Troubleshooting
 
 ### Build Fails with "google-services.json not found"
+
 ```bash
 # Ensure file exists at:
 android/app/src/prod/google-services.json
 
 # Or build FOSS flavor instead:
-flutter build apk --release --flavor foss -t lib/main.dart
+flutter build apk --release --flavor foss --dart-define=FLAVOR=foss -t lib/main.dart
 ```
 
 ### "Duplicate class found" Error
+
 ```bash
 flutter clean
 flutter pub get
@@ -365,6 +392,7 @@ flutter pub get
 ```
 
 ### APK Not Installing
+
 ```bash
 # Uninstall existing version first
 adb uninstall app.lastquakes       # Production
@@ -375,6 +403,7 @@ adb install -r build/app/outputs/flutter-apk/[apk-file].apk
 ```
 
 ### Gradle Build Fails
+
 ```bash
 # Navigate to android directory
 cd android

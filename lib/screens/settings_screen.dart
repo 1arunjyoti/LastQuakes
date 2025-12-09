@@ -10,6 +10,7 @@ import 'package:lastquakes/provider/theme_provider.dart';
 import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/utils/enums.dart';
 import 'package:lastquakes/widgets/appbar.dart';
+import 'package:lastquakes/widgets/data_source_status_widget.dart';
 import 'package:lastquakes/widgets/settings/clock_settings_card.dart';
 import 'package:lastquakes/widgets/settings/theme_settings_card.dart';
 import 'package:lastquakes/widgets/settings/units_settings_card.dart';
@@ -662,6 +663,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Show current status of data sources
+                  const DataSourceStatusWidget(compact: false),
+                  const SizedBox(height: 16),
                   const Text(
                     'Select earthquake data sources:',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),

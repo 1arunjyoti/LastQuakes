@@ -8,11 +8,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:lastquakes/models/data_source_status.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
 import 'package:lastquakes/services/home_widget_service.dart';
 import 'package:lastquakes/services/location_service.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
 import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -376,12 +378,14 @@ List<LatLng> _parseLineStringCoordinates(List coordinates, int maxPoints) {
 
 class EarthquakeProvider extends ChangeNotifier {
   final GetEarthquakesUseCase getEarthquakesUseCase;
+  final MultiSourceApiService? apiService;
   final LocationService _locationService = LocationService();
 
   // --- Shared State ---
   List<Earthquake> _allEarthquakes = [];
   bool _isLoading = false;
   String? _error;
+  Map<DataSource, DataSourceStatus> _sourceStatuses = {};
 
   // --- List View State ---
   List<Earthquake> _listFilteredEarthquakes = [];
@@ -440,6 +444,7 @@ class EarthquakeProvider extends ChangeNotifier {
   // Shared
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Map<DataSource, DataSourceStatus> get sourceStatuses => _sourceStatuses;
 
   // List Getters
   List<Earthquake> get listEarthquakes => _listFilteredEarthquakes;
@@ -475,7 +480,10 @@ class EarthquakeProvider extends ChangeNotifier {
   List<FaultLineLabel> get faultLineLabels => _faultLineLabels;
   bool get isLoadingFaultLines => _isLoadingFaultLines;
 
-  EarthquakeProvider({required this.getEarthquakesUseCase});
+  EarthquakeProvider({
+    required this.getEarthquakesUseCase,
+    this.apiService,
+  });
 
   Future<void> init() async {
     await _loadPreferences();
@@ -568,6 +576,11 @@ class EarthquakeProvider extends ChangeNotifier {
 
       // Cache the data for next time
       EarthquakeCacheService.cacheData(_allEarthquakes);
+      
+      // Update source statuses
+      if (apiService != null) {
+        _sourceStatuses = apiService!.getSourceStatuses();
+      }
 
       // Apply filters for both views
       await Future.wait([_applyListFilters(), _applyMapFilters()]);
@@ -620,6 +633,11 @@ class EarthquakeProvider extends ChangeNotifier {
       // Update cache and data
       _allEarthquakes = freshData;
       EarthquakeCacheService.cacheData(_allEarthquakes);
+      
+      // Update source statuses
+      if (apiService != null) {
+        _sourceStatuses = apiService!.getSourceStatuses();
+      }
 
       await Future.wait([_applyListFilters(), _applyMapFilters()]);
       _distanceCache.clear();

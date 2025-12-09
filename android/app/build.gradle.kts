@@ -5,6 +5,15 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    
+    // Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
+
+    // Add the Crashlytics Gradle plugin
+    id("com.google.firebase.crashlytics")
+    
+    // Add the Performance Monitoring Gradle plugin
+    id("com.google.firebase.firebase-perf")
 }
 
 val keystoreProperties = Properties()
@@ -68,6 +77,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Enable Performance Monitoring for debug builds (for testing)
+            // Remove this in production to avoid unnecessary data collection during development
+            configure<com.google.firebase.perf.plugin.FirebasePerfExtension> {
+                setInstrumentationEnabled(true)
+            }
+        }
         release {
             // Signing with the debug keys for now, so `flutter run --release` works.
             // signingConfig = signingConfigs.getByName("debug")
@@ -111,6 +127,20 @@ dependencies {
     implementation("androidx.window:window-java:1.0.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
+
+    // Import the Firebase BoM
+
+    //Remove the below SDKs when building FOSS flavor
+
+    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics")
+
+    // Add the dependency for the Performance Monitoring library
+    // When using the BoM, you don't specify versions in Firebase library dependencies
+
+    implementation("com.google.firebase:firebase-perf")
 }
 
 // Exclude Google Play Core libraries from FOSS builds to pass F-Droid scanner

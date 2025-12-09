@@ -39,7 +39,7 @@ if (-not (Test-Path $googleServicesFile)) {
 # Build APK if requested
 if ($BuildType -eq "apk" -or $BuildType -eq "both") {
     Write-Host "📦 Building Production APK..." -ForegroundColor Green
-    flutter build apk --release --flavor prod -t lib/main_prod.dart
+    flutter build apk --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Production APK built successfully!" -ForegroundColor Green
@@ -53,7 +53,7 @@ if ($BuildType -eq "apk" -or $BuildType -eq "both") {
 # Build App Bundle if requested
 if ($BuildType -eq "appbundle" -or $BuildType -eq "both") {
     Write-Host "📦 Building Production App Bundle..." -ForegroundColor Green
-    flutter build appbundle --release --flavor prod -t lib/main_prod.dart
+    flutter build appbundle --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Production App Bundle built successfully!" -ForegroundColor Green
