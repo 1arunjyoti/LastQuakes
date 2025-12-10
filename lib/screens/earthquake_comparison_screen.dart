@@ -38,7 +38,7 @@ class _EarthquakeComparisonScreenState
           .fetchHistoricalComparison(
             earthquake: widget.earthquake,
             radiusKm: 200,
-            magnitudeRange: 1.0,
+            minMagnitude: 4.0, // Fetch all significant earthquakes (M4+)
             yearsBack: 50,
           );
 
@@ -81,21 +81,26 @@ class _EarthquakeComparisonScreenState
 
     return RefreshIndicator(
       onRefresh: _loadComparison,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCurrentEarthquakeCard(context),
-            const SizedBox(height: 16),
-            _buildStatisticsCard(context),
-            const SizedBox(height: 16),
-            _buildRankingCard(context),
-            const SizedBox(height: 16),
-            _buildHistoricalList(context),
-            const SizedBox(height: 32),
-          ],
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCurrentEarthquakeCard(context),
+                const SizedBox(height: 16),
+                _buildStatisticsCard(context),
+                const SizedBox(height: 16),
+                _buildRankingCard(context),
+                const SizedBox(height: 16),
+                _buildHistoricalList(context),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
         ),
       ),
     );

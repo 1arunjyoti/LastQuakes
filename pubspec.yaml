@@ -11,35 +11,49 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Core UI
   cupertino_icons: ^1.0.8
-  intl: ^0.20.2
-  http: ^1.3.0
-  flutter_map: ^8.2.2
-  latlong2: ^0.9.0
-  url_launcher: ^6.3.1
-  provider: ^6.1.2
-  shared_preferences: ^2.5.2
   font_awesome_flutter: ^10.8.0
+  introduction_screen: ^4.0.0
+  screenshot: ^3.0.0
+
+  # State Management
+  provider: ^6.1.2
+
+  # Map & Visualization
+  flutter_map: ^8.2.2
   flutter_map_marker_cluster: ^8.2.2
   flutter_map_heatmap_plus: ^0.1.0
   flutter_map_cache: ^2.0.0
+  flutter_earth_globe: ^2.1.2
+  latlong2: ^0.9.0
+
+  # Networking & API
+  http: ^1.3.0
   http_cache_hive_store: ^5.0.0
-  flutter_local_notifications: ^19.0.0
-  share_plus: ^12.0.1
-  package_info_plus: ^9.0.0
-  path_provider: ^2.1.5
-  permission_handler: ^12.0.0+1
-  flutter_dotenv: ^6.0.0
-  flutter_secure_storage: ^9.2.2
-  crypto: ^3.0.3
-  screenshot: ^3.0.0
-  introduction_screen: ^4.0.0
-  meta: ^1.17.0
+
+  # Local Storage & Caching
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  yaml: ^3.1.3
-  flutter_earth_globe: ^2.1.2
+  shared_preferences: ^2.5.2
+  flutter_secure_storage: ^9.2.2
+  path_provider: ^2.1.5
+
+  # Firebase Services
+
+  # Widgets
   home_widget: ^0.7.0
+
+  # Utilities
+  intl: ^0.20.2
+  url_launcher: ^6.3.1
+  share_plus: ^12.0.1
+  package_info_plus: ^9.0.0
+  permission_handler: ^12.0.0+1
+  flutter_dotenv: ^6.0.0
+  crypto: ^3.0.3
+  yaml: ^3.1.3
+  meta: ^1.17.0
 
 dev_dependencies:
   flutter_test:

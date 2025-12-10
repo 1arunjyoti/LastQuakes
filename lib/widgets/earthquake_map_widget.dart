@@ -35,6 +35,8 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
   double _zoomLevel = 2.0;
   static const double _minZoom = 2.0;
   static const double _maxZoom = 18.0;
+  // Zoom level threshold for disabling clustering (individual markers shown above this)
+  static const double _clusterDisableZoom = 4.0;
   // Markers
   List<Marker> _currentMarkers = [];
   static final Map<String, Marker> _markerCache = {};
@@ -288,8 +290,9 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                   flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
                 onPositionChanged: (position, hasGesture) {
-                  if (hasGesture) {
-                    _zoomLevel = position.zoom;
+                  // Update zoom level and rebuild to toggle cluster/marker layers
+                  if (position.zoom != _zoomLevel) {
+                    setState(() => _zoomLevel = position.zoom);
                   }
                 },
               ),
@@ -326,7 +329,8 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                     reset: _heatmapResetController.stream,
                   ),
                 // Hide clusters when heatmap is active for better visibility
-                if (!provider.showHeatmap)
+                // Show clusters when zoomed out, individual markers when zoomed in past threshold
+                if (!provider.showHeatmap && _zoomLevel < _clusterDisableZoom)
                   MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
                       maxClusterRadius: 45,
@@ -355,6 +359,9 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                       },
                     ),
                   ),
+                // Show individual markers when zoomed in past threshold
+                if (!provider.showHeatmap && _zoomLevel >= _clusterDisableZoom)
+                  MarkerLayer(markers: _currentMarkers),
                 if (_userPosition != null)
                   MarkerLayer(markers: [_buildUserLocationMarker()]),
               ],

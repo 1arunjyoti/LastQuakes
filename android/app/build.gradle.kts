@@ -1,5 +1,7 @@
 import java.util.Properties
 import java.io.FileInputStream
+import org.gradle.api.tasks.compile.JavaCompile
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
 
 plugins {
     id("com.android.application")
@@ -24,31 +26,28 @@ android {
         isCoreLibraryDesugaringEnabled= true
     }
 
+    // Suppress obsolete Java version warnings for all compile tasks
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Xlint:-options")
+    }
+
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
+        allWarningsAsErrors = false
+        
+        // Suppress obsolete Java version warnings and plugin deprecation warnings
+        freeCompilerArgs += listOf(
+            "-Xlint:-options",
+            "-Xsuppress-version-warnings"
+        )
     }
 
     defaultConfig {
-        applicationId = "app.lastquakes"
+        applicationId = "app.lastquakes.foss"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-    }
-
-    flavorDimensions += "mode"
-    productFlavors {
-        create("prod") {
-            dimension = "mode"
-            resValue("string", "app_name", "LastQuakes")
-        }
-        create("foss") {
-            dimension = "mode"
-            resValue("string", "app_name", "LastQuakes FOSS")
-            applicationIdSuffix = ".foss"
-            // Add FOSS-specific ProGuard rules to ignore missing Firebase classes
-            proguardFiles("proguard-rules-foss.pro")
-        }
     }
 
     signingConfigs {
@@ -69,8 +68,6 @@ android {
 
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            // signingConfig = signingConfigs.getByName("debug")
             signingConfig = signingConfigs.getByName("release")
 
             isMinifyEnabled = true
@@ -78,26 +75,15 @@ android {
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules-foss.pro"
             )
         }
     }
 
     applicationVariants.all {
-        val variant = this
         outputs.all {
-            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            val flavorName = variant.flavorName
-            val buildType = variant.buildType.name
-            val appName = "LastQuakes"
-            val versionName = variant.versionName
-            val versionCode = variant.versionCode
-            
-            output.outputFileName = when {
-                flavorName.contains("prod") -> "${appName}-${versionName}+${versionCode}-${buildType}.apk"
-                flavorName.contains("foss") -> "${appName}-FOSS-${versionName}+${versionCode}-${buildType}.apk"
-                else -> "app-${flavorName}-${buildType}.apk"
-            }
+            (this as BaseVariantOutputImpl).outputFileName = 
+                "LastQuakes-FOSS-${versionName}+${versionCode}-${name}.apk"
         }
     }
 }
@@ -113,14 +99,14 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
 }
 
-// Exclude Google Play Core libraries from FOSS builds to pass F-Droid scanner
+// Exclude Google Play Services and Firebase from FOSS build
 configurations.all {
-    if (name.lowercase().contains("foss")) {
-        exclude(group = "com.google.android.play", module = "core")
-        exclude(group = "com.google.android.play", module = "core-common")
-        exclude(group = "com.google.android.play", module = "core-ktx")
-        exclude(group = "com.google.android.play", module = "feature-delivery")
-        exclude(group = "com.google.android.play", module = "feature-delivery-ktx")
-    }
+    exclude(group = "com.google.android.gms")
+    exclude(group = "com.google.firebase")
+    exclude(group = "com.google.android.play", module = "core")
+    exclude(group = "com.google.android.play", module = "core-common")
+    exclude(group = "com.google.android.play", module = "core-ktx")
+    exclude(group = "com.google.android.play", module = "feature-delivery")
+    exclude(group = "com.google.android.play", module = "feature-delivery-ktx")
 }
 

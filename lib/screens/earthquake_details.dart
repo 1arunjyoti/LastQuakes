@@ -8,7 +8,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:lastquakes/presentation/providers/bookmark_provider.dart';
 import 'package:lastquakes/services/tile_cache_service.dart';
 import 'package:lastquakes/models/earthquake.dart';
-import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/utils/formatting.dart';
 import 'package:lastquakes/widgets/appbar.dart';
 import 'package:lastquakes/widgets/components/zoom_controls.dart';
@@ -41,15 +40,6 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
   void initState() {
     super.initState();
     _mapController = MapController();
-
-    // Log earthquake detail view
-    AnalyticsService.instance.logEarthquakeDetailView(
-      earthquakeId: widget.earthquake.id,
-      magnitude: widget.earthquake.magnitude,
-      location: widget.earthquake.place,
-      source: widget.earthquake.source,
-    );
-    AnalyticsService.instance.logScreenView('earthquake_details');
   }
 
   @override
@@ -187,7 +177,7 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                                   children: [
                                     TileLayer(
                                       urlTemplate:
-                                          "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+                                          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
                                       userAgentPackageName: 'app.lastquakes',
                                       tileProvider:
                                           TileCacheService.instance
@@ -728,19 +718,8 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
           subject: 'Earthquake Information: M $magnitude near $location',
         ),
       );
-
-      // Log share event
-      AnalyticsService.instance.logShare(
-        contentType: 'earthquake',
-        method: 'screenshot',
-        earthquakeId: widget.earthquake.id,
-      );
     } catch (e) {
       debugPrint('Error sharing: $e');
-      AnalyticsService.instance.logError(
-        error: e,
-        reason: 'Failed to share earthquake details',
-      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -841,12 +820,9 @@ class EarthquakeDetailsScreenState extends State<EarthquakeDetailsScreen> {
                 ),
                 children: [
                   TileLayer(
-                    /* urlTemplate:
-                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png", */
                     urlTemplate:
-                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", // USGS Topo Alt
-                    userAgentPackageName:
-                        'app.lastquakes', // Use your package name
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
+                    userAgentPackageName: 'app.lastquakes',
                     tileProvider:
                         TileCacheService.instance.createCachedProvider(),
                   ),

@@ -27,8 +27,11 @@ LastQuakes is a comprehensive application providing real-time global earthquake 
     *   Visual representation of seismic activity trends.
     *   Magnitude and geographic distribution charts.
 
+*   **Widget**:
+    *   Add widget to home screen to display latest earthquakes.
+
 *   **Privacy & Security**:
-    *   **F-Droid Version**: Completely open-source with NO proprietary dependencies (Firebase Analytics/Crashlytics removed).
+    *   **FOSS Version**: Completely open-source with NO proprietary dependencies (Firebase Analytics/Crashlytics removed).
     *   **Secure Storage**: Encrypted storage for sensitive data.
 
 **Note**: This is an independent project and is not officially affiliated with USGS, EMSC, or any government seismological organization.

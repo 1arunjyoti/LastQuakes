@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:lastquakes/services/location_service.dart';
+import 'package:lastquakes/services/preferences_service.dart';
+import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Location Button Widget for Map Controls
@@ -29,6 +32,37 @@ class _LocationButtonState extends State<LocationButton> {
 
   Future<void> _fetchUserLocation() async {
     if (!mounted) return;
+
+    // Check if notifications are enabled
+    final preferencesService = PreferencesService();
+    if (!preferencesService.isLoaded) {
+      await preferencesService.loadSettings();
+    }
+
+    // If notifications are enabled (not set to 'none'), check and request location permission
+    if (preferencesService.filterType != NotificationFilterType.none) {
+      final locationStatus = await Permission.location.status;
+      
+      if (locationStatus.isDenied || locationStatus.isPermanentlyDenied) {
+        if (mounted) {
+          setState(() => _isLoadingLocation = false);
+          _showLocationPermissionDialog();
+          return;
+        }
+      }
+      
+      // Request permission if needed
+      if (!locationStatus.isGranted) {
+        final result = await Permission.location.request();
+        if (!result.isGranted) {
+          if (mounted) {
+            setState(() => _isLoadingLocation = false);
+            _showLocationPermissionDeniedDialog();
+            return;
+          }
+        }
+      }
+    }
 
     bool serviceEnabled = await _locationService.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -94,6 +128,63 @@ class _LocationButtonState extends State<LocationButton> {
                   Navigator.of(context).pop();
                   // Open device settings
                   await launchUrl(Uri.parse('app-settings:'));
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showLocationPermissionDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Location Permission Required'),
+            content: const Text(
+              'Location access is required because notifications are enabled. '
+              'This allows the app to provide location-based earthquake alerts.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  final result = await Permission.location.request();
+                  if (result.isGranted) {
+                    _fetchUserLocation();
+                  }
+                },
+                child: const Text('Grant Permission'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showLocationPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Location Permission Denied'),
+            content: const Text(
+              'Location permission is required for location-based notifications. '
+              'Please grant permission in your device settings.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await openAppSettings();
                 },
                 child: const Text('Open Settings'),
               ),

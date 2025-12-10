@@ -52,17 +52,14 @@ jobs:
 
       - name: Build signed FOSS APK
         run: |
-          flutter build apk \
-            --flavor foss \
-            --dart-define=FLAVOR=foss \
-            --release
+          flutter build apk --release
 
       - name: List APK output
-        run: ls -la build/app/outputs/apk/foss/release/
+        run: ls -la build/app/outputs/apk/release/
 
       - name: Verify APK (no GMS/Firebase)
         run: |
-          APK_FILE=$(ls build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk)
+          APK_FILE=$(ls build/app/outputs/apk/release/LastQuakes-FOSS-*.apk)
           echo "::notice::APK file: $APK_FILE"
 
           # Check for Google Play Services (should not be present in FOSS)
@@ -85,14 +82,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: foss-apk-signed
-          path: build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk
+          path: build/app/outputs/apk/release/LastQuakes-FOSS-*.apk
           retention-days: 90
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
-          files: build/app/outputs/apk/foss/release/LastQuakes-FOSS-*.apk
+          files: build/app/outputs/apk/release/LastQuakes-FOSS-*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

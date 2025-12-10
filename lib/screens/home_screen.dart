@@ -5,7 +5,6 @@ import 'package:lastquakes/screens/earthquake_list.dart';
 import 'package:lastquakes/screens/earthquake_map_screen.dart';
 import 'package:lastquakes/screens/statistics_screen.dart';
 import 'package:lastquakes/screens/web_dashboard_screen.dart';
-import 'package:lastquakes/services/analytics_service.dart';
 import 'package:provider/provider.dart';
 
 class NavigationHandler extends StatefulWidget {
@@ -17,10 +16,6 @@ class NavigationHandler extends StatefulWidget {
 
 class _NavigationHandlerState extends State<NavigationHandler> {
   int _currentIndex = 0;
-  
-  // Screen names for analytics
-  static const List<String> _screenNames = ['earthquake_list', 'earthquake_map', 'statistics'];
-  static const List<String> _wideScreenNames = ['dashboard', 'earthquake_map', 'statistics'];
 
   // Handle bottom navigation tap
   void _onBottomNavTap(int index) {
@@ -28,11 +23,6 @@ class _NavigationHandlerState extends State<NavigationHandler> {
       setState(() {
         _currentIndex = index;
       });
-      
-      // Log screen view when tab changes
-      final isWide = MediaQuery.of(context).size.width >= 900;
-      final screenName = isWide ? _wideScreenNames[index] : _screenNames[index];
-      AnalyticsService.instance.logScreenView(screenName);
     }
   }
 
@@ -45,11 +35,6 @@ class _NavigationHandlerState extends State<NavigationHandler> {
         context,
         listen: false,
       ).ensureDataLoaded();
-      
-      // Log initial screen view
-      final isWide = MediaQuery.of(context).size.width >= 900;
-      final screenName = isWide ? _wideScreenNames[0] : _screenNames[0];
-      AnalyticsService.instance.logScreenView(screenName);
     });
   }
 

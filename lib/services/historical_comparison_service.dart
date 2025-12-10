@@ -24,12 +24,14 @@ class HistoricalComparisonService {
   /// Parameters:
   /// - [earthquake] - The earthquake to compare against
   /// - [radiusKm] - Search radius in kilometers (default: 200)
-  /// - [magnitudeRange] - Magnitude tolerance (default: ±1.0)
+  /// - [magnitudeRange] - Magnitude tolerance (default: ±1.0), ignored if minMagnitude is set
+  /// - [minMagnitude] - Absolute minimum magnitude to fetch (overrides magnitudeRange)
   /// - [yearsBack] - How many years of history to fetch (default: 20)
   Future<HistoricalComparisonResult> fetchHistoricalComparison({
     required Earthquake earthquake,
     double radiusKm = 200,
     double magnitudeRange = 1.0,
+    double? minMagnitude,
     int yearsBack = 50,
   }) async {
     final cacheKey = _generateCacheKey(
@@ -46,14 +48,20 @@ class HistoricalComparisonService {
       return cachedResult;
     }
 
+    // Determine magnitude filter: use minMagnitude if provided, otherwise use range
+    final double effectiveMinMag =
+        minMagnitude ?? max(0, earthquake.magnitude - magnitudeRange);
+    final double? effectiveMaxMag =
+        minMagnitude != null ? null : earthquake.magnitude + magnitudeRange;
+
     // Fetch from API
     try {
       final earthquakes = await _fetchFromUsgs(
         latitude: earthquake.latitude,
         longitude: earthquake.longitude,
         radiusKm: radiusKm,
-        minMagnitude: max(0, earthquake.magnitude - magnitudeRange),
-        maxMagnitude: earthquake.magnitude + magnitudeRange,
+        minMagnitude: effectiveMinMag,
+        maxMagnitude: effectiveMaxMag,
         yearsBack: yearsBack,
       );
 
@@ -85,13 +93,13 @@ class HistoricalComparisonService {
     required double longitude,
     required double radiusKm,
     required double minMagnitude,
-    required double maxMagnitude,
+    double? maxMagnitude,
     required int yearsBack,
   }) async {
     final now = DateTime.now();
     final startDate = DateTime(now.year - yearsBack, now.month, now.day);
 
-    final uri = Uri.https('earthquake.usgs.gov', '/fdsnws/event/1/query', {
+    final queryParams = <String, String>{
       'format': 'geojson',
       'latitude': latitude.toStringAsFixed(4),
       'longitude': longitude.toStringAsFixed(4),
@@ -99,10 +107,20 @@ class HistoricalComparisonService {
       'starttime': startDate.toIso8601String().split('T')[0],
       'endtime': now.toIso8601String().split('T')[0],
       'minmagnitude': minMagnitude.toStringAsFixed(1),
-      'maxmagnitude': maxMagnitude.toStringAsFixed(1),
-      'orderby': 'time',
+      'orderby': 'magnitude', // Sort by magnitude to get strongest first
       'limit': '500',
-    });
+    };
+
+    // Only add maxmagnitude if specified
+    if (maxMagnitude != null) {
+      queryParams['maxmagnitude'] = maxMagnitude.toStringAsFixed(1);
+    }
+
+    final uri = Uri.https(
+      'earthquake.usgs.gov',
+      '/fdsnws/event/1/query',
+      queryParams,
+    );
 
     SecureLogger.api('earthquake.usgs.gov/fdsnws/event/1/query', method: 'GET');
 

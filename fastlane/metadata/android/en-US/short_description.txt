@@ -1,1 +1,1 @@
-Real-time global earthquake monitor with custom alerts and multi-source data.
+Comprehensive application providing near real-time global earthquake monitoring with multi-source data integration.

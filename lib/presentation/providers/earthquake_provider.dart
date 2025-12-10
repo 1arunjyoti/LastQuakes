@@ -8,11 +8,12 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lastquakes/domain/usecases/get_earthquakes_usecase.dart';
+import 'package:lastquakes/models/data_source_status.dart';
 import 'package:lastquakes/models/earthquake.dart';
-import 'package:lastquakes/services/analytics_service.dart';
 import 'package:lastquakes/services/earthquake_cache_service.dart';
 import 'package:lastquakes/services/home_widget_service.dart';
 import 'package:lastquakes/services/location_service.dart';
+import 'package:lastquakes/services/multi_source_api_service.dart';
 import 'package:lastquakes/utils/enums.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -376,12 +377,14 @@ List<LatLng> _parseLineStringCoordinates(List coordinates, int maxPoints) {
 
 class EarthquakeProvider extends ChangeNotifier {
   final GetEarthquakesUseCase getEarthquakesUseCase;
+  final MultiSourceApiService? apiService;
   final LocationService _locationService = LocationService();
 
   // --- Shared State ---
   List<Earthquake> _allEarthquakes = [];
   bool _isLoading = false;
   String? _error;
+  Map<DataSource, DataSourceStatus> _sourceStatuses = {};
 
   // --- List View State ---
   List<Earthquake> _listFilteredEarthquakes = [];
@@ -440,6 +443,7 @@ class EarthquakeProvider extends ChangeNotifier {
   // Shared
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Map<DataSource, DataSourceStatus> get sourceStatuses => _sourceStatuses;
 
   // List Getters
   List<Earthquake> get listEarthquakes => _listFilteredEarthquakes;
@@ -475,7 +479,10 @@ class EarthquakeProvider extends ChangeNotifier {
   List<FaultLineLabel> get faultLineLabels => _faultLineLabels;
   bool get isLoadingFaultLines => _isLoadingFaultLines;
 
-  EarthquakeProvider({required this.getEarthquakesUseCase});
+  EarthquakeProvider({
+    required this.getEarthquakesUseCase,
+    this.apiService,
+  });
 
   Future<void> init() async {
     await _loadPreferences();
@@ -545,14 +552,6 @@ class EarthquakeProvider extends ChangeNotifier {
           _isLoading = false;
           notifyListeners();
 
-          // Log cached data load
-          AnalyticsService.instance.logDataRefresh(
-            source: 'cache',
-            success: true,
-            earthquakeCount: cachedData.length,
-            loadTimeMs: stopwatch.elapsedMilliseconds,
-          );
-
           // Fetch fresh data in background
           _fetchFreshDataInBackground();
           return;
@@ -568,6 +567,11 @@ class EarthquakeProvider extends ChangeNotifier {
 
       // Cache the data for next time
       EarthquakeCacheService.cacheData(_allEarthquakes);
+      
+      // Update source statuses
+      if (apiService != null) {
+        _sourceStatuses = apiService!.getSourceStatuses();
+      }
 
       // Apply filters for both views
       await Future.wait([_applyListFilters(), _applyMapFilters()]);
@@ -578,30 +582,12 @@ class EarthquakeProvider extends ChangeNotifier {
       }
 
       stopwatch.stop();
-      // Log successful data refresh
-      AnalyticsService.instance.logDataRefresh(
-        source: forceRefresh ? 'manual' : 'auto',
-        success: true,
-        earthquakeCount: _allEarthquakes.length,
-        loadTimeMs: stopwatch.elapsedMilliseconds,
-      );
 
       // Update home screen widget (Android only, non-blocking)
       _updateHomeWidget();
     } catch (e) {
       _error = "Failed to load earthquakes: ${e.toString()}";
       stopwatch.stop();
-
-      // Log failed data refresh
-      AnalyticsService.instance.logDataRefresh(
-        source: forceRefresh ? 'manual' : 'auto',
-        success: false,
-        loadTimeMs: stopwatch.elapsedMilliseconds,
-      );
-      AnalyticsService.instance.logError(
-        error: e,
-        reason: 'Failed to load earthquakes',
-      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -620,6 +606,11 @@ class EarthquakeProvider extends ChangeNotifier {
       // Update cache and data
       _allEarthquakes = freshData;
       EarthquakeCacheService.cacheData(_allEarthquakes);
+      
+      // Update source statuses
+      if (apiService != null) {
+        _sourceStatuses = apiService!.getSourceStatuses();
+      }
 
       await Future.wait([_applyListFilters(), _applyMapFilters()]);
       _distanceCache.clear();
@@ -728,7 +719,13 @@ class EarthquakeProvider extends ChangeNotifier {
       if (position != null) {
         _userPosition = position;
         _distanceCache.clear();
-        await _preCalculateDistances();
+        
+        // If list is empty, ensure data is loaded first
+        if (_listFilteredEarthquakes.isEmpty && _allEarthquakes.isNotEmpty) {
+          await _applyListFilters();
+        } else {
+          await _preCalculateDistances();
+        }
       } else {
         _locationError = 'Unable to determine your location. Please try again.';
       }
@@ -753,7 +750,8 @@ class EarthquakeProvider extends ChangeNotifier {
 
     final userLat = _userPosition!.latitude;
     final userLon = _userPosition!.longitude;
-
+    
+    // Calculate distances for all filtered earthquakes
     for (final quake in _listFilteredEarthquakes) {
       if (_distanceCache.containsKey(quake.id)) continue;
 
@@ -765,15 +763,17 @@ class EarthquakeProvider extends ChangeNotifier {
       );
 
       _distanceCache[quake.id] = computedDistance;
-
-      // Implement cache size limit to prevent memory bloat
-      if (_distanceCache.length > _maxCacheSize) {
-        // Remove oldest entries (FIFO)
-        final keysToRemove = _distanceCache.keys.take(100).toList();
-        for (final key in keysToRemove) {
-          _distanceCache.remove(key);
-        }
-      }
+    }
+    
+    // After calculating all distances, trim cache if needed
+    // Keep the first _maxCacheSize entries (these are the most recent/visible earthquakes)
+    if (_distanceCache.length > _maxCacheSize) {
+      final keysToKeep = _listFilteredEarthquakes
+          .take(_maxCacheSize)
+          .map((e) => e.id)
+          .toSet();
+      
+      _distanceCache.removeWhere((key, value) => !keysToKeep.contains(key));
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:lastquakes/models/data_source_status.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/services/cache_manager/cache_manager.dart';
 import 'package:lastquakes/services/secure_http_client.dart';
@@ -31,6 +32,9 @@ class MultiSourceApiService {
 
   // Cache for expensive operations
   final Map<String, List<Earthquake>> _memoryCache = {};
+  
+  // Track data source statuses
+  final Map<DataSource, DataSourceStatus> _sourceStatuses = {};
 
   MultiSourceApiService({
     required SharedPreferences prefs,
@@ -100,6 +104,16 @@ class MultiSourceApiService {
   /// Get all available data sources
   Set<DataSource> getAvailableSources() {
     return DataSource.values.toSet();
+  }
+  
+  /// Get status of all data sources
+  Map<DataSource, DataSourceStatus> getSourceStatuses() {
+    return Map.unmodifiable(_sourceStatuses);
+  }
+  
+  /// Get status of a specific data source
+  DataSourceStatus? getSourceStatus(DataSource source) {
+    return _sourceStatuses[source];
   }
 
   /// Check if multiple sources are selected
@@ -230,6 +244,7 @@ class MultiSourceApiService {
       final stopwatch = Stopwatch()..start();
       final results = await Future.wait(
         sourcesList.map((source) async {
+          final sourceStopwatch = Stopwatch()..start();
           try {
             final dataSource = _sources[source];
             if (dataSource == null) {
@@ -242,12 +257,42 @@ class MultiSourceApiService {
               minMagnitude: minMagnitude,
               days: days,
             );
+            sourceStopwatch.stop();
+            
+            // Track successful fetch
+            _sourceStatuses[source] = DataSourceStatus.healthy(
+              source: source,
+              earthquakeCount: data.length,
+              responseTimeMs: sourceStopwatch.elapsedMilliseconds,
+            );
+            
             SecureLogger.info(
               "${source.name.toUpperCase()}: ${data.length} earthquakes",
             );
             return MapEntry(source, data);
           } catch (e) {
-            errors.add("${source.name.toUpperCase()}: $e");
+            sourceStopwatch.stop();
+            
+            // Extract readable error message
+            String errorMsg = e.toString();
+            if (errorMsg.contains('TimeoutException') || errorMsg.contains('timeout')) {
+              errorMsg = 'Request timeout';
+            } else if (errorMsg.contains('SocketException') || errorMsg.contains('Failed host lookup')) {
+              errorMsg = 'Network error';
+            } else if (errorMsg.contains('HandshakeException') || errorMsg.contains('certificate')) {
+              errorMsg = 'SSL/Certificate error';
+            } else if (errorMsg.contains('FormatException')) {
+              errorMsg = 'Invalid response format';
+            }
+            
+            // Track failed fetch
+            _sourceStatuses[source] = DataSourceStatus.failed(
+              source: source,
+              errorMessage: errorMsg,
+              responseTimeMs: sourceStopwatch.elapsedMilliseconds,
+            );
+            
+            errors.add("${source.name.toUpperCase()}: $errorMsg");
             SecureLogger.error("Error from ${source.name}", e);
             return MapEntry(source, <Earthquake>[]);
           }
