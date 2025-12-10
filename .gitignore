@@ -60,3 +60,4 @@ key.properties
 my-firebase-backend
 .vscode
 Readme files/
+android/app/src/prod/google-services.json

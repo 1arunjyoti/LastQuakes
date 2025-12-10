@@ -3,17 +3,17 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    
     id("kotlin-android")
-
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     
     // Add the Google services Gradle plugin
     id("com.google.gms.google-services")
-    
+
     // Add the Crashlytics Gradle plugin
     id("com.google.firebase.crashlytics")
+    
+    // Add the Performance Monitoring Gradle plugin
+    id("com.google.firebase.firebase-perf")
 }
 
 val keystoreProperties = Properties()
@@ -39,12 +39,25 @@ android {
 
     defaultConfig {
         applicationId = "app.lastquakes"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "mode"
+    productFlavors {
+        create("prod") {
+            dimension = "mode"
+            resValue("string", "app_name", "LastQuakes")
+        }
+        create("foss") {
+            dimension = "mode"
+            resValue("string", "app_name", "LastQuakes FOSS")
+            applicationIdSuffix = ".foss"
+            // Add FOSS-specific ProGuard rules to ignore missing Firebase classes
+            proguardFiles("proguard-rules-foss.pro")
+        }
     }
 
     signingConfigs {
@@ -64,30 +77,43 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Enable Performance Monitoring for debug builds (for testing)
+            // Remove this in production to avoid unnecessary data collection during development
+            configure<com.google.firebase.perf.plugin.FirebasePerfExtension> {
+                setInstrumentationEnabled(true)
+            }
+        }
         release {
-            applicationVariants.all(closureOf<com.android.build.gradle.api.ApplicationVariant> {
-                outputs.all {
-                    if (this is com.android.build.gradle.internal.api.ApkVariantOutputImpl) {
-                        this.outputFileName = "lastquake-${versionName}-${versionCode}.apk"
-                    }
-                }
-            })
             // Signing with the debug keys for now, so `flutter run --release` works.
-            //signingConfig = signingConfigs.getByName("debug")
-
+            // signingConfig = signingConfigs.getByName("debug")
             signingConfig = signingConfigs.getByName("release")
 
-            // Enables code-related app optimization.
             isMinifyEnabled = true
-            
-            // Enables resource shrinking.
             isShrinkResources = true
 
             proguardFiles(
-                // Default file with automatically generated optimization rules.
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
             )
+        }
+    }
 
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val flavorName = variant.flavorName
+            val buildType = variant.buildType.name
+            val appName = "LastQuakes"
+            val versionName = variant.versionName
+            val versionCode = variant.versionCode
+            
+            output.outputFileName = when {
+                flavorName.contains("prod") -> "${appName}-${versionName}+${versionCode}-${buildType}.apk"
+                flavorName.contains("foss") -> "${appName}-FOSS-${versionName}+${versionCode}-${buildType}.apk"
+                else -> "app-${flavorName}-${buildType}.apk"
+            }
         }
     }
 }
@@ -95,15 +121,36 @@ android {
 flutter {
     source = "../.."
 }
+
 dependencies {
     implementation("androidx.window:window:1.0.0")
     implementation("androidx.window:window-java:1.0.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
+
     // Import the Firebase BoM
+
+    //Remove the below SDKs when building FOSS flavor
 
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
 
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-crashlytics")
+
+    // Add the dependency for the Performance Monitoring library
+    // When using the BoM, you don't specify versions in Firebase library dependencies
+
+    implementation("com.google.firebase:firebase-perf")
 }
+
+// Exclude Google Play Core libraries from FOSS builds to pass F-Droid scanner
+configurations.all {
+    if (name.lowercase().contains("foss")) {
+        exclude(group = "com.google.android.play", module = "core")
+        exclude(group = "com.google.android.play", module = "core-common")
+        exclude(group = "com.google.android.play", module = "core-ktx")
+        exclude(group = "com.google.android.play", module = "feature-delivery")
+        exclude(group = "com.google.android.play", module = "feature-delivery-ktx")
+    }
+}
+

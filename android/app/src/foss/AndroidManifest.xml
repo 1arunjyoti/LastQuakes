@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <queries>
+        <package android:name="com.google.android.gms" tools:node="remove" />
+        <package android:name="com.google.android.gms.location" tools:node="remove" />
+    </queries>
+
+</manifest>
