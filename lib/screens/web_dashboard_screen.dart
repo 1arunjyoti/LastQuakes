@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:lastquakes/models/earthquake.dart';
 import 'package:lastquakes/presentation/providers/earthquake_provider.dart';
+import 'package:lastquakes/screens/earthquake_details.dart';
+import 'package:lastquakes/utils/app_page_transitions.dart';
 import 'package:lastquakes/widgets/appbar.dart';
+import 'package:lastquakes/widgets/components/earthquake_bottom_sheet.dart';
 import 'package:lastquakes/widgets/custom_drawer.dart';
 import 'package:lastquakes/widgets/earthquake_list_widget.dart';
 import 'package:lastquakes/widgets/earthquake_map_widget.dart';
@@ -36,7 +39,29 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
     // Fly to the earthquake location
     _mapController.move(
       LatLng(earthquake.latitude, earthquake.longitude),
-      10.0, // Zoom level
+      6.0, // Zoom level
+    );
+    
+    // Show bottom sheet with earthquake details
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return EarthquakeBottomSheet(
+          earthquake: earthquake,
+          onViewDetails: () {
+            Navigator.push(
+              context,
+              AppPageTransitions.scaleRoute(
+                page: EarthquakeDetailsScreen(
+                  earthquake: earthquake,
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

@@ -15,6 +15,52 @@ class EarthquakeListScreen extends StatefulWidget {
 
 class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
   final GlobalKey<EarthquakeListWidgetState> _listKey = GlobalKey();
+  String? _lastLocationError;
+
+  void _handleLocationError(EarthquakeProvider provider) {
+    if (provider.locationError != null && 
+        provider.locationError != _lastLocationError) {
+      _lastLocationError = provider.locationError;
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(provider.locationError!),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'Dismiss',
+                textColor: Colors.red.shade700,
+                onPressed: () {
+                  provider.clearLocationError();
+                },
+              ),
+            ),
+          );
+        }
+      });
+    } else if (provider.locationError == null && _lastLocationError != null) {
+      _lastLocationError = null;
+    }
+  }
+
+  void _handleLocationSuccess(EarthquakeProvider provider) {
+    if (provider.userPosition != null && !provider.isLoadingLocation) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Location updated! Distance info added to cards.'),
+              backgroundColor: Colors.green.shade400,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +70,9 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
         actions: [
           Consumer<EarthquakeProvider>(
             builder: (context, provider, _) {
+              // Handle location errors
+              _handleLocationError(provider);
+              
               return IconButton(
                 icon:
                     provider.isLoadingLocation
@@ -36,7 +85,13 @@ class _EarthquakeListScreenState extends State<EarthquakeListScreen> {
                 onPressed:
                     provider.isLoadingLocation
                         ? null
-                        : () => provider.fetchUserLocation(),
+                        : () async {
+                            final hadLocation = provider.userPosition != null;
+                            await provider.fetchUserLocation();
+                            if (!hadLocation && provider.userPosition != null) {
+                              _handleLocationSuccess(provider);
+                            }
+                          },
                 tooltip: 'Refresh Location',
               );
             },

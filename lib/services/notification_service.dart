@@ -65,6 +65,7 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           ticker: 'ticker',
+          icon: '@mipmap/launcher_icon', // Use the app launcher icon
         );
 
     const NotificationDetails notificationDetails = NotificationDetails(

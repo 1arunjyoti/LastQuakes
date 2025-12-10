@@ -746,7 +746,13 @@ class EarthquakeProvider extends ChangeNotifier {
       if (position != null) {
         _userPosition = position;
         _distanceCache.clear();
-        await _preCalculateDistances();
+        
+        // If list is empty, ensure data is loaded first
+        if (_listFilteredEarthquakes.isEmpty && _allEarthquakes.isNotEmpty) {
+          await _applyListFilters();
+        } else {
+          await _preCalculateDistances();
+        }
       } else {
         _locationError = 'Unable to determine your location. Please try again.';
       }
@@ -771,7 +777,8 @@ class EarthquakeProvider extends ChangeNotifier {
 
     final userLat = _userPosition!.latitude;
     final userLon = _userPosition!.longitude;
-
+    
+    // Calculate distances for all filtered earthquakes
     for (final quake in _listFilteredEarthquakes) {
       if (_distanceCache.containsKey(quake.id)) continue;
 
@@ -783,15 +790,17 @@ class EarthquakeProvider extends ChangeNotifier {
       );
 
       _distanceCache[quake.id] = computedDistance;
-
-      // Implement cache size limit to prevent memory bloat
-      if (_distanceCache.length > _maxCacheSize) {
-        // Remove oldest entries (FIFO)
-        final keysToRemove = _distanceCache.keys.take(100).toList();
-        for (final key in keysToRemove) {
-          _distanceCache.remove(key);
-        }
-      }
+    }
+    
+    // After calculating all distances, trim cache if needed
+    // Keep the first _maxCacheSize entries (these are the most recent/visible earthquakes)
+    if (_distanceCache.length > _maxCacheSize) {
+      final keysToKeep = _listFilteredEarthquakes
+          .take(_maxCacheSize)
+          .map((e) => e.id)
+          .toSet();
+      
+      _distanceCache.removeWhere((key, value) => !keysToKeep.contains(key));
     }
   }
 
