@@ -221,13 +221,13 @@ dart run scripts/monitor_certificates.dart
 
 ```bash
 # Build web version (FOSS by default)
-flutter build web --release
+flutter build web --release --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Build with base href
-flutter build web --release --base-href /lastquakes/
+flutter build web --release --dart-define=FLAVOR=foss --base-href /lastquakes/ -t lib/main.dart
 
 # Run web locally
-flutter run -d chrome
+flutter run -d chrome --dart-define=FLAVOR=foss -t lib/main.dart
 
 # Output location
 build/web/

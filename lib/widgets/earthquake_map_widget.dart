@@ -290,8 +290,9 @@ class EarthquakeMapWidgetState extends State<EarthquakeMapWidget>
                   flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
                 onPositionChanged: (position, hasGesture) {
-                  if (hasGesture) {
-                    _zoomLevel = position.zoom;
+                  // Update zoom level and rebuild to toggle cluster/marker layers
+                  if (position.zoom != _zoomLevel) {
+                    setState(() => _zoomLevel = position.zoom);
                   }
                 },
               ),

@@ -481,7 +481,7 @@ flutter build apk --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_
 flutter build appbundle --release --flavor prod --dart-define=FLAVOR=prod -t lib/main_prod.dart
 
 # Web build
-flutter build web --release
+flutter build web --release --dart-define=FLAVOR=foss -t lib/main.dart
 ```
 
 **Build Output Locations:**
