@@ -44,7 +44,6 @@ jobs:
         run: |
           flutter build web \
             --release \
-            --web-renderer canvaskit \
             --dart-define=FLAVOR=foss \
             --base-href "/LastQuakes/" \
             -t lib/main.dart
