@@ -1,37 +1,60 @@
 LastQuakes is a comprehensive application providing real-time global earthquake monitoring with multi-source data integration, customizable push notifications, interactive map visualization, and advanced filtering capabilities.
 
-**Core Features:**
+<b>Core Features:</b>
 
-*   **Multi-Source Data Integration**:
-    *   **USGS (U.S. Geological Survey)**: Comprehensive global earthquake data.
-    *   **EMSC (European-Mediterranean Seismological Centre)**: Enhanced coverage for European and Mediterranean regions.
-    *   **Intelligent Deduplication**: Automatic removal of duplicate events from multiple sources.
+<ul>
+<li><b>Multi-Source Data Integration</b>:
+<ul>
+<li><b>USGS (U.S. Geological Survey)</b>: Comprehensive global earthquake data.</li>
+<li><b>EMSC (European-Mediterranean Seismological Centre)</b>: Enhanced coverage for European and Mediterranean regions.</li>
+<li><b>Intelligent Deduplication</b>: Automatic removal of duplicate events from multiple sources.</li>
+</ul>
+</li>
 
-*   **Interactive Map Visualization**:
-    *   High-performance map rendering with smooth panning and zooming.
-    *   Multiple Base Layers: Street Map, Satellite Imagery, Terrain View, Dark Theme.
-    *   Magnitude-Based Markers: Color-coded markers with size scaling.
-    *   Fault Line Overlays: Optional tectonic plate boundary visualization.
+<li><b>Interactive Map Visualization</b>:
+<ul>
+<li>High-performance map rendering with smooth panning and zooming.</li>
+<li>Multiple Base Layers: Street Map, Satellite Imagery, Terrain View, Dark Theme.</li>
+<li>Magnitude-Based Markers: Color-coded markers with size scaling.</li>
+<li>Fault Line Overlays: Optional tectonic plate boundary visualization.</li>
+</ul>
+</li>
 
-*   **Dynamic List View**:
-    *   Filter by magnitude, country/region, and distance.
-    *   Sort by time, magnitude, or distance.
-    *   Modern card-based design with gradient headers.
+<li><b>Dynamic List View</b>:
+<ul>
+<li>Filter by magnitude, country/region, and distance.</li>
+<li>Sort by time, magnitude, or distance.</li>
+<li>Modern card-based design with gradient headers.</li>
+</ul>
+</li>
 
-*   **Detailed Event Analysis**:
-    *   Magnitude, depth, location coordinates, and tsunami warning status.
-    *   Distance from user's location.
-    *   Interactive map pinpointing event location.
+<li><b>Detailed Event Analysis</b>:
+<ul>
+<li>Magnitude, depth, location coordinates, and tsunami warning status.</li>
+<li>Distance from user's location.</li>
+<li>Interactive map pinpointing event location.</li>
+</ul>
+</li>
 
-*   **Statistics & Analytics**:
-    *   Visual representation of seismic activity trends.
-    *   Magnitude and geographic distribution charts.
+<li><b>Statistics &amp; Analytics</b>:
+<ul>
+<li>Visual representation of seismic activity trends.</li>
+<li>Magnitude and geographic distribution charts.</li>
+</ul>
+</li>
 
-*   **Widget**:
-    *   Add widget to home screen to display latest earthquakes.
+<li><b>Widget</b>:
+<ul>
+<li>Add widget to home screen to display latest earthquakes.</li>
+</ul>
+</li>
 
-*   **Privacy & Security**:
-    *   **FOSS Version**: Completely open-source with NO proprietary dependencies (Firebase Analytics/Crashlytics removed).
-    *   **Secure Storage**: Encrypted storage for sensitive data.
+<li><b>Privacy &amp; Security</b>:
+<ul>
+<li><b>FOSS Version</b>: Completely open-source with NO proprietary dependencies.</li>
+<li><b>Secure Storage</b>: Encrypted storage for sensitive data.</li>
+</ul>
+</li>
+</ul>
 
-**Note**: This is an independent project and is not officially affiliated with USGS, EMSC, or any government seismological organization.
+<b>Note</b>: This is an independent project and is not officially affiliated with USGS, EMSC, or any government seismological organization.
